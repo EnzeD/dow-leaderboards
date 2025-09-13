@@ -1,17 +1,53 @@
 const BASE = "https://dow-api.reliclink.com";
 
-type RawGroup = { id: number, members: Array<{ profile_id: number, alias?: string }> };
-type RawStat = { statgroup_id: number, rank: number, rating: number, wins: number, losses: number, streak: number };
+type RawGroup = { id: number, members: Array<{ profile_id: number, alias?: string, country?: string }> };
+type RawStat = { statgroup_id: number, rank: number, rating: number, wins: number, losses: number, streak: number, lastmatchdate?: number };
 
 export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
+  country?: string; lastMatchDate?: Date;
 };
+
+export type Leaderboard = {
+  id: number;
+  name: string;
+  faction?: string;
+  matchType?: string;
+};
+
+// Faction and match type parsing utilities
+export function parseFactionFromName(name: string): string {
+  if (name.includes('chaos_marine')) return 'Chaos Marine';
+  if (name.includes('dark_eldar')) return 'Dark Eldar';
+  if (name.includes('eldar') && !name.includes('dark')) return 'Eldar';
+  if (name.includes('guard')) return 'Imperial Guard';
+  if (name.includes('necron')) return 'Necron';
+  if (name.includes('ork')) return 'Ork';
+  if (name.includes('sisters')) return 'Sisters of Battle';
+  if (name.includes('space_marine')) return 'Space Marine';
+  if (name.includes('tau')) return 'Tau';
+  return 'Unknown';
+}
+
+export function parseMatchTypeFromName(name: string): string {
+  if (name.startsWith('1v1')) return '1v1';
+  if (name.startsWith('2v2')) return '2v2';
+  if (name.startsWith('3v3')) return '3v3';
+  if (name.startsWith('4v4')) return '4v4';
+  if (name.includes('Custom')) return 'Custom';
+  return 'Unknown';
+}
 
 export async function fetchLeaderboards() {
   const url = `${BASE}/community/leaderboard/GetAvailableLeaderboards?title=dow1-de`;
   const data = await fetch(url, { cache: "force-cache" }).then(r => r.json());
-  const items = (data?.leaderboards ?? []).map((l: any) => ({ id: l.id, name: l.name }));
+  const items: Leaderboard[] = (data?.leaderboards ?? []).map((l: any) => ({
+    id: l.id,
+    name: l.name,
+    faction: parseFactionFromName(l.name),
+    matchType: parseMatchTypeFromName(l.name)
+  }));
   return { items, lastUpdated: new Date().toISOString() };
 }
 
@@ -30,7 +66,8 @@ export async function fetchTop100(leaderboardId: number) {
         rating: it.rating ?? it.elo ?? it.score,
         wins: it.wins ?? it.win_count ?? 0,
         losses: it.losses ?? it.loss_count ?? 0,
-        streak: it.streak ?? 0
+        streak: it.streak ?? 0,
+        lastmatchdate: it.lastmatchdate
       }));
 
   const groupsById = new Map(groups.map(g => [g.id, g]));
@@ -42,6 +79,7 @@ export async function fetchTop100(leaderboardId: number) {
       const profileId = String(member?.profile_id ?? "");
       const alias = member?.alias?.trim();
       const winrate = (s.wins + s.losses) ? +( (s.wins / (s.wins + s.losses)) * 100 ).toFixed(1) : 0;
+      const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
       return {
         rank: s.rank ?? 0,
         profileId,
@@ -51,6 +89,8 @@ export async function fetchTop100(leaderboardId: number) {
         losses: s.losses ?? 0,
         winrate,
         streak: s.streak ?? 0,
+        country: member?.country,
+        lastMatchDate,
       };
     }).filter(r => r.profileId);
 
