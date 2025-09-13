@@ -197,16 +197,19 @@ export default function Home() {
   const [sortDesc, setSortDesc] = useState(false);
 
   // Filter states
-  const [selectedFaction, setSelectedFaction] = useState<string>("All Factions");
+  const [selectedFaction, setSelectedFaction] = useState<string>("1v1 - All Factions");
   const [selectedMatchType, setSelectedMatchType] = useState<string>("All Types");
 
+  // Check if we're in combined mode
+  const isCombinedMode = selectedFaction === "1v1 - All Factions";
+
   // Get unique factions and match types
-  const factions = ["All Factions", ...Array.from(new Set(leaderboards.map(lb => lb.faction).filter(Boolean)))];
+  const factions = ["All Factions", "1v1 - All Factions", ...Array.from(new Set(leaderboards.map(lb => lb.faction).filter(Boolean)))];
   const matchTypes = ["All Types", ...Array.from(new Set(leaderboards.map(lb => lb.matchType).filter(Boolean)))];
 
-  // Filter leaderboards based on selection
+  // Filter leaderboards based on selection (not used in combined mode)
   const filteredLeaderboards = leaderboards.filter(lb =>
-    (selectedFaction === "All Factions" || lb.faction === selectedFaction) &&
+    (selectedFaction === "All Factions" || selectedFaction === "1v1 - All Factions" || lb.faction === selectedFaction) &&
     (selectedMatchType === "All Types" || lb.matchType === selectedMatchType)
   );
 
@@ -229,16 +232,29 @@ export default function Home() {
 
   // Load ladder when selection changes
   useEffect(() => {
-    if (!selectedId) return;
-    setLoading(true);
-    fetch(`/api/ladder?leaderboard_id=${selectedId}`)
-      .then(r => r.json())
-      .then(data => {
-        setLadderData(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [selectedId]);
+    if (isCombinedMode) {
+      // Fetch combined 1v1 data
+      setLoading(true);
+      fetch('/api/combined')
+        .then(r => r.json())
+        .then(data => {
+          setLadderData(data);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    } else {
+      // Fetch single leaderboard data
+      if (!selectedId) return;
+      setLoading(true);
+      fetch(`/api/ladder?leaderboard_id=${selectedId}`)
+        .then(r => r.json())
+        .then(data => {
+          setLadderData(data);
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }
+  }, [selectedId, isCombinedMode]);
 
   const handleSort = (field: keyof LadderRow) => {
     if (sortField === field) {
@@ -340,30 +356,32 @@ export default function Home() {
 
         {/* Specific Leaderboard Selection & Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <select
-            value={selectedId}
-            onChange={(e) => setSelectedId(Number(e.target.value))}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
-            disabled={loading}
-          >
-            {filteredLeaderboards.map(lb => (
-              <option key={lb.id} value={lb.id}>{lb.name}</option>
-            ))}
-          </select>
+          {!isCombinedMode && (
+            <select
+              value={selectedId}
+              onChange={(e) => setSelectedId(Number(e.target.value))}
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+              disabled={loading}
+            >
+              {filteredLeaderboards.map(lb => (
+                <option key={lb.id} value={lb.id}>{lb.name}</option>
+              ))}
+            </select>
+          )}
 
           <input
             type="text"
             placeholder="Search players..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="px-3 py-2 bg-gray-800 border border-gray-700 rounded flex-1 text-white placeholder-gray-400"
+            className={`px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400 ${isCombinedMode ? 'flex-1' : 'flex-1'}`}
           />
         </div>
 
         {/* Current Selection Info */}
-        {selectedLeaderboard && (
+        {(selectedLeaderboard || isCombinedMode) && (
           <div className="mb-4 text-sm text-gray-400">
-            Showing: {selectedLeaderboard.faction} • {selectedLeaderboard.matchType}
+            Showing: {isCombinedMode ? "Combined 1v1 Rankings - All Factions" : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`}
             {ladderData && (
               <>
                 {" • "}Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
@@ -386,6 +404,7 @@ export default function Home() {
                   {[
                     { key: "rank", label: "Rank" },
                     { key: "playerName", label: "Alias" },
+                    ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
                     { key: "rating", label: "ELO" },
                     { key: "streak", label: "Streak" },
                     { key: "wins", label: "Wins" },
@@ -421,6 +440,9 @@ export default function Home() {
                         {row.playerName}
                       </div>
                     </td>
+                    {isCombinedMode && (
+                      <td className="px-4 py-4 text-orange-300 font-medium">{row.faction || 'Unknown'}</td>
+                    )}
                     <td className="px-4 py-4 text-white font-semibold">{row.rating}</td>
                     <td className={`px-4 py-4 font-semibold ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-gray-400"}`}>
                       {row.streak > 0 ? `+${row.streak}` : row.streak}

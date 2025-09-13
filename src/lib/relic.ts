@@ -6,7 +6,7 @@ type RawStat = { statgroup_id: number, rank: number, rating: number, wins: numbe
 export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
-  country?: string; lastMatchDate?: Date;
+  country?: string; lastMatchDate?: Date; faction?: string;
 };
 
 export type Leaderboard = {
@@ -37,6 +37,11 @@ export function parseMatchTypeFromName(name: string): string {
   if (name.startsWith('4v4')) return '4v4';
   if (name.includes('Custom')) return 'Custom';
   return 'Unknown';
+}
+
+export function getFactionFromLeaderboardId(leaderboards: Leaderboard[], leaderboardId: number): string {
+  const lb = leaderboards.find(l => l.id === leaderboardId);
+  return lb?.faction || 'Unknown';
 }
 
 export async function fetchLeaderboards() {
@@ -115,4 +120,54 @@ export async function resolveNames(profileIds: string[]): Promise<Record<string,
     await new Promise(r => setTimeout(r, 120)); // soft throttle (≤ ~8 req/s)
   }
   return out;
+}
+
+export async function fetchCombined1v1() {
+  // First, get all available leaderboards to identify 1v1 race-specific ones
+  const { items: leaderboards } = await fetchLeaderboards();
+  const oneVsOneLeaderboards = leaderboards.filter(lb =>
+    lb.matchType === '1v1' && lb.faction && lb.faction !== 'Unknown'
+  );
+
+  // Fetch Top-100 from all 1v1 faction leaderboards in parallel
+  const allResults = await Promise.allSettled(
+    oneVsOneLeaderboards.map(async (lb) => {
+      const rows = await fetchTop100(lb.id);
+      // Add faction information to each row
+      return rows.map(row => ({
+        ...row,
+        faction: lb.faction,
+        originalRank: row.rank, // Keep original rank for reference
+        leaderboardId: lb.id
+      }));
+    })
+  );
+
+  // Collect all successful results
+  const allRows: (LadderRow & { originalRank: number; leaderboardId: number })[] = [];
+  allResults.forEach(result => {
+    if (result.status === 'fulfilled') {
+      allRows.push(...result.value);
+    }
+  });
+
+  // Deduplicate players - keep the version with highest rating
+  const playerMap = new Map<string, LadderRow & { originalRank: number; leaderboardId: number }>();
+
+  for (const row of allRows) {
+    const existing = playerMap.get(row.profileId);
+    if (!existing || row.rating > existing.rating) {
+      playerMap.set(row.profileId, row);
+    }
+  }
+
+  // Convert back to array and sort by rating (descending)
+  const deduplicatedRows = Array.from(playerMap.values())
+    .sort((a, b) => b.rating - a.rating)
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1 // Re-rank based on combined leaderboard position
+    }));
+
+  return deduplicatedRows;
 }
