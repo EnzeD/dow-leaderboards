@@ -283,8 +283,12 @@ export default function Home() {
         {/* Header */}
         <div className="flex items-center mb-8">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center mr-4">
-              <span className="text-black font-bold text-xl">⚡</span>
+            <div className="mr-4">
+              <img
+                src="/assets/daw-logo.webp"
+                alt="Dawn of War: Definitive Edition"
+                className="h-16 w-auto object-contain"
+              />
             </div>
             <h1 className="text-3xl font-bold text-yellow-400">
               Leaderboards for Dawn of War: Definitive Edition
