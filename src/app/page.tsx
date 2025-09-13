@@ -10,42 +10,147 @@ type LadderData = {
   rows: LadderRow[];
 };
 
-// Country code to name mapping
-const getCountryName = (countryCode?: string): string => {
-  if (!countryCode) return "";
-  const countries: Record<string, string> = {
-    'by': 'BY',
-    'ru': 'RU',
-    'ua': 'UA',
-    'kz': 'KZ',
-    'us': 'US',
-    'ca': 'CA',
-    'de': 'DE',
-    'fr': 'FR',
-    'uk': 'UK',
-    'pl': 'PL',
-    'se': 'SE',
-    'no': 'NO',
-    'dk': 'DK',
-    'fi': 'FI',
-    'nl': 'NL',
-    'be': 'BE',
-    'ch': 'CH',
-    'at': 'AT',
-    'it': 'IT',
-    'es': 'ES',
-    'pt': 'PT',
-    'br': 'BR',
-    'ar': 'AR',
-    'mx': 'MX',
-    'jp': 'JP',
-    'kr': 'KR',
-    'cn': 'CN',
-    'in': 'IN',
-    'au': 'AU',
-    'nz': 'NZ'
+// Country code to name mapping and flag component
+const getCountryInfo = (countryCode?: string) => {
+  if (!countryCode) return null;
+
+  const countries: Record<string, { name: string; colors: string[] }> = {
+    'by': { name: 'Belarus', colors: ['#00AF66', '#FFFFFF', '#CE1021'] },
+    'ru': { name: 'Russia', colors: ['#FFFFFF', '#0039A6', '#D52B1E'] },
+    'ua': { name: 'Ukraine', colors: ['#005BBB', '#FFD500'] },
+    'kz': { name: 'Kazakhstan', colors: ['#00AFCA', '#FEDF00'] },
+    'us': { name: 'United States', colors: ['#B22234', '#FFFFFF', '#3C3B6E'] },
+    'ca': { name: 'Canada', colors: ['#FF0000', '#FFFFFF'] },
+    'de': { name: 'Germany', colors: ['#000000', '#DD0000', '#FFCE00'] },
+    'fr': { name: 'France', colors: ['#0055A4', '#FFFFFF', '#EF4135'] },
+    'gb': { name: 'United Kingdom', colors: ['#012169', '#FFFFFF', '#C8102E'] },
+    'uk': { name: 'United Kingdom', colors: ['#012169', '#FFFFFF', '#C8102E'] },
+    'pl': { name: 'Poland', colors: ['#FFFFFF', '#DC143C'] },
+    'se': { name: 'Sweden', colors: ['#006AA7', '#FECC00'] },
+    'no': { name: 'Norway', colors: ['#EF2B2D', '#FFFFFF', '#002868'] },
+    'dk': { name: 'Denmark', colors: ['#C60C30', '#FFFFFF'] },
+    'fi': { name: 'Finland', colors: ['#FFFFFF', '#003580'] },
+    'nl': { name: 'Netherlands', colors: ['#AE1C28', '#FFFFFF', '#21468B'] },
+    'be': { name: 'Belgium', colors: ['#000000', '#FDDA24', '#EF3340'] },
+    'ch': { name: 'Switzerland', colors: ['#DC143C', '#FFFFFF'] },
+    'at': { name: 'Austria', colors: ['#ED2939', '#FFFFFF'] },
+    'it': { name: 'Italy', colors: ['#009246', '#FFFFFF', '#CE2B37'] },
+    'es': { name: 'Spain', colors: ['#AA151B', '#F1BF00'] },
+    'pt': { name: 'Portugal', colors: ['#006600', '#FF0000'] },
+    'br': { name: 'Brazil', colors: ['#009739', '#FEDD00', '#012169'] },
+    'ar': { name: 'Argentina', colors: ['#74ACDF', '#FFFFFF'] },
+    'mx': { name: 'Mexico', colors: ['#006847', '#FFFFFF', '#CE1126'] },
+    'jp': { name: 'Japan', colors: ['#FFFFFF', '#BC002D'] },
+    'kr': { name: 'South Korea', colors: ['#FFFFFF', '#C60C30', '#003478'] },
+    'cn': { name: 'China', colors: ['#DE2910', '#FFDE00'] },
+    'in': { name: 'India', colors: ['#FF9933', '#FFFFFF', '#138808'] },
+    'au': { name: 'Australia', colors: ['#012169', '#FFFFFF', '#E4002B'] },
+    'nz': { name: 'New Zealand', colors: ['#012169', '#FFFFFF', '#CC142B'] }
   };
-  return countries[countryCode.toLowerCase()] || countryCode.toUpperCase();
+
+  const country = countries[countryCode.toLowerCase()];
+  return country ? {
+    name: country.name,
+    code: countryCode.toUpperCase(),
+    colors: country.colors
+  } : {
+    name: countryCode.toUpperCase(),
+    code: countryCode.toUpperCase(),
+    colors: ['#666666', '#CCCCCC']
+  };
+};
+
+// CSS-based flag component with better design
+const FlagIcon = ({ countryCode }: { countryCode: string }) => {
+  const countryInfo = getCountryInfo(countryCode);
+  if (!countryInfo) return null;
+
+  // Special handling for complex flags
+  const renderFlag = () => {
+    const code = countryCode.toLowerCase();
+
+    if (code === 'ua') {
+      // Ukraine - horizontal bands
+      return (
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+          <div className="w-full h-1/2" style={{ backgroundColor: '#005BBB' }} />
+          <div className="w-full h-1/2" style={{ backgroundColor: '#FFD500' }} />
+        </div>
+      );
+    }
+
+    if (code === 'ru') {
+      // Russia - horizontal bands
+      return (
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+          <div className="w-full h-1/3" style={{ backgroundColor: '#FFFFFF' }} />
+          <div className="w-full h-1/3" style={{ backgroundColor: '#0039A6' }} />
+          <div className="w-full h-1/3" style={{ backgroundColor: '#D52B1E' }} />
+        </div>
+      );
+    }
+
+    if (code === 'by') {
+      // Belarus - special pattern
+      return (
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+          <div className="w-1/5" style={{ backgroundColor: '#CE1021' }} />
+          <div className="flex-1">
+            <div className="w-full h-1/3" style={{ backgroundColor: '#CE1021' }} />
+            <div className="w-full h-1/3" style={{ backgroundColor: '#00AF66' }} />
+            <div className="w-full h-1/3" style={{ backgroundColor: '#CE1021' }} />
+          </div>
+        </div>
+      );
+    }
+
+    if (code === 'de') {
+      // Germany - horizontal bands
+      return (
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+          <div className="w-full h-1/3" style={{ backgroundColor: '#000000' }} />
+          <div className="w-full h-1/3" style={{ backgroundColor: '#DD0000' }} />
+          <div className="w-full h-1/3" style={{ backgroundColor: '#FFCE00' }} />
+        </div>
+      );
+    }
+
+    if (code === 'fr') {
+      // France - vertical bands
+      return (
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+          <div className="flex-1 h-full" style={{ backgroundColor: '#0055A4' }} />
+          <div className="flex-1 h-full" style={{ backgroundColor: '#FFFFFF' }} />
+          <div className="flex-1 h-full" style={{ backgroundColor: '#EF4135' }} />
+        </div>
+      );
+    }
+
+    // Default: simple horizontal stripes
+    return (
+      <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+        {countryInfo.colors.map((color, index) => (
+          <div
+            key={index}
+            className="flex-1 h-full"
+            style={{ backgroundColor: color }}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className="inline-flex items-center gap-1.5 text-xs bg-gray-700/80 px-2 py-1 rounded-md border border-gray-600/50 backdrop-blur-sm"
+      title={`${countryInfo.name} (${countryInfo.code})`}
+    >
+      {renderFlag()}
+      <span className="font-mono text-gray-200 font-medium text-xs">
+        {countryInfo.code}
+      </span>
+    </div>
+  );
 };
 
 // Format last match date
@@ -308,11 +413,7 @@ export default function Home() {
                     </td>
                     <td className={`px-4 py-4 ${row.playerName === "Unknown" ? "text-gray-500" : "text-blue-400"}`}>
                       <div className="flex items-center gap-2">
-                        {row.country && (
-                          <span className="text-xs bg-gray-600 px-2 py-1 rounded font-mono text-gray-300" title={`Country: ${getCountryName(row.country)}`}>
-                            {getCountryName(row.country)}
-                          </span>
-                        )}
+                        {row.country && <FlagIcon countryCode={row.country} />}
                         {row.playerName}
                       </div>
                     </td>
