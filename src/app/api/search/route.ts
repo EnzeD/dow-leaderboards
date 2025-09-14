@@ -33,7 +33,7 @@ async function fetchPlayers(leaderboardId: number, count: number = 200): Promise
         const groupsById = new Map(groups.map((g: any) => [g.id, g]));
 
         const rows = stats.map((s: any) => {
-          const group = groupsById.get(s.statgroup_id);
+          const group = groupsById.get(s.statgroup_id) as any;
           const member = group?.members?.[0];
           return {
             rank: s.rank,
