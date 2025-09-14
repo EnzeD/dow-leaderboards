@@ -232,6 +232,7 @@ export default function Home() {
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
   const [selectedMatchType, setSelectedMatchType] = useState<string>("1v1");
+  const [selectedCountry, setSelectedCountry] = useState<string>("Global");
 
   // Check if we're in combined mode (only for All factions + 1v1)
   const isCombinedMode = selectedFaction === "All factions" && selectedMatchType === "1v1";
@@ -243,6 +244,18 @@ export default function Home() {
     ? ["All factions", ...availableFactions]
     : availableFactions;
   const matchTypes = ["1v1", "All Types", ...Array.from(new Set(leaderboards.map(lb => lb.matchType).filter(Boolean).filter(type => type !== "1v1")))];
+
+  // Get unique countries from current ladder data
+  const availableCountries = Array.from(new Set(
+    (ladderData?.rows || [])
+      .map(row => row.country)
+      .filter(Boolean)
+      .map(code => {
+        const countryInfo = getCountryInfo(code);
+        return countryInfo ? countryInfo.name : code?.toUpperCase();
+      })
+  )).sort();
+  const countries = ["Global", ...availableCountries];
 
   // Filter leaderboards based on selection (not used in combined mode)
   const filteredLeaderboards = leaderboards.filter(lb =>
@@ -320,9 +333,12 @@ export default function Home() {
   };
 
   // Filter and sort rows
-  const filteredRows = ladderData?.rows?.filter(row =>
-    row.playerName.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  const filteredRows = ladderData?.rows?.filter(row => {
+    const matchesSearch = row.playerName.toLowerCase().includes(search.toLowerCase());
+    const matchesCountry = selectedCountry === "Global" ||
+      (row.country && getCountryInfo(row.country)?.name === selectedCountry);
+    return matchesSearch && matchesCountry;
+  }) || [];
 
   const sortedRows = [...filteredRows].sort((a, b) => {
     const aVal = a[sortField];
@@ -529,7 +545,7 @@ export default function Home() {
           <>
             {/* Filter Bar */}
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex flex-col">
               <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
               <select
@@ -553,6 +569,19 @@ export default function Home() {
               >
                 {factions.map(faction => (
                   <option key={faction} value={faction}>{faction}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-neutral-300 mb-2 font-medium">Country</label>
+              <select
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                disabled={loading}
+              >
+                {countries.map(country => (
+                  <option key={country} value={country}>{country}</option>
                 ))}
               </select>
             </div>
