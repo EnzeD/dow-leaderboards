@@ -229,19 +229,23 @@ export default function Home() {
   const [searchLoading, setSearchLoading] = useState(false);
 
   // Filter states
-  const [selectedFaction, setSelectedFaction] = useState<string>("1v1 - All Factions");
-  const [selectedMatchType, setSelectedMatchType] = useState<string>("All Types");
+  const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
+  const [selectedMatchType, setSelectedMatchType] = useState<string>("1v1");
 
-  // Check if we're in combined mode
-  const isCombinedMode = selectedFaction === "1v1 - All Factions";
+  // Check if we're in combined mode (only for All factions + 1v1)
+  const isCombinedMode = selectedFaction === "All factions" && selectedMatchType === "1v1";
 
   // Get unique factions and match types
-  const factions = ["All Factions", "1v1 - All Factions", ...Array.from(new Set(leaderboards.map(lb => lb.faction).filter(Boolean)))];
-  const matchTypes = ["All Types", ...Array.from(new Set(leaderboards.map(lb => lb.matchType).filter(Boolean)))];
+  // Only show "All factions" for 1v1 match type
+  const availableFactions = Array.from(new Set(leaderboards.map(lb => lb.faction).filter(Boolean)));
+  const factions = selectedMatchType === "1v1" || selectedMatchType === "All Types"
+    ? ["All factions", ...availableFactions]
+    : availableFactions;
+  const matchTypes = ["1v1", "All Types", ...Array.from(new Set(leaderboards.map(lb => lb.matchType).filter(Boolean).filter(type => type !== "1v1")))];
 
   // Filter leaderboards based on selection (not used in combined mode)
   const filteredLeaderboards = leaderboards.filter(lb =>
-    (selectedFaction === "All Factions" || selectedFaction === "1v1 - All Factions" || lb.faction === selectedFaction) &&
+    (selectedFaction === "All factions" || lb.faction === selectedFaction) &&
     (selectedMatchType === "All Types" || lb.matchType === selectedMatchType)
   );
 
@@ -254,6 +258,20 @@ export default function Home() {
         if (data.items?.length) setSelectedId(data.items[0].id);
       });
   }, []);
+
+  // Auto-switch away from "All factions" for non-1v1 match types
+  useEffect(() => {
+    if (selectedFaction === "All factions" && selectedMatchType !== "1v1" && selectedMatchType !== "All Types") {
+      // Switch to the first available faction for this match type
+      const factionsForMatchType = leaderboards
+        .filter(lb => lb.matchType === selectedMatchType)
+        .map(lb => lb.faction)
+        .filter(Boolean);
+      if (factionsForMatchType.length > 0) {
+        setSelectedFaction(factionsForMatchType[0]);
+      }
+    }
+  }, [selectedMatchType, leaderboards, selectedFaction]);
 
   // Update selected ID when filters change
   useEffect(() => {
@@ -431,17 +449,18 @@ export default function Home() {
         {activeTab === 'leaderboards' && (
           <>
             {/* Filter Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
           <div className="flex flex-col">
-            <label className="text-sm text-neutral-300 mb-2 font-medium">Region</label>
-            <select className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all">
-              <option>Global</option>
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-neutral-300 mb-2 font-medium">Platform</label>
-            <select className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all">
-              <option>PC</option>
+            <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
+            <select
+              value={selectedMatchType}
+              onChange={(e) => setSelectedMatchType(e.target.value)}
+              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
+              disabled={loading}
+            >
+              {matchTypes.map(type => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
           </div>
           <div className="flex flex-col">
@@ -454,19 +473,6 @@ export default function Home() {
             >
               {factions.map(faction => (
                 <option key={faction} value={faction}>{faction}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
-            <select
-              value={selectedMatchType}
-              onChange={(e) => setSelectedMatchType(e.target.value)}
-              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
-              disabled={loading}
-            >
-              {matchTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
               ))}
             </select>
           </div>
@@ -497,9 +503,9 @@ export default function Home() {
         </div>
 
         {/* Current Selection Info */}
-        {(selectedLeaderboard || isCombinedMode) && (
+        {(selectedLeaderboard || isCombinedMode || selectedFaction === "All factions") && (
           <div className="mb-4 text-sm text-neutral-300 font-medium p-3 bg-neutral-900/40 rounded-md border border-neutral-700/30" style={{backdropFilter: 'blur(5px)'}}>
-            Showing: {isCombinedMode ? "Combined 1v1 Rankings - All Factions" : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`}
+            Showing: {isCombinedMode ? "Combined 1v1 Rankings - All factions" : (selectedFaction === "All factions" ? `All factions • ${selectedMatchType}` : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`)}
             {ladderData && (
               <>
                 {" • "}Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
