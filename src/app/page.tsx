@@ -61,18 +61,19 @@ const getCountryInfo = (countryCode?: string) => {
 };
 
 // CSS-based flag component with better design
-const FlagIcon = ({ countryCode }: { countryCode: string }) => {
+const FlagIcon = ({ countryCode, compact = false }: { countryCode: string; compact?: boolean }) => {
   const countryInfo = getCountryInfo(countryCode);
   if (!countryInfo) return null;
 
   // Special handling for complex flags
   const renderFlag = () => {
     const code = countryCode.toLowerCase();
+    const flagSize = compact ? "w-4 h-2.5" : "w-5 h-3";
 
     if (code === 'ua') {
       // Ukraine - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
+        <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm`}>
           <div className="w-full h-1/2" style={{ backgroundColor: '#005BBB' }} />
           <div className="w-full h-1/2" style={{ backgroundColor: '#FFD500' }} />
         </div>
@@ -82,7 +83,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'ru') {
       // Russia - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
+        <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm`}>
           <div className="w-full h-1/3" style={{ backgroundColor: '#FFFFFF' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#0039A6' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#D52B1E' }} />
@@ -93,7 +94,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'by') {
       // Belarus - special pattern
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
+        <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex`}>
           <div className="w-1/5" style={{ backgroundColor: '#CE1021' }} />
           <div className="flex-1">
             <div className="w-full h-1/3" style={{ backgroundColor: '#CE1021' }} />
@@ -107,7 +108,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'de') {
       // Germany - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
+        <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm`}>
           <div className="w-full h-1/3" style={{ backgroundColor: '#000000' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#DD0000' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#FFCE00' }} />
@@ -118,7 +119,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'fr') {
       // France - vertical bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
+        <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex`}>
           <div className="flex-1 h-full" style={{ backgroundColor: '#0055A4' }} />
           <div className="flex-1 h-full" style={{ backgroundColor: '#FFFFFF' }} />
           <div className="flex-1 h-full" style={{ backgroundColor: '#EF4135' }} />
@@ -128,7 +129,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
 
     // Default: simple horizontal stripes
     return (
-      <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
+      <div className={`${flagSize} rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex`}>
         {countryInfo.colors.map((color, index) => (
           <div
             key={index}
@@ -142,11 +143,11 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
 
   return (
     <div
-      className="inline-flex items-center gap-1.5 text-xs bg-neutral-700/80 px-2 py-1 rounded-md border border-neutral-600/50 backdrop-blur-sm"
+      className={`inline-flex items-center gap-1.5 text-xs bg-neutral-700/80 ${compact ? 'px-1.5 py-0.5' : 'px-2 py-1'} rounded-md border border-neutral-600/50 backdrop-blur-sm`}
       title={`${countryInfo.name} (${countryInfo.code})`}
     >
       {renderFlag()}
-      <span className="font-mono text-neutral-200 font-medium text-xs">
+      <span className={`font-mono text-neutral-200 font-medium ${compact ? 'text-xs' : 'text-xs'}`}>
         {countryInfo.code}
       </span>
     </div>
@@ -377,19 +378,20 @@ export default function Home() {
 
   return (
     <div className="min-h-screen text-white">
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
         {/* Header */}
-        <div className="flex items-center mb-8">
-          <div className="flex items-center">
-            <div className="mr-4">
+        <div className="mb-4 sm:mb-8">
+          {/* Mobile Header */}
+          <div className="flex flex-col sm:hidden items-center text-center mb-4">
+            <div className="mb-3">
               <img
                 src="/assets/daw-logo.webp"
                 alt="Dawn of War: Definitive Edition"
-                className="h-16 w-auto object-contain"
+                className="h-12 w-auto object-contain mx-auto"
               />
             </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-white">
+            <div className="flex flex-col items-center gap-2">
+              <h1 className="text-xl font-bold text-white leading-tight px-4">
                 Dawn of War: Definitive Edition Leaderboards
               </h1>
               <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
@@ -397,109 +399,193 @@ export default function Home() {
               </span>
             </div>
           </div>
+
+          {/* Desktop Header */}
+          <div className="hidden sm:flex items-center">
+            <div className="flex items-center">
+              <div className="mr-4">
+                <img
+                  src="/assets/daw-logo.webp"
+                  alt="Dawn of War: Definitive Edition"
+                  className="h-16 w-auto object-contain"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-white">
+                  Dawn of War: Definitive Edition Leaderboards
+                </h1>
+                <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
+                  BETA
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-neutral-700/60 mb-6">
-          <button
-            onClick={() => setActiveTab('leaderboards')}
-            className={`px-6 py-3 font-medium transition-all duration-300 ${
-              activeTab === 'leaderboards'
-                ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-            }`}
-          >
-            Leaderboards
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`px-6 py-3 font-medium transition-all duration-300 ${
-              activeTab === 'search'
-                ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-            }`}
-          >
-            Search
-          </button>
-          <a
-            href="https://github.com/EnzeD/dow-leaderboards"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-          >
-            Contribute on GitHub
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
-          <a
-            href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-          >
-            Provide Feedback
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            </svg>
-          </a>
+        <div className="border-b border-neutral-700/60 mb-4 sm:mb-6">
+          {/* Mobile Navigation */}
+          <div className="flex flex-col sm:hidden space-y-2">
+            <div className="flex">
+              <button
+                onClick={() => setActiveTab('leaderboards')}
+                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
+                  activeTab === 'leaderboards'
+                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                }`}
+              >
+                Leaderboards
+              </button>
+              <button
+                onClick={() => setActiveTab('search')}
+                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
+                  activeTab === 'search'
+                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                }`}
+              >
+                Search
+              </button>
+            </div>
+            <div className="flex">
+              <a
+                href="https://github.com/EnzeD/dow-leaderboards"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+              >
+                GitHub
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+              <a
+                href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+              >
+                Feedback
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          {/* Desktop Navigation */}
+          <div className="hidden sm:flex">
+            <button
+              onClick={() => setActiveTab('leaderboards')}
+              className={`px-6 py-3 font-medium transition-all duration-300 ${
+                activeTab === 'leaderboards'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              Leaderboards
+            </button>
+            <button
+              onClick={() => setActiveTab('search')}
+              className={`px-6 py-3 font-medium transition-all duration-300 ${
+                activeTab === 'search'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              Search
+            </button>
+            <a
+              href="https://github.com/EnzeD/dow-leaderboards"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
+            >
+              Contribute on GitHub
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+            <a
+              href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
+            >
+              Provide Feedback
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
         </div>
 
         {/* Leaderboards Tab Content */}
         {activeTab === 'leaderboards' && (
           <>
             {/* Filter Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
-          <div className="flex flex-col">
-            <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
-            <select
-              value={selectedMatchType}
-              onChange={(e) => setSelectedMatchType(e.target.value)}
-              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
-              disabled={loading}
-            >
-              {matchTypes.map(type => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col">
-            <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
-            <select
-              value={selectedFaction}
-              onChange={(e) => setSelectedFaction(e.target.value)}
-              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
-              disabled={loading}
-            >
-              {factions.map(faction => (
-                <option key={faction} value={faction}>{faction}</option>
-              ))}
-            </select>
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col">
+              <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
+              <select
+                value={selectedMatchType}
+                onChange={(e) => setSelectedMatchType(e.target.value)}
+                className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                disabled={loading}
+              >
+                {matchTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
+              <select
+                value={selectedFaction}
+                onChange={(e) => setSelectedFaction(e.target.value)}
+                className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                disabled={loading}
+              >
+                {factions.map(faction => (
+                  <option key={faction} value={faction}>{faction}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
         {/* Specific Leaderboard Selection & Search */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-neutral-900/30 rounded-lg border border-neutral-700/30" style={{backdropFilter: 'blur(10px)'}}>
-          {!isCombinedMode && (
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(Number(e.target.value))}
-              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
-              disabled={loading}
-            >
-              {filteredLeaderboards.map(lb => (
-                <option key={lb.id} value={lb.id}>{lb.name}</option>
-              ))}
-            </select>
-          )}
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-neutral-900/30 rounded-lg border border-neutral-700/30" style={{backdropFilter: 'blur(10px)'}}>
+          <div className="flex flex-col gap-4">
+            {!isCombinedMode && (
+              <div className="flex flex-col">
+                <label className="text-xs text-neutral-400 mb-1">Specific Leaderboard</label>
+                <select
+                  value={selectedId}
+                  onChange={(e) => setSelectedId(Number(e.target.value))}
+                  className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                  disabled={loading}
+                >
+                  {filteredLeaderboards.map(lb => (
+                    <option key={lb.id} value={lb.id}>{lb.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-          <input
-            type="text"
-            placeholder="Search players..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={`px-3 py-2 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all ${isCombinedMode ? 'flex-1' : 'flex-1'}`}
-          />
+            <div className="flex flex-col">
+              <label className="text-xs text-neutral-400 mb-1">Search Players</label>
+              <input
+                type="text"
+                placeholder="Search players..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full px-4 py-3 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Current Selection Info */}
@@ -517,87 +603,118 @@ export default function Home() {
           </div>
         )}
 
-        {/* Table */}
+        {/* Table - Desktop */}
         {loading ? (
           <div className="text-center py-16 text-white font-medium">
             Loading...
           </div>
         ) : (
-          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg shadow-2xl">
-            <table className="w-full table-fixed">
-              <thead className="bg-neutral-800 border-b-2 border-neutral-600/50" style={{background: 'linear-gradient(135deg, #262626, #171717)'}}>
-                <tr>
-                  {[
-                    { key: "rank", label: "Rank" },
-                    { key: "playerName", label: "Alias" },
-                    ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
-                    { key: "rating", label: "ELO" },
-                    { key: "streak", label: "Streak" },
-                    { key: "wins", label: "Wins" },
-                    { key: "losses", label: "Losses" },
-                    { key: "winrate", label: "Ratio" },
-                    { key: "lastMatchDate", label: "Last Game" },
-                  ].map(({ key, label }) => (
-                    <th
-                      key={key}
-                      className={`px-3 py-3 text-left cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 ${
-                        key === 'rank' ? 'w-16' :
-                        key === 'playerName' ? 'w-32' :
-                        key === 'faction' ? 'w-24' :
-                        key === 'rating' ? 'w-20' :
-                        key === 'streak' ? 'w-16' :
-                        key === 'wins' ? 'w-16' :
-                        key === 'losses' ? 'w-16' :
-                        key === 'winrate' ? 'w-16' :
-                        key === 'lastMatchDate' ? 'w-24' : 'w-auto'
-                      }`}
-                      onClick={() => handleSort(key as keyof LadderRow)}
-                    >
-                      {label}
-                      {sortField === key && (
-                        <span className="ml-1 text-yellow-400 text-lg">{sortDesc ? "↓" : "↑"}</span>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRows.map((row, i) => (
-                  <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
-                    <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
-                        <span className="font-bold text-sm">
-                          {row.rank}
-                        </span>
-                      </div>
-                    </td>
-                    <td className={`px-3 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20`}>
-                      <div className="flex items-center gap-2 truncate">
-                        {row.country && <FlagIcon countryCode={row.country} />}
-                        <span className="truncate text-sm">{row.playerName}</span>
-                      </div>
-                    </td>
-                    {isCombinedMode && (
-                      <td className={`px-3 py-3 font-semibold border-r border-neutral-600/20 text-sm ${getFactionColor(row.faction || '')}`}>
-                        <span className="truncate">{row.faction || 'Unknown'}</span>
-                      </td>
-                    )}
-                    <td className="px-3 py-3 text-white font-bold text-sm border-r border-neutral-600/20">{row.rating}</td>
-                    <td className={`px-3 py-3 font-bold border-r border-neutral-600/20 text-sm ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-neutral-400"}`}>
-                      {row.streak > 0 ? `+${row.streak}` : row.streak}
-                    </td>
-                    <td className="px-3 py-3 text-green-400 font-semibold border-r border-neutral-600/20 text-sm">{row.wins}</td>
-                    <td className="px-3 py-3 text-red-400 font-semibold border-r border-neutral-600/20 text-sm">{row.losses}</td>
-                    <td className="px-3 py-3 text-white font-semibold border-r border-neutral-600/20 text-sm">{row.winrate}%</td>
-                    <td className="px-3 py-3 text-neutral-300 text-xs font-medium border-r border-neutral-700/30 last:border-r-0">
-                      <span className="truncate">{formatLastMatch(row.lastMatchDate)}</span>
-                    </td>
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-neutral-900 border border-neutral-600/40 rounded-lg shadow-2xl overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-neutral-800 border-b-2 border-neutral-600/50" style={{background: 'linear-gradient(135deg, #262626, #171717)'}}>
+                  <tr>
+                    {[
+                      { key: "rank", label: "Rank" },
+                      { key: "playerName", label: "Alias" },
+                      ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
+                      { key: "rating", label: "ELO" },
+                      { key: "streak", label: "Streak" },
+                      { key: "wins", label: "Wins" },
+                      { key: "losses", label: "Losses" },
+                      { key: "winrate", label: "Ratio" },
+                      { key: "lastMatchDate", label: "Last Game" },
+                    ].map(({ key, label }) => (
+                      <th
+                        key={key}
+                        className="px-4 py-3 text-left cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 whitespace-nowrap"
+                        onClick={() => handleSort(key as keyof LadderRow)}
+                      >
+                        {label}
+                        {sortField === key && (
+                          <span className="ml-1 text-yellow-400 text-lg">{sortDesc ? "↓" : "↑"}</span>
+                        )}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sortedRows.map((row, i) => (
+                    <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
+                      <td className={`px-4 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
+                          <span className="font-bold">
+                            {row.rank}
+                          </span>
+                        </div>
+                      </td>
+                      <td className={`px-4 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20 min-w-0`}>
+                        <div className="flex items-center gap-2">
+                          {row.country && <FlagIcon countryCode={row.country} />}
+                          <span className="truncate">{row.playerName}</span>
+                        </div>
+                      </td>
+                      {isCombinedMode && (
+                        <td className={`px-4 py-3 font-semibold border-r border-neutral-600/20 ${getFactionColor(row.faction || '')}`}>
+                          <span className="truncate">{row.faction || 'Unknown'}</span>
+                        </td>
+                      )}
+                      <td className="px-4 py-3 text-white font-bold border-r border-neutral-600/20">{row.rating}</td>
+                      <td className={`px-4 py-3 font-bold border-r border-neutral-600/20 ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-neutral-400"}`}>
+                        {row.streak > 0 ? `+${row.streak}` : row.streak}
+                      </td>
+                      <td className="px-4 py-3 text-green-400 font-semibold border-r border-neutral-600/20">{row.wins}</td>
+                      <td className="px-4 py-3 text-red-400 font-semibold border-r border-neutral-600/20">{row.losses}</td>
+                      <td className="px-4 py-3 text-white font-semibold border-r border-neutral-600/20">{row.winrate}%</td>
+                      <td className="px-4 py-3 text-neutral-300 text-xs font-medium">
+                        <span className="truncate">{formatLastMatch(row.lastMatchDate)}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View - Ultra Compact Single Line */}
+            <div className="md:hidden space-y-1">
+              {sortedRows.map((row, i) => (
+                <div key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/70" : "bg-neutral-800/70"} border border-neutral-600/30 rounded p-2 backdrop-blur-sm`}>
+                  {/* Everything in one line */}
+                  <div className="flex items-center gap-2 text-xs">
+                    {/* Rank */}
+                    <div className={`flex items-center gap-1 ${getRankColor(row.rank)} shrink-0`}>
+                      <span className="text-xs">{getTierIndicator(row.rank)}</span>
+                      <span className="font-bold text-xs">#{row.rank}</span>
+                    </div>
+
+                    {/* Player Name with Flag */}
+                    <div className={`flex items-center gap-1 min-w-0 flex-1 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white"}`}>
+                      {row.country && <FlagIcon countryCode={row.country} compact />}
+                      <span className="text-xs truncate font-medium">{row.playerName}</span>
+                      {isCombinedMode && (
+                        <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')}`}>
+                          {row.faction ? row.faction.slice(0, 3) : 'Unk'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stats - Ultra compact */}
+                    <div className="flex items-center gap-2 shrink-0 text-xs">
+                      <span className="text-white font-bold">{row.rating}</span>
+                      <span className="text-green-400 font-semibold">{row.wins}</span>
+                      <span className="text-neutral-500">-</span>
+                      <span className="text-red-400 font-semibold">{row.losses}</span>
+                      <span className={`font-bold ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-neutral-400"}`}>
+                        {row.streak > 0 ? `+${row.streak}` : row.streak}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
             {/* Footer */}
@@ -616,19 +733,19 @@ export default function Home() {
                 Search for a player by their Steam name or alias to find their profile ID and statistics across all leaderboards.
               </p>
 
-              <div className="flex gap-4 mb-6">
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
                 <input
                   type="text"
                   placeholder="Enter player name or Steam alias..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner"
+                  className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner text-base"
                   onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
                 />
                 <button
                   onClick={handlePlayerSearch}
                   disabled={searchLoading || !searchQuery.trim()}
-                  className="px-6 py-3 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 disabled:bg-neutral-600 disabled:cursor-not-allowed text-white font-bold rounded-md shadow-lg border border-neutral-500 transition-all duration-300 transform hover:scale-105"
+                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 disabled:bg-neutral-600 disabled:cursor-not-allowed text-white font-bold rounded-md shadow-lg border border-neutral-500 transition-all duration-300 transform hover:scale-105"
                 >
                   {searchLoading ? 'Searching...' : 'Search'}
                 </button>
