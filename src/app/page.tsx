@@ -72,7 +72,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'ua') {
       // Ukraine - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
           <div className="w-full h-1/2" style={{ backgroundColor: '#005BBB' }} />
           <div className="w-full h-1/2" style={{ backgroundColor: '#FFD500' }} />
         </div>
@@ -82,7 +82,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'ru') {
       // Russia - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
           <div className="w-full h-1/3" style={{ backgroundColor: '#FFFFFF' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#0039A6' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#D52B1E' }} />
@@ -93,7 +93,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'by') {
       // Belarus - special pattern
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
           <div className="w-1/5" style={{ backgroundColor: '#CE1021' }} />
           <div className="flex-1">
             <div className="w-full h-1/3" style={{ backgroundColor: '#CE1021' }} />
@@ -107,7 +107,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'de') {
       // Germany - horizontal bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm">
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm">
           <div className="w-full h-1/3" style={{ backgroundColor: '#000000' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#DD0000' }} />
           <div className="w-full h-1/3" style={{ backgroundColor: '#FFCE00' }} />
@@ -118,7 +118,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
     if (code === 'fr') {
       // France - vertical bands
       return (
-        <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+        <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
           <div className="flex-1 h-full" style={{ backgroundColor: '#0055A4' }} />
           <div className="flex-1 h-full" style={{ backgroundColor: '#FFFFFF' }} />
           <div className="flex-1 h-full" style={{ backgroundColor: '#EF4135' }} />
@@ -128,7 +128,7 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
 
     // Default: simple horizontal stripes
     return (
-      <div className="w-5 h-3 rounded-sm overflow-hidden border border-gray-400 shadow-sm flex">
+      <div className="w-5 h-3 rounded-sm overflow-hidden border border-neutral-400 shadow-sm flex">
         {countryInfo.colors.map((color, index) => (
           <div
             key={index}
@@ -142,11 +142,11 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
 
   return (
     <div
-      className="inline-flex items-center gap-1.5 text-xs bg-gray-700/80 px-2 py-1 rounded-md border border-gray-600/50 backdrop-blur-sm"
+      className="inline-flex items-center gap-1.5 text-xs bg-neutral-700/80 px-2 py-1 rounded-md border border-neutral-600/50 backdrop-blur-sm"
       title={`${countryInfo.name} (${countryInfo.code})`}
     >
       {renderFlag()}
-      <span className="font-mono text-gray-200 font-medium text-xs">
+      <span className="font-mono text-neutral-200 font-medium text-xs">
         {countryInfo.code}
       </span>
     </div>
@@ -185,6 +185,29 @@ const getTierIndicator = (rank: number): string => {
   if (rank <= 25) return "🥈"; // Top 25
   if (rank <= 50) return "🥉"; // Top 50
   return "⚡"; // Everyone else
+};
+
+// Get faction-specific colors
+const getFactionColor = (faction: string): string => {
+  const factionColors: Record<string, string> = {
+    'Eldar': 'text-blue-400',
+    'Dark Eldar': 'text-purple-400',
+    'Ork': 'text-green-400',
+    'Space Marine': 'text-blue-300',
+    'Chaos Marine': 'text-red-400',
+    'Imperial Guard': 'text-yellow-400',
+    'Tau': 'text-cyan-400',
+    'Sisters of Battle': 'text-pink-400'
+  };
+  return factionColors[faction] || 'text-orange-300';
+};
+
+// Get rank color based on position
+const getRankColor = (rank: number): string => {
+  if (rank <= 5) return 'text-yellow-400'; // Gold for top 5
+  if (rank <= 10) return 'text-yellow-300'; // Light gold for top 10
+  if (rank <= 25) return 'text-orange-400'; // Orange for top 25
+  return 'text-red-400'; // Red for others
 };
 
 // Tab types
@@ -335,7 +358,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen text-white">
       <div className="container mx-auto p-6 max-w-7xl">
         {/* Header */}
         <div className="flex items-center mb-8">
@@ -348,10 +371,10 @@ export default function Home() {
               />
             </div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-yellow-400">
+              <h1 className="text-3xl font-bold text-white">
                 Dawn of War: Definitive Edition Leaderboards
               </h1>
-              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs font-semibold rounded-md">
+              <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
                 BETA
               </span>
             </div>
@@ -359,23 +382,23 @@ export default function Home() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-700 mb-6">
+        <div className="flex border-b border-neutral-700/60 mb-6">
           <button
             onClick={() => setActiveTab('leaderboards')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-6 py-3 font-medium transition-all duration-300 ${
               activeTab === 'leaderboards'
-                ? 'text-yellow-400 border-b-2 border-yellow-400'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
             }`}
           >
             Leaderboards
           </button>
           <button
             onClick={() => setActiveTab('search')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-6 py-3 font-medium transition-all duration-300 ${
               activeTab === 'search'
-                ? 'text-yellow-400 border-b-2 border-yellow-400'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
             }`}
           >
             Search
@@ -384,7 +407,7 @@ export default function Home() {
             href="https://github.com/EnzeD/dow-leaderboards"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-6 py-3 font-medium text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+            className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
           >
             Contribute on GitHub
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -397,25 +420,25 @@ export default function Home() {
         {activeTab === 'leaderboards' && (
           <>
             {/* Filter Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
           <div className="flex flex-col">
-            <label className="text-sm text-gray-400 mb-2">Region</label>
-            <select className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+            <label className="text-sm text-neutral-300 mb-2 font-medium">Region</label>
+            <select className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all">
               <option>Global</option>
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-sm text-gray-400 mb-2">Platform</label>
-            <select className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white">
+            <label className="text-sm text-neutral-300 mb-2 font-medium">Platform</label>
+            <select className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all">
               <option>PC</option>
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-sm text-gray-400 mb-2">Faction</label>
+            <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
             <select
               value={selectedFaction}
               onChange={(e) => setSelectedFaction(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
               disabled={loading}
             >
               {factions.map(faction => (
@@ -424,11 +447,11 @@ export default function Home() {
             </select>
           </div>
           <div className="flex flex-col">
-            <label className="text-sm text-gray-400 mb-2">Type</label>
+            <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
             <select
               value={selectedMatchType}
               onChange={(e) => setSelectedMatchType(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
               disabled={loading}
             >
               {matchTypes.map(type => (
@@ -439,12 +462,12 @@ export default function Home() {
         </div>
 
         {/* Specific Leaderboard Selection & Search */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-neutral-900/30 rounded-lg border border-neutral-700/30" style={{backdropFilter: 'blur(10px)'}}>
           {!isCombinedMode && (
             <select
               value={selectedId}
               onChange={(e) => setSelectedId(Number(e.target.value))}
-              className="bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
+              className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-2 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all"
               disabled={loading}
             >
               {filteredLeaderboards.map(lb => (
@@ -458,13 +481,13 @@ export default function Home() {
             placeholder="Search players..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className={`px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-400 ${isCombinedMode ? 'flex-1' : 'flex-1'}`}
+            className={`px-3 py-2 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all ${isCombinedMode ? 'flex-1' : 'flex-1'}`}
           />
         </div>
 
         {/* Current Selection Info */}
         {(selectedLeaderboard || isCombinedMode) && (
-          <div className="mb-4 text-sm text-gray-400">
+          <div className="mb-4 text-sm text-neutral-300 font-medium p-3 bg-neutral-900/40 rounded-md border border-neutral-700/30" style={{backdropFilter: 'blur(5px)'}}>
             Showing: {isCombinedMode ? "Combined 1v1 Rankings - All Factions" : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`}
             {ladderData && (
               <>
@@ -479,11 +502,13 @@ export default function Home() {
 
         {/* Table */}
         {loading ? (
-          <div className="text-center py-16 text-gray-400">Loading...</div>
+          <div className="text-center py-16 text-white font-medium">
+            Loading...
+          </div>
         ) : (
-          <div className="overflow-x-auto bg-gray-800 rounded-lg shadow-lg">
-            <table className="w-full">
-              <thead className="bg-gray-700">
+          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg shadow-2xl">
+            <table className="w-full table-fixed">
+              <thead className="bg-neutral-800 border-b-2 border-neutral-600/50" style={{background: 'linear-gradient(135deg, #262626, #171717)'}}>
                 <tr>
                   {[
                     { key: "rank", label: "Rank" },
@@ -498,12 +523,22 @@ export default function Home() {
                   ].map(({ key, label }) => (
                     <th
                       key={key}
-                      className="px-4 py-4 text-left cursor-pointer hover:bg-gray-600 text-gray-200 font-medium"
+                      className={`px-3 py-3 text-left cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 ${
+                        key === 'rank' ? 'w-16' :
+                        key === 'playerName' ? 'w-32' :
+                        key === 'faction' ? 'w-24' :
+                        key === 'rating' ? 'w-20' :
+                        key === 'streak' ? 'w-16' :
+                        key === 'wins' ? 'w-16' :
+                        key === 'losses' ? 'w-16' :
+                        key === 'winrate' ? 'w-16' :
+                        key === 'lastMatchDate' ? 'w-24' : 'w-auto'
+                      }`}
                       onClick={() => handleSort(key as keyof LadderRow)}
                     >
                       {label}
                       {sortField === key && (
-                        <span className="ml-1 text-yellow-400">{sortDesc ? "↓" : "↑"}</span>
+                        <span className="ml-1 text-yellow-400 text-lg">{sortDesc ? "↓" : "↑"}</span>
                       )}
                     </th>
                   ))}
@@ -511,31 +546,35 @@ export default function Home() {
               </thead>
               <tbody>
                 {sortedRows.map((row, i) => (
-                  <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-gray-800" : "bg-gray-750"} hover:bg-gray-700 transition-colors`}>
-                    <td className="px-4 py-4 text-yellow-400 font-semibold">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{getTierIndicator(row.rank)}</span>
-                        {row.rank}
+                  <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
+                    <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20`}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
+                        <span className="font-bold text-sm">
+                          {row.rank}
+                        </span>
                       </div>
                     </td>
-                    <td className={`px-4 py-4 ${row.playerName === "Unknown" ? "text-gray-500" : "text-blue-400"}`}>
-                      <div className="flex items-center gap-2">
+                    <td className={`px-3 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20`}>
+                      <div className="flex items-center gap-2 truncate">
                         {row.country && <FlagIcon countryCode={row.country} />}
-                        {row.playerName}
+                        <span className="truncate text-sm">{row.playerName}</span>
                       </div>
                     </td>
                     {isCombinedMode && (
-                      <td className="px-4 py-4 text-orange-300 font-medium">{row.faction || 'Unknown'}</td>
+                      <td className={`px-3 py-3 font-semibold border-r border-neutral-600/20 text-sm ${getFactionColor(row.faction || '')}`}>
+                        <span className="truncate">{row.faction || 'Unknown'}</span>
+                      </td>
                     )}
-                    <td className="px-4 py-4 text-white font-semibold">{row.rating}</td>
-                    <td className={`px-4 py-4 font-semibold ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-gray-400"}`}>
+                    <td className="px-3 py-3 text-white font-bold text-sm border-r border-neutral-600/20">{row.rating}</td>
+                    <td className={`px-3 py-3 font-bold border-r border-neutral-600/20 text-sm ${row.streak > 0 ? "text-green-400" : row.streak < 0 ? "text-red-400" : "text-neutral-400"}`}>
                       {row.streak > 0 ? `+${row.streak}` : row.streak}
                     </td>
-                    <td className="px-4 py-4 text-green-400">{row.wins}</td>
-                    <td className="px-4 py-4 text-red-400">{row.losses}</td>
-                    <td className="px-4 py-4 text-white">{row.winrate}%</td>
-                    <td className="px-4 py-4 text-gray-400 text-sm">
-                      {formatLastMatch(row.lastMatchDate)}
+                    <td className="px-3 py-3 text-green-400 font-semibold border-r border-neutral-600/20 text-sm">{row.wins}</td>
+                    <td className="px-3 py-3 text-red-400 font-semibold border-r border-neutral-600/20 text-sm">{row.losses}</td>
+                    <td className="px-3 py-3 text-white font-semibold border-r border-neutral-600/20 text-sm">{row.winrate}%</td>
+                    <td className="px-3 py-3 text-neutral-300 text-xs font-medium border-r border-neutral-700/30 last:border-r-0">
+                      <span className="truncate">{formatLastMatch(row.lastMatchDate)}</span>
                     </td>
                   </tr>
                 ))}
@@ -545,7 +584,7 @@ export default function Home() {
         )}
 
             {/* Footer */}
-            <div className="mt-8 text-center text-sm text-gray-500">
+            <div className="mt-8 text-center text-sm text-neutral-400 font-medium p-4 bg-neutral-900/20 rounded-lg border border-neutral-700/20" style={{backdropFilter: 'blur(5px)'}}>
               Data from Relic Community API • Updates in real-time
             </div>
           </>
@@ -554,9 +593,9 @@ export default function Home() {
         {/* Search Tab Content */}
         {activeTab === 'search' && (
           <div className="space-y-6">
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-bold text-yellow-400 mb-4">Player Search</h2>
-              <p className="text-gray-400 mb-6">
+            <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 shadow-2xl">
+              <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
+              <p className="text-neutral-400 mb-6">
                 Search for a player by their Steam name or alias to find their profile ID and statistics across all leaderboards.
               </p>
 
@@ -566,13 +605,13 @@ export default function Home() {
                   placeholder="Enter player name or Steam alias..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400"
+                  className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner"
                   onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
                 />
                 <button
                   onClick={handlePlayerSearch}
                   disabled={searchLoading || !searchQuery.trim()}
-                  className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+                  className="px-6 py-3 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 disabled:bg-neutral-600 disabled:cursor-not-allowed text-white font-bold rounded-md shadow-lg border border-neutral-500 transition-all duration-300 transform hover:scale-105"
                 >
                   {searchLoading ? 'Searching...' : 'Search'}
                 </button>
@@ -583,18 +622,18 @@ export default function Home() {
                   <h3 className="text-lg font-semibold text-white">Search Results</h3>
                   <div className="grid gap-4">
                     {searchResults.map((result, index) => (
-                      <div key={index} className="bg-gray-700 rounded-lg p-4">
+                      <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h4 className="text-white font-medium">{result.playerName}</h4>
-                            <p className="text-gray-400 text-sm">Profile ID: {result.profileId}</p>
+                            <p className="text-neutral-400 text-sm">Profile ID: {result.profileId}</p>
                             {result.steamProfile && (
-                              <p className="text-gray-400 text-sm">Steam: {result.steamProfile.personaname}</p>
+                              <p className="text-neutral-400 text-sm">Steam: {result.steamProfile.personaname}</p>
                             )}
                           </div>
                           <button
                             onClick={() => handleViewPlayerStats(result.playerName)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                            className="px-4 py-2 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 text-white font-semibold rounded-md shadow-md border border-neutral-500 transition-all duration-300 transform hover:scale-105"
                           >
                             View Stats
                           </button>
@@ -602,24 +641,24 @@ export default function Home() {
 
                         {/* Leaderboard appearances */}
                         {result.leaderboardAppearances && result.leaderboardAppearances.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-600">
-                            <h5 className="text-sm text-gray-300 mb-2">Leaderboard Appearances:</h5>
+                          <div className="mt-3 pt-3 border-t border-neutral-600/40">
+                            <h5 className="text-sm text-neutral-300 mb-2">Leaderboard Appearances:</h5>
                             <div className="grid gap-2">
                               {result.leaderboardAppearances.slice(0, 3).map((appearance: any, appIndex: number) => (
-                                <div key={appIndex} className="text-xs bg-gray-800 p-2 rounded">
-                                  <div className="flex justify-between items-center">
+                                <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
+                                  <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
                                     <span className="text-orange-300">
                                       {appearance.faction} {appearance.matchType}
                                     </span>
                                     <div className="flex gap-3">
-                                      <span className="text-yellow-400">#{appearance.rank}</span>
+                                      <span className={getRankColor(appearance.rank)}>#{appearance.rank}</span>
                                       <span className="text-white">{appearance.rating} ELO</span>
                                     </div>
                                   </div>
                                 </div>
                               ))}
                               {result.leaderboardAppearances.length > 3 && (
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-neutral-400">
                                   +{result.leaderboardAppearances.length - 3} more leaderboards
                                 </p>
                               )}
