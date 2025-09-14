@@ -187,7 +187,11 @@ const getTierIndicator = (rank: number): string => {
   return "⚡"; // Everyone else
 };
 
+// Tab types
+type TabType = 'leaderboards' | 'search' | 'contribute';
+
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
   const [ladderData, setLadderData] = useState<LadderData | null>(null);
@@ -195,6 +199,11 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<keyof LadderRow>("rank");
   const [sortDesc, setSortDesc] = useState(false);
+
+  // Search tab state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("1v1 - All Factions");
@@ -293,6 +302,38 @@ export default function Home() {
 
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
 
+  // Search functionality
+  const handlePlayerSearch = async () => {
+    if (!searchQuery.trim()) return;
+
+    setSearchLoading(true);
+    setSearchResults([]);
+
+    try {
+      // Call the search API endpoint
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: searchQuery.trim() })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.results || []);
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleViewPlayerStats = async (profileId: string) => {
+    // Switch to leaderboards tab and search for this player
+    setActiveTab('leaderboards');
+    setSearch(profileId); // This will filter the current leaderboard
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <div className="container mx-auto p-6 max-w-7xl">
@@ -306,13 +347,56 @@ export default function Home() {
                 className="h-16 w-auto object-contain"
               />
             </div>
-            <h1 className="text-3xl font-bold text-yellow-400">
-              Leaderboards for Dawn of War: Definitive Edition
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-yellow-400">
+                Dawn of War: Definitive Edition Leaderboards
+              </h1>
+              <span className="px-2 py-1 bg-yellow-600 text-yellow-100 text-xs font-semibold rounded-md">
+                BETA
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Filter Bar */}
+        {/* Tab Navigation */}
+        <div className="flex border-b border-gray-700 mb-6">
+          <button
+            onClick={() => setActiveTab('leaderboards')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              activeTab === 'leaderboards'
+                ? 'text-yellow-400 border-b-2 border-yellow-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Leaderboards
+          </button>
+          <button
+            onClick={() => setActiveTab('search')}
+            className={`px-6 py-3 font-medium transition-colors ${
+              activeTab === 'search'
+                ? 'text-yellow-400 border-b-2 border-yellow-400'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Search
+          </button>
+          <a
+            href="https://github.com/EnzeD/dow-leaderboards"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-3 font-medium text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+          >
+            Contribute on GitHub
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+
+        {/* Leaderboards Tab Content */}
+        {activeTab === 'leaderboards' && (
+          <>
+            {/* Filter Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="flex flex-col">
             <label className="text-sm text-gray-400 mb-2">Region</label>
@@ -460,10 +544,96 @@ export default function Home() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-500">
-          Data from Relic Community API • Updates in real-time
-        </div>
+            {/* Footer */}
+            <div className="mt-8 text-center text-sm text-gray-500">
+              Data from Relic Community API • Updates in real-time
+            </div>
+          </>
+        )}
+
+        {/* Search Tab Content */}
+        {activeTab === 'search' && (
+          <div className="space-y-6">
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h2 className="text-xl font-bold text-yellow-400 mb-4">Player Search</h2>
+              <p className="text-gray-400 mb-6">
+                Search for a player by their Steam name or alias to find their profile ID and statistics across all leaderboards.
+              </p>
+
+              <div className="flex gap-4 mb-6">
+                <input
+                  type="text"
+                  placeholder="Enter player name or Steam alias..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400"
+                  onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
+                />
+                <button
+                  onClick={handlePlayerSearch}
+                  disabled={searchLoading || !searchQuery.trim()}
+                  className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded transition-colors"
+                >
+                  {searchLoading ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              {searchResults.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-white">Search Results</h3>
+                  <div className="grid gap-4">
+                    {searchResults.map((result, index) => (
+                      <div key={index} className="bg-gray-700 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="text-white font-medium">{result.playerName}</h4>
+                            <p className="text-gray-400 text-sm">Profile ID: {result.profileId}</p>
+                            {result.steamProfile && (
+                              <p className="text-gray-400 text-sm">Steam: {result.steamProfile.personaname}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleViewPlayerStats(result.playerName)}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                          >
+                            View Stats
+                          </button>
+                        </div>
+
+                        {/* Leaderboard appearances */}
+                        {result.leaderboardAppearances && result.leaderboardAppearances.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-600">
+                            <h5 className="text-sm text-gray-300 mb-2">Leaderboard Appearances:</h5>
+                            <div className="grid gap-2">
+                              {result.leaderboardAppearances.slice(0, 3).map((appearance: any, appIndex: number) => (
+                                <div key={appIndex} className="text-xs bg-gray-800 p-2 rounded">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-orange-300">
+                                      {appearance.faction} {appearance.matchType}
+                                    </span>
+                                    <div className="flex gap-3">
+                                      <span className="text-yellow-400">#{appearance.rank}</span>
+                                      <span className="text-white">{appearance.rating} ELO</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {result.leaderboardAppearances.length > 3 && (
+                                <p className="text-xs text-gray-400">
+                                  +{result.leaderboardAppearances.length - 3} more leaderboards
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

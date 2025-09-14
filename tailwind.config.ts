@@ -12,6 +12,9 @@ export default {
         background: "var(--background)",
         foreground: "var(--foreground)",
       },
+      fontFamily: {
+        'exo-2': ['"Exo 2"', 'sans-serif'],
+      },
     },
   },
   plugins: [],
