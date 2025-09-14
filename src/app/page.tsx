@@ -256,7 +256,7 @@ export default function Home() {
       .then(r => r.json())
       .then(data => {
         setLeaderboards(data.items || []);
-        if (data.items?.length) setSelectedId(data.items[0].id);
+        // Don't set selectedId here - let the filter effect handle it
       });
   }, []);
 
@@ -268,16 +268,19 @@ export default function Home() {
         .filter(lb => lb.matchType === selectedMatchType)
         .map(lb => lb.faction)
         .filter(Boolean);
-      if (factionsForMatchType.length > 0) {
+      if (factionsForMatchType.length > 0 && factionsForMatchType[0]) {
         setSelectedFaction(factionsForMatchType[0]);
       }
     }
   }, [selectedMatchType, leaderboards, selectedFaction]);
 
-  // Update selected ID when filters change
+  // Update selected ID when filters change OR when leaderboards first load
   useEffect(() => {
     if (filteredLeaderboards.length > 0) {
-      setSelectedId(filteredLeaderboards[0].id);
+      const newId = filteredLeaderboards[0].id;
+      if (newId !== selectedId) {
+        setSelectedId(newId);
+      }
     }
   }, [selectedFaction, selectedMatchType, leaderboards]);
 

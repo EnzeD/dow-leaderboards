@@ -12,6 +12,8 @@ export async function GET(req: Request) {
       lastUpdated: new Date().toISOString(),
       stale: false,
       rows
+    }, {
+      headers: { "Cache-Control": "s-maxage=300" }
     });
   } catch {
     // TODO: serve cached copy here; for brevity return 502

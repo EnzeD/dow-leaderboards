@@ -58,7 +58,7 @@ export async function fetchLeaderboards() {
 
 export async function fetchTop100(leaderboardId: number) {
   const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=1&count=100&sortBy=1`;
-  const data = await fetch(url, { cache: "no-store" }).then(r => r.json());
+  const data = await fetch(url, { cache: "default" }).then(r => r.json());
 
   const groups: RawGroup[] = data?.statGroups ?? [];
   // Some games include a parallel "leaderboardStats" array. Prefer it when present.
