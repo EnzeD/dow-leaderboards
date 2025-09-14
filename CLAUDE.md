@@ -103,3 +103,4 @@ The prototype is fully functional and ready for additional features like:
 - Historical data tracking
 - Performance analytics
 - Deployment configuration
+- make sure to test for typescript errors to avoid failure at deployment
