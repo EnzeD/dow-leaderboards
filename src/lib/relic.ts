@@ -102,6 +102,55 @@ export async function fetchTop100(leaderboardId: number) {
   return rows;
 }
 
+// Fetch an arbitrary number of rows from a leaderboard (batched by 100)
+export async function fetchLeaderboardRows(leaderboardId: number, count: number = 200) {
+  const batchSize = 100;
+  const all: LadderRow[] = [];
+  for (let start = 1; start <= count; start += batchSize) {
+    const currentCount = Math.min(batchSize, count - start + 1);
+    const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=${start}&count=${currentCount}&sortBy=1`;
+    const data = await fetch(url, { cache: "default" }).then(r => r.json());
+
+    const groups: RawGroup[] = data?.statGroups ?? [];
+    const stats: RawStat[] = data?.leaderboardStats ?? [];
+    if (!groups.length || !stats.length) break;
+
+    const groupsById = new Map(groups.map(g => [g.id, g]));
+    const rows: LadderRow[] = stats
+      .filter(s => s?.statgroup_id)
+      .map(s => {
+        const group = groupsById.get(s.statgroup_id);
+        const member = group?.members?.[0];
+        const profileId = String(member?.profile_id ?? "");
+        const alias = member?.alias?.trim();
+        const winrate = (s.wins + s.losses) ? +(((s.wins / (s.wins + s.losses)) * 100).toFixed(1)) : 0;
+        const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
+        return {
+          rank: s.rank ?? 0,
+          profileId,
+          playerName: alias || "",
+          rating: s.rating ?? 0,
+          wins: s.wins ?? 0,
+          losses: s.losses ?? 0,
+          winrate,
+          streak: s.streak ?? 0,
+          country: member?.country,
+          lastMatchDate,
+        };
+      }).filter(r => r.profileId);
+
+    all.push(...rows);
+    if (rows.length < currentCount) break; // last page
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return all;
+}
+
+// Fetch all rows (up to a safety cap) for a leaderboard
+export async function fetchAllRows(leaderboardId: number, max: number = 10000) {
+  return fetchLeaderboardRows(leaderboardId, max);
+}
+
 export async function resolveNames(profileIds: string[]): Promise<Record<string, string>> {
   // Chunk to avoid very long URLs and respect rate limits.
   const uniq = Array.from(new Set(profileIds));
@@ -170,4 +219,36 @@ export async function fetchCombined1v1() {
     }));
 
   return deduplicatedRows;
+}
+
+export async function fetchCombined1v1Max() {
+  const { items: leaderboards } = await fetchLeaderboards();
+  const oneVsOneLeaderboards = leaderboards.filter(lb =>
+    lb.matchType === '1v1' && lb.faction && lb.faction !== 'Unknown'
+  );
+
+  const allResults = await Promise.allSettled(
+    oneVsOneLeaderboards.map(async (lb) => {
+      const rows = await fetchAllRows(lb.id, 10000);
+      return rows.map(row => ({
+        ...row,
+        faction: lb.faction,
+        originalRank: row.rank,
+        leaderboardId: lb.id
+      }));
+    })
+  );
+
+  const allRows: (LadderRow & { originalRank: number; leaderboardId: number })[] = [];
+  allResults.forEach(result => { if (result.status === 'fulfilled') allRows.push(...result.value); });
+
+  const playerMap = new Map<string, LadderRow & { originalRank: number; leaderboardId: number }>();
+  for (const row of allRows) {
+    const existing = playerMap.get(row.profileId);
+    if (!existing || row.rating > existing.rating) playerMap.set(row.profileId, row);
+  }
+
+  return Array.from(playerMap.values())
+    .sort((a, b) => b.rating - a.rating)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
 }

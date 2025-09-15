@@ -1,4 +1,4 @@
-import { fetchTop100, resolveNames } from "@/lib/relic";
+import { fetchLeaderboardRows, resolveNames } from "@/lib/relic";
 
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
   const idNum = Number(ctx.params?.id ?? 0);
@@ -6,7 +6,7 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
     return Response.json({ error: "invalid_leaderboard_id" }, { status: 400 });
   }
   try {
-    const rows = await fetchTop100(idNum);
+    const rows = await fetchLeaderboardRows(idNum, 200);
     const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
     for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
@@ -32,4 +32,3 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
     );
   }
 }
-

@@ -236,6 +236,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [combinedLimit, setCombinedLimit] = useState<number>(200);
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
@@ -349,7 +350,7 @@ export default function Home() {
     if (isCombinedMode) {
       // Fetch combined 1v1 data (CDN cached)
       setLoading(true);
-      fetch('/api/cache/combined-1v1')
+      fetch(`/api/cache/combined-1v1/${combinedLimit}`)
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -368,7 +369,7 @@ export default function Home() {
         })
         .catch(() => setLoading(false));
     }
-  }, [selectedId, isCombinedMode]);
+  }, [selectedId, isCombinedMode, combinedLimit]);
 
   const handleSort = (field: keyof LadderRow) => {
     if (sortField === field) {
@@ -827,6 +828,29 @@ export default function Home() {
             </div>
           </>
         )}
+
+            {/* Combined controls */}
+            {activeTab === 'leaderboards' && isCombinedMode && (
+              <div className="mt-4 text-center">
+                {combinedLimit === 200 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCombinedLimit(1000)}
+                    className="text-blue-300 hover:underline font-medium"
+                  >
+                    Show top 1000
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setCombinedLimit(200)}
+                    className="text-blue-300 hover:underline font-medium"
+                  >
+                    Show top 200
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Footer */}
             <div className="mt-8 text-center text-sm text-neutral-400 font-medium p-4 bg-neutral-900/20 rounded-lg border border-neutral-700/20" style={{backdropFilter: 'blur(5px)'}}>

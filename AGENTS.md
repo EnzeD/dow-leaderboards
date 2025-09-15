@@ -29,7 +29,7 @@
 - If adding tests, co-locate by area (e.g., `src/lib/__tests__/relic.test.ts`). Aim for fast, unit-level coverage of parsing utilities.
 
 ## Commit & Pull Request Guidelines
-- **Commits**: Prefer Conventional Commits (seen in history): `feat:`, `fix:`, `doc:`, etc. Keep messages imperative and scoped (e.g., `feat: add country filtering`).
+- **Commits**: Prefer Conventional Commits (seen in history): `feat:`, `fix:`, `doc:`, etc. Keep messages imperative and scoped (e.g., `feat: add country filtering`). Ask for commit after every substantial development. Never ask for push.
 - **PRs**: Include:
   - Clear description with motivation and screenshots of UI changes (`.screenshots/` helpful).
   - Linked issue (if applicable) and notes on API/cache behavior.
