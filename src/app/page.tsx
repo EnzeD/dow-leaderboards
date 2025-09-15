@@ -347,9 +347,9 @@ export default function Home() {
   // Load ladder when selection changes
   useEffect(() => {
     if (isCombinedMode) {
-      // Fetch combined 1v1 data
+      // Fetch combined 1v1 data (CDN cached)
       setLoading(true);
-      fetch('/api/combined')
+      fetch('/api/cache/combined-1v1')
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
