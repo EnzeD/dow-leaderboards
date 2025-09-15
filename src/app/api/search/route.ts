@@ -14,7 +14,7 @@ type RecentMatch = {
   ratingDiff?: number;
   teamId?: number;
   raceId?: number;
-  players?: Array<{ profileId: string; alias?: string; teamId?: number }>;
+  players?: Array<{ profileId: string; alias?: string; teamId?: number; raceId?: number }>;
 };
 
 type SearchResult = {
@@ -167,10 +167,11 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
       const ratingDiff = (typeof oldRating === 'number' && typeof newRating === 'number') ? (newRating - oldRating) : undefined;
       const outcome: 'Win' | 'Loss' | 'Unknown' = me?.outcome === 1 ? 'Win' : (me?.outcome === 0 ? 'Loss' : 'Unknown');
 
-      const players: Array<{ profileId: string; alias?: string; teamId?: number }> = members.map((p: any) => ({
+      const players: Array<{ profileId: string; alias?: string; teamId?: number; raceId?: number }> = members.map((p: any) => ({
         profileId: String(p?.profile_id ?? ''),
         alias: aliasMap.get(String(p?.profile_id ?? '')),
         teamId: typeof p?.teamid === 'number' ? p.teamid : undefined,
+        raceId: Number.isFinite(Number(p?.race_id)) && Number(p?.race_id) > 0 ? Number(p?.race_id) : undefined,
       }));
 
       matches.push({
@@ -185,7 +186,7 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
         newRating,
         ratingDiff,
         teamId: typeof me?.teamid === 'number' ? me.teamid : undefined,
-        raceId: typeof me?.race_id === 'number' ? me.race_id : undefined,
+        raceId: (Number.isFinite(Number(me?.race_id)) && Number(me?.race_id) > 0) ? Number(me?.race_id) : undefined,
         players,
       });
     }

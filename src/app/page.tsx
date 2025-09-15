@@ -197,10 +197,28 @@ const getFactionColor = (faction: string): string => {
     'Space Marine': 'text-blue-300',
     'Chaos Marine': 'text-red-400',
     'Imperial Guard': 'text-yellow-400',
+    'Necron': 'text-emerald-300',
     'Tau': 'text-cyan-400',
     'Sisters of Battle': 'text-pink-400'
   };
   return factionColors[faction] || 'text-orange-300';
+};
+
+// Map raceId from match history to faction name
+const raceIdToFaction = (raceId?: number): string => {
+  const map: Record<number, string> = {
+    1: 'Space Marine',
+    2: 'Chaos Marine',
+    3: 'Ork',
+    4: 'Eldar',
+    5: 'Imperial Guard',
+    6: 'Necron',
+    7: 'Tau',
+    8: 'Sisters of Battle',
+    9: 'Dark Eldar',
+  };
+  if (!raceId) return 'Unknown';
+  return map[raceId] || 'Unknown';
 };
 
 // Get rank color based on position
@@ -980,6 +998,8 @@ export default function Home() {
                                 const start = m.startTime ? new Date(m.startTime * 1000) : undefined;
                                 const duration = typeof m.durationSec === 'number' ? m.durationSec : undefined;
                                 const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';
+                                const mePlayer = (m.players || []).find((p: any) => p.profileId === result.profileId);
+                                const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
                                 return (
                                   <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
                                     <div className="flex justify-between items-center gap-3">
@@ -989,6 +1009,10 @@ export default function Home() {
                                         <span className="text-white truncate" title={m.mapName}>{m.mapName || 'Unknown Map'}</span>
                                         <span className="text-neutral-500">•</span>
                                         <span className="text-orange-300">{matchType}</span>
+                                        <>
+                                          <span className="text-neutral-500">•</span>
+                                          <span className={`${myFaction === 'Unknown' ? 'text-neutral-400' : getFactionColor(myFaction)}`}>{myFaction}</span>
+                                        </>
                                         {start && (
                                           <>
                                             <span className="text-neutral-500">•</span>
@@ -1016,36 +1040,48 @@ export default function Home() {
                                         <div className="flex-1 min-w-0">
                                           <span className="text-neutral-400 mr-1">Team:</span>
                                           <span className="text-neutral-200 truncate">
-                                            {allies.slice(0,3).map((p: any, i: number) => (
-                                              <button
-                                                key={p.profileId + i}
-                                                type="button"
-                                                onClick={() => p.alias && runSearchByName(p.alias)}
-                                                className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                title={p.alias || p.profileId}
-                                              >
-                                                {p.alias || p.profileId}
-                                                {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
-                                              </button>
-                                            ))}
+                                            {allies.slice(0,3).map((p: any, i: number) => {
+                                              const f = raceIdToFaction(p.raceId);
+                                              return (
+                                                <button
+                                                  key={p.profileId + i}
+                                                  type="button"
+                                                  onClick={() => p.alias && runSearchByName(p.alias)}
+                                                  className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                  title={p.alias || p.profileId}
+                                                >
+                                                  {p.alias || p.profileId}
+                                                  {f !== 'Unknown' && (
+                                                    <span className={`ml-1 ${getFactionColor(f)}`}>({f})</span>
+                                                  )}
+                                                  {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
+                                                </button>
+                                              );
+                                            })}
                                             {allies.length > 3 && ` +${allies.length - 3}`}
                                           </span>
                                         </div>
                                         <div className="flex-1 min-w-0 text-right">
                                           <span className="text-neutral-400 mr-1">Opponents:</span>
                                           <span className="text-neutral-200 truncate">
-                                            {opps.slice(0,3).map((p: any, i: number) => (
-                                              <button
-                                                key={p.profileId + i}
-                                                type="button"
-                                                onClick={() => p.alias && runSearchByName(p.alias)}
-                                                className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                title={p.alias || p.profileId}
-                                              >
-                                                {p.alias || p.profileId}
-                                                {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
-                                              </button>
-                                            ))}
+                                            {opps.slice(0,3).map((p: any, i: number) => {
+                                              const f = raceIdToFaction(p.raceId);
+                                              return (
+                                                <button
+                                                  key={p.profileId + i}
+                                                  type="button"
+                                                  onClick={() => p.alias && runSearchByName(p.alias)}
+                                                  className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                  title={p.alias || p.profileId}
+                                                >
+                                                  {p.alias || p.profileId}
+                                                  {f !== 'Unknown' && (
+                                                    <span className={`ml-1 ${getFactionColor(f)}`}>({f})</span>
+                                                  )}
+                                                  {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
+                                                </button>
+                                              );
+                                            })}
                                             {opps.length > 3 && ` +${opps.length - 3}`}
                                           </span>
                                         </div>

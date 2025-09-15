@@ -1,4 +1,6 @@
 import { fetchCombined1v1Max, resolveNames } from "@/lib/relic";
+// This route reads request.url (query params). Mark dynamic to avoid static export errors.
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {

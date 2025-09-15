@@ -14,7 +14,7 @@ type RecentMatch = {
   ratingDiff?: number;
   teamId?: number;
   raceId?: number;
-  players?: Array<{ profileId: string; alias?: string; teamId?: number }>;
+  players?: Array<{ profileId: string; alias?: string; teamId?: number; raceId?: number }>;
 };
 
 type PlayerPayload = {
@@ -160,7 +160,9 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
       profileId: String(p?.profile_id ?? ''),
       alias: aliasMap.get(String(p?.profile_id ?? '')),
       teamId: typeof p?.teamid === 'number' ? p.teamid : undefined,
+      raceId: Number.isFinite(Number(p?.race_id)) && Number(p?.race_id) > 0 ? Number(p?.race_id) : undefined,
     }));
+    const meRaceIdNum = Number(me?.race_id);
     matches.push({
       matchId: Number(m?.id ?? 0) || 0,
       mapName: m?.mapname,
@@ -173,7 +175,7 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
       newRating,
       ratingDiff,
       teamId: typeof me?.teamid === 'number' ? me.teamid : undefined,
-      raceId: typeof me?.race_id === 'number' ? me.race_id : undefined,
+      raceId: Number.isFinite(meRaceIdNum) && meRaceIdNum > 0 ? meRaceIdNum : undefined,
       players,
     });
   }
@@ -208,4 +210,3 @@ export async function GET(_req: NextRequest, ctx: { params: { alias: string } })
     return Response.json({ results: [] }, { status: 502, headers: { 'Cache-Control': 'public, s-maxage=60' } });
   }
 }
-
