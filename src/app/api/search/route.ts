@@ -5,6 +5,23 @@ type SearchResult = {
   profileId: string;
   playerName: string; // exact alias
   steamId?: string;   // SteamID64 parsed from `/steam/<id>` when available
+  personalStats?: {
+    profile?: {
+      alias?: string;
+      country?: string;
+      level?: number;
+      xp?: number;
+      statgroupId?: number;
+    };
+    leaderboardStats?: Array<{
+      leaderboardId: number;
+      wins: number; losses: number; streak: number;
+      rating: number; rank: number;
+      lastmatchdate?: number;
+      highestrank?: number; highestrating?: number;
+      ranktotal?: number; regionrank?: number; regionranktotal?: number;
+    }>;
+  };
 };
 
 function parseSteamIdFromProfileName(name?: string): string | undefined {
@@ -112,8 +129,55 @@ export async function POST(request: Request) {
     }
 
     const results = await searchByExactAlias(q);
+
+    // Enrich with personal stats when Steam ID is present
+    const enriched: SearchResult[] = [];
+    for (const r of results) {
+      if (!r.steamId) { enriched.push(r); continue; }
+      try {
+        const profileName = encodeURIComponent(JSON.stringify([`/steam/${r.steamId}`]));
+        const url = `https://dow-api.reliclink.com/community/leaderboard/getPersonalStat?&title=dow1-de&profile_names=${profileName}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`personalStat HTTP ${res.status}`);
+        const data: any = await res.json();
+
+        const group = Array.isArray(data?.statGroups) ? data.statGroups[0] : undefined;
+        const member = Array.isArray(group?.members) ? group.members[0] : undefined;
+        const profile = member ? {
+          alias: member.alias,
+          country: member.country,
+          level: Number(member.level ?? 0) || undefined,
+          xp: Number(member.xp ?? 0) || undefined,
+          statgroupId: Number(group?.id ?? member?.personal_statgroup_id ?? 0) || undefined
+        } : undefined;
+
+        const lbStatsRaw: any[] = Array.isArray(data?.leaderboardStats) ? data.leaderboardStats : [];
+        const leaderboardStats = lbStatsRaw.map(s => ({
+          leaderboardId: Number(s.leaderboard_id ?? 0) || 0,
+          wins: Number(s.wins ?? 0),
+          losses: Number(s.losses ?? 0),
+          streak: Number(s.streak ?? 0),
+          rating: Number(s.rating ?? 0),
+          rank: Number(s.rank ?? -1),
+          lastmatchdate: typeof s.lastmatchdate === 'number' ? s.lastmatchdate : undefined,
+          highestrank: Number(s.highestrank ?? 0) || undefined,
+          highestrating: Number(s.highestrating ?? 0) || undefined,
+          ranktotal: Number(s.ranktotal ?? 0) || undefined,
+          regionrank: Number(s.regionrank ?? 0) || undefined,
+          regionranktotal: Number(s.regionranktotal ?? 0) || undefined,
+        }));
+
+        enriched.push({ ...r, personalStats: { profile, leaderboardStats } });
+        // brief delay to respect API
+        await new Promise(res => setTimeout(res, 120));
+      } catch (e) {
+        console.warn('Failed to fetch personal stats for', r.profileId, e);
+        enriched.push(r);
+      }
+    }
+
     return Response.json({
-      results,
+      results: enriched,
       query: q,
       timestamp: new Date().toISOString()
     });

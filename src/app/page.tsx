@@ -794,6 +794,28 @@ export default function Home() {
                             <h4 className="text-white font-medium">{result.playerName}</h4>
                             <p className="text-neutral-400 text-sm">Profile ID: {result.profileId}</p>
                             <p className="text-neutral-400 text-sm">Steam ID: {result.steamId || 'Not available'}</p>
+                            {result.personalStats?.profile && (
+                              <div className="mt-2 text-xs text-neutral-300 flex items-center gap-2 flex-wrap">
+                                {result.personalStats.profile.country && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-neutral-400">Country:</span>
+                                    <FlagIcon countryCode={result.personalStats.profile.country} />
+                                  </div>
+                                )}
+                                {typeof result.personalStats.profile.level === 'number' && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-neutral-400">Level:</span>
+                                    <span className="text-white">{result.personalStats.profile.level}</span>
+                                  </div>
+                                )}
+                                {typeof result.personalStats.profile.xp === 'number' && (
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-neutral-400">XP:</span>
+                                    <span className="text-white">{result.personalStats.profile.xp.toLocaleString?.() || result.personalStats.profile.xp}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <button
                             onClick={() => handleViewPlayerStats(result.playerName)}
@@ -802,6 +824,50 @@ export default function Home() {
                             View Stats
                           </button>
                         </div>
+
+                        {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-neutral-600/40">
+                            <h5 className="text-sm text-neutral-300 mb-2">Stats by Leaderboard:</h5>
+                            <div className="grid gap-2">
+                              {result.personalStats.leaderboardStats
+                                .slice()
+                                .sort((a: any, b: any) => (b.lastmatchdate || 0) - (a.lastmatchdate || 0) || b.rating - a.rating)
+                                .slice(0, 6)
+                                .map((s: any, appIndex: number) => {
+                                  const lb = leaderboards.find(l => l.id === s.leaderboardId);
+                                  const name = lb?.name || `Leaderboard ${s.leaderboardId}`;
+                                  const faction = lb?.faction || 'Unknown';
+                                  const type = lb?.matchType || '';
+                                  return (
+                                    <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
+                                      <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="text-orange-300 truncate" title={name}>
+                                            {faction} {type}
+                                          </span>
+                                          <span className="text-neutral-400 hidden sm:inline">•</span>
+                                          <span className="text-neutral-300 truncate hidden sm:inline" title={name}>{name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
+                                          <span className="text-white">{s.rating} ELO</span>
+                                          <span className="text-neutral-300">{s.wins}<span className="text-neutral-500">-</span>{s.losses}</span>
+                                          <span className={`font-bold ${s.streak > 0 ? 'text-green-400' : s.streak < 0 ? 'text-red-400' : 'text-neutral-400'}`}>
+                                            {s.streak > 0 ? `+${s.streak}` : s.streak}
+                                          </span>
+                                          {s.lastmatchdate && (
+                                            <span className="text-neutral-400" title={new Date(s.lastmatchdate * 1000).toISOString()}>
+                                              {formatLastMatch(new Date(s.lastmatchdate * 1000))}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
