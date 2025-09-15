@@ -38,3 +38,24 @@
 ## Security & Configuration Tips
 - Do not add secrets; the app uses public Relic/Steam endpoints. Respect rate limits (soft-throttling already implemented in `relic.ts`).
 - Keep endpoints pinned to `title=dow1-de`. Avoid introducing client-side keys.
+
+## Agent Push Policy (Required)
+When the user asks to "push", always perform the following checks locally before committing and pushing to `main` to avoid deployment failures:
+
+- Build gate: Run `npm run typecheck` and `npm run build` and ensure both succeed. If either fails, fix the issue first; do not push broken code.
+- Lint gate: If ESLint is configured (no interactive prompt), run `npm run lint`. If it prompts for setup, skip lint in this step and rely on the build/type gates.
+- Conventional commit: Use an imperative Conventional Commit message (e.g., `fix(search): handle null recentMatches shape`).
+- CI parity: Prefer to land changes only when typecheck, lint, and build pass locally to mirror Vercel’s build stage (`Linting and checking validity of types ...`).
+
+Recommended command sequence:
+
+1. `npm run typecheck`
+2. `npm run lint` (if non-interactive)
+3. `npm run build`
+4. `git add -A && git commit -m "<conventional message>" && git push`
+
+Notes:
+
+- If a push is requested mid-failure, inform the user what fails (type/lint/build), propose a fix, implement it, and re-run the checks before pushing.
+- Avoid pushing if Next.js type validation fails in production mode even when `npm run dev` works locally.
+- Keep these checks lightweight and fast; prioritize type correctness and a clean production build over exhaustive testing.
