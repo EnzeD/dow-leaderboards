@@ -704,7 +704,14 @@ export default function Home() {
                       <td className={`px-4 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20 min-w-0`}>
                         <div className="flex items-center gap-2">
                           {row.country && <FlagIcon countryCode={row.country} />}
-                          <span className="truncate">{row.playerName}</span>
+                          <button
+                            type="button"
+                            onClick={() => runSearchByName(row.playerName)}
+                            className="truncate text-left hover:underline"
+                            title={`Search for ${row.playerName}`}
+                          >
+                            {row.playerName}
+                          </button>
                         </div>
                       </td>
                       {isCombinedMode && (
@@ -743,7 +750,14 @@ export default function Home() {
                     {/* Player Name with Flag */}
                     <div className={`flex items-center gap-1 min-w-0 flex-1 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white"}`}>
                       {row.country && <FlagIcon countryCode={row.country} compact />}
-                      <span className="text-xs truncate font-medium">{row.playerName}</span>
+                      <button
+                        type="button"
+                        onClick={() => runSearchByName(row.playerName)}
+                        className="text-xs truncate font-medium text-left hover:underline"
+                        title={`Search for ${row.playerName}`}
+                      >
+                        {row.playerName}
+                      </button>
                       {isCombinedMode && (
                         <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')}`}>
                           {row.faction ? row.faction.slice(0, 3) : 'Unk'}
