@@ -817,12 +817,7 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => handleViewPlayerStats(result.playerName)}
-                            className="px-4 py-2 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 text-white font-semibold rounded-md shadow-md border border-neutral-500 transition-all duration-300 transform hover:scale-105"
-                          >
-                            View Stats
-                          </button>
+                          {/* Removed View Stats button per request */}
                         </div>
 
                         {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
@@ -865,6 +860,77 @@ export default function Home() {
                                     </div>
                                   );
                                 })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recent Match History */}
+                        {result.recentMatches && result.recentMatches.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-neutral-600/40">
+                            <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
+                            <div className="grid gap-2">
+                              {result.recentMatches.slice(0, 8).map((m: any, mi: number) => {
+                                const myTeam = m.teamId;
+                                const allies = (m.players || []).filter((p: any) => p.teamId === myTeam && p.profileId !== result.profileId);
+                                const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
+                                const outcomeColor = m.outcome === 'Win' ? 'text-green-400' : m.outcome === 'Loss' ? 'text-red-400' : 'text-neutral-300';
+                                const diffColor = (m.ratingDiff ?? 0) > 0 ? 'text-green-400' : (m.ratingDiff ?? 0) < 0 ? 'text-red-400' : 'text-neutral-400';
+                                const matchType = m.matchTypeId === 1 ? '1v1' : m.matchTypeId === 2 ? '2v2' : m.matchTypeId === 3 ? '3v3' : m.matchTypeId === 4 ? '4v4' : 'Match';
+                                const start = m.startTime ? new Date(m.startTime * 1000) : undefined;
+                                const duration = typeof m.durationSec === 'number' ? m.durationSec : undefined;
+                                const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';
+                                return (
+                                  <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
+                                    <div className="flex justify-between items-center gap-3">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className={`${outcomeColor} font-semibold`}>{m.outcome || 'Unknown'}</span>
+                                        <span className="text-neutral-500">•</span>
+                                        <span className="text-white truncate" title={m.mapName}>{m.mapName || 'Unknown Map'}</span>
+                                        <span className="text-neutral-500">•</span>
+                                        <span className="text-orange-300">{matchType}</span>
+                                        {start && (
+                                          <>
+                                            <span className="text-neutral-500">•</span>
+                                            <span className="text-neutral-400">{formatLastMatch(start)}</span>
+                                          </>
+                                        )}
+                                        {durStr && (
+                                          <>
+                                            <span className="text-neutral-500">•</span>
+                                            <span className="text-neutral-400">{durStr}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {typeof m.oldRating === 'number' && typeof m.newRating === 'number' && (
+                                          <span className="text-neutral-300">{m.oldRating}→{m.newRating}</span>
+                                        )}
+                                        {typeof m.ratingDiff === 'number' && (
+                                          <span className={`font-semibold ${diffColor}`}>{m.ratingDiff > 0 ? `+${m.ratingDiff}` : m.ratingDiff}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {(allies.length > 0 || opps.length > 0) && (
+                                      <div className="flex items-center justify-between mt-2 gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <span className="text-neutral-400 mr-1">Team:</span>
+                                          <span className="text-neutral-200 truncate">
+                                            {allies.slice(0,3).map((p: any) => p.alias || p.profileId).join(', ')}
+                                            {allies.length > 3 && ` +${allies.length - 3}`}
+                                          </span>
+                                        </div>
+                                        <div className="flex-1 min-w-0 text-right">
+                                          <span className="text-neutral-400 mr-1">Opponents:</span>
+                                          <span className="text-neutral-200 truncate">
+                                            {opps.slice(0,3).map((p: any) => p.alias || p.profileId).join(', ')}
+                                            {opps.length > 3 && ` +${opps.length - 3}`}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
