@@ -869,7 +869,13 @@ export default function Home() {
                           <div className="mt-4 pt-3 border-t border-neutral-600/40">
                             <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
                             <div className="grid gap-2">
-                              {result.recentMatches.slice(0, 8).map((m: any, mi: number) => {
+                              {result.recentMatches
+                                .slice()
+                                .sort((a: any, b: any) => (
+                                  (b.endTime ?? b.startTime ?? 0) - (a.endTime ?? a.startTime ?? 0)
+                                ))
+                                .slice(0, 8)
+                                .map((m: any, mi: number) => {
                                 const myTeam = m.teamId;
                                 const allies = (m.players || []).filter((p: any) => p.teamId === myTeam && p.profileId !== result.profileId);
                                 const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
