@@ -389,10 +389,29 @@ export default function Home() {
     }
   };
 
-  const handleViewPlayerStats = async (profileId: string) => {
-    // Switch to leaderboards tab and search for this player
-    setActiveTab('leaderboards');
-    setSearch(profileId); // This will filter the current leaderboard
+  // Trigger a search for a specific alias (stays in Search tab)
+  const runSearchByName = async (name: string) => {
+    const q = (name || '').trim();
+    if (!q) return;
+    setActiveTab('search');
+    setSearchQuery(q);
+    setSearchLoading(true);
+    setSearchResults([]);
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.results || []);
+      }
+    } catch (e) {
+      console.error('Search failed:', e);
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   return (
@@ -790,34 +809,26 @@ export default function Home() {
                     {searchResults.map((result, index) => (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
                         <div className="flex items-start justify-between mb-3">
-                          <div>
+                          <div className="flex items-center gap-3 flex-wrap">
                             <h4 className="text-white font-medium">{result.playerName}</h4>
-                            <p className="text-neutral-400 text-sm">Profile ID: {result.profileId}</p>
-                            <p className="text-neutral-400 text-sm">Steam ID: {result.steamId || 'Not available'}</p>
-                            {result.personalStats?.profile && (
-                              <div className="mt-2 text-xs text-neutral-300 flex items-center gap-2 flex-wrap">
-                                {result.personalStats.profile.country && (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-neutral-400">Country:</span>
-                                    <FlagIcon countryCode={result.personalStats.profile.country} />
-                                  </div>
-                                )}
-                                {typeof result.personalStats.profile.level === 'number' && (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-neutral-400">Level:</span>
-                                    <span className="text-white">{result.personalStats.profile.level}</span>
-                                  </div>
-                                )}
-                                {typeof result.personalStats.profile.xp === 'number' && (
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-neutral-400">XP:</span>
-                                    <span className="text-white">{result.personalStats.profile.xp.toLocaleString?.() || result.personalStats.profile.xp}</span>
-                                  </div>
-                                )}
+                            {result.personalStats?.profile?.country && (
+                              <div className="flex items-center gap-1">
+                                <FlagIcon countryCode={result.personalStats.profile.country} />
+                              </div>
+                            )}
+                            {typeof result.personalStats?.profile?.level === 'number' && (
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className="text-neutral-400">Level</span>
+                                <span className="text-white">{result.personalStats.profile.level}</span>
+                              </div>
+                            )}
+                            {typeof result.personalStats?.profile?.xp === 'number' && (
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className="text-neutral-400">XP</span>
+                                <span className="text-white">{result.personalStats.profile.xp.toLocaleString?.() || result.personalStats.profile.xp}</span>
                               </div>
                             )}
                           </div>
-                          {/* Removed View Stats button per request */}
                         </div>
 
                         {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
@@ -921,14 +932,36 @@ export default function Home() {
                                         <div className="flex-1 min-w-0">
                                           <span className="text-neutral-400 mr-1">Team:</span>
                                           <span className="text-neutral-200 truncate">
-                                            {allies.slice(0,3).map((p: any) => p.alias || p.profileId).join(', ')}
+                                            {allies.slice(0,3).map((p: any, i: number) => (
+                                              <button
+                                                key={p.profileId + i}
+                                                type="button"
+                                                onClick={() => p.alias && runSearchByName(p.alias)}
+                                                className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                title={p.alias || p.profileId}
+                                              >
+                                                {p.alias || p.profileId}
+                                                {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
+                                              </button>
+                                            ))}
                                             {allies.length > 3 && ` +${allies.length - 3}`}
                                           </span>
                                         </div>
                                         <div className="flex-1 min-w-0 text-right">
                                           <span className="text-neutral-400 mr-1">Opponents:</span>
                                           <span className="text-neutral-200 truncate">
-                                            {opps.slice(0,3).map((p: any) => p.alias || p.profileId).join(', ')}
+                                            {opps.slice(0,3).map((p: any, i: number) => (
+                                              <button
+                                                key={p.profileId + i}
+                                                type="button"
+                                                onClick={() => p.alias && runSearchByName(p.alias)}
+                                                className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                title={p.alias || p.profileId}
+                                              >
+                                                {p.alias || p.profileId}
+                                                {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
+                                              </button>
+                                            ))}
                                             {opps.length > 3 && ` +${opps.length - 3}`}
                                           </span>
                                         </div>
