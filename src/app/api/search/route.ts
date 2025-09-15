@@ -1,25 +1,27 @@
 // Exact search by in-game alias using recent match history
 // This avoids scanning all leaderboards and derives profile_id and SteamID from the response.
 
+type RecentMatch = {
+  matchId: number;
+  mapName?: string;
+  matchTypeId?: number;
+  startTime?: number;
+  endTime?: number;
+  durationSec?: number;
+  outcome?: 'Win' | 'Loss' | 'Unknown';
+  oldRating?: number;
+  newRating?: number;
+  ratingDiff?: number;
+  teamId?: number;
+  raceId?: number;
+  players?: Array<{ profileId: string; alias?: string; teamId?: number }>;
+};
+
 type SearchResult = {
   profileId: string;
   playerName: string; // exact alias
   steamId?: string;   // SteamID64 parsed from `/steam/<id>` when available
-  recentMatches?: Array<{
-    matchId: number;
-    mapName?: string;
-    matchTypeId?: number;
-    startTime?: number;
-    endTime?: number;
-    durationSec?: number;
-    outcome?: 'Win' | 'Loss' | 'Unknown';
-    oldRating?: number;
-    newRating?: number;
-    ratingDiff?: number;
-    teamId?: number;
-    raceId?: number;
-    players?: Array<{ profileId: string; alias?: string; teamId?: number }>;
-  }>;
+  recentMatches?: RecentMatch[];
   personalStats?: {
     profile?: {
       alias?: string;
@@ -155,7 +157,7 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
       }
     }
 
-    const matches: Array<SearchResult['recentMatches'][number]> = [];
+    const matches: RecentMatch[] = [];
     const stats: any[] = Array.isArray(data?.matchHistoryStats) ? data.matchHistoryStats : [];
     for (const m of stats) {
       const members: any[] = Array.isArray(m?.matchhistorymember) ? m.matchhistorymember : [];
