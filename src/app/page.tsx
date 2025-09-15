@@ -880,7 +880,7 @@ export default function Home() {
         {/* Search Tab Content */}
         {activeTab === 'search' && (
           <div className="space-y-6">
-            <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 shadow-2xl">
+            <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
                 Exact search by in-game profile name (alias). This looks up recent match history to resolve the Relic profile ID and Steam ID without scanning leaderboards.
@@ -892,7 +892,7 @@ export default function Home() {
                   placeholder="Enter player name or Steam alias..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner text-base"
+                  className="w-full flex-1 min-w-0 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner text-base"
                   onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
                 />
                 <button
@@ -907,11 +907,11 @@ export default function Home() {
               {searchResults.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-white">Search Results</h3>
-                  <div className="grid gap-4">
+                  <div className="grid gap-4 grid-cols-1">
                     {searchResults.map((result, index) => (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                             <h4 className="text-white font-medium">{result.playerName}</h4>
                             {result.personalStats?.profile?.country && (
                               <div className="flex items-center gap-1">
@@ -1002,8 +1002,8 @@ export default function Home() {
                                 const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
                                 return (
                                   <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                    <div className="flex justify-between items-center gap-3">
-                                      <div className="flex items-center gap-2 min-w-0">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
                                         <span className={`${outcomeColor} font-semibold`}>{m.outcome || 'Unknown'}</span>
                                         <span className="text-neutral-500">•</span>
                                         <span className="text-white truncate" title={m.mapName}>{m.mapName || 'Unknown Map'}</span>
@@ -1026,7 +1026,7 @@ export default function Home() {
                                           </>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 mt-1 sm:mt-0">
                                         {typeof m.oldRating === 'number' && typeof m.newRating === 'number' && (
                                           <span className="text-neutral-300">{m.oldRating}→{m.newRating}</span>
                                         )}
@@ -1036,10 +1036,10 @@ export default function Home() {
                                       </div>
                                     </div>
                                     {(allies.length > 0 || opps.length > 0) && (
-                                      <div className="flex items-center justify-between mt-2 gap-2">
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-2">
                                         <div className="flex-1 min-w-0">
                                           <span className="text-neutral-400 mr-1">Team:</span>
-                                          <span className="text-neutral-200 truncate">
+                                          <span className="text-neutral-200 sm:truncate break-words">
                                             {allies.slice(0,3).map((p: any, i: number) => {
                                               const f = raceIdToFaction(p.raceId);
                                               return (
@@ -1061,9 +1061,9 @@ export default function Home() {
                                             {allies.length > 3 && ` +${allies.length - 3}`}
                                           </span>
                                         </div>
-                                        <div className="flex-1 min-w-0 text-right">
+                                        <div className="flex-1 min-w-0 sm:text-right">
                                           <span className="text-neutral-400 mr-1">Opponents:</span>
-                                          <span className="text-neutral-200 truncate">
+                                          <span className="text-neutral-200 sm:truncate break-words">
                                             {opps.slice(0,3).map((p: any, i: number) => {
                                               const f = raceIdToFaction(p.raceId);
                                               return (
