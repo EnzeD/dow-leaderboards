@@ -215,6 +215,14 @@ const getRankColor = (rank: number): string => {
 type TabType = 'leaderboards' | 'search' | 'contribute';
 
 export default function Home() {
+  type AppState = {
+    view: 'leaderboards' | 'search' | 'contribute';
+    searchQuery?: string;
+    selectedFaction?: string;
+    selectedMatchType?: string;
+    selectedCountry?: string;
+    selectedId?: number;
+  };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
@@ -271,6 +279,45 @@ export default function Home() {
         setLeaderboards(data.items || []);
         // Don't set selectedId here - let the filter effect handle it
       });
+  }, []);
+
+  // Initialize browser history state and handle back/forward within the SPA
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const initialState = {
+      view: activeTab,
+      searchQuery,
+      selectedFaction,
+      selectedMatchType,
+      selectedCountry,
+      selectedId,
+    };
+    try {
+      window.history.replaceState(initialState, '');
+    } catch {}
+
+    const onPopState = (e: PopStateEvent) => {
+      const s = (e.state || {}) as any;
+      if (!s || typeof s !== 'object') return;
+      if (s.view) setActiveTab(s.view);
+      if (s.view === 'search') {
+        const q = (s.searchQuery || s.query || '').trim();
+        setSearchQuery(q);
+        setSearchResults([]);
+        if (q) {
+          // Re-run search without pushing history
+          handlePlayerSearch(q, { pushHistory: false });
+        }
+      } else if (s.view === 'leaderboards') {
+        if (typeof s.selectedFaction === 'string') setSelectedFaction(s.selectedFaction);
+        if (typeof s.selectedMatchType === 'string') setSelectedMatchType(s.selectedMatchType);
+        if (typeof s.selectedCountry === 'string') setSelectedCountry(s.selectedCountry);
+        if (typeof s.selectedId === 'number') setSelectedId(s.selectedId);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-switch away from "All factions" for non-1v1 match types
@@ -364,20 +411,40 @@ export default function Home() {
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
 
   // Search functionality
-  const handlePlayerSearch = async () => {
-    if (!searchQuery.trim()) return;
+  const handlePlayerSearch = async (qOverride?: string, opts?: { pushHistory?: boolean }) => {
+    const q = (qOverride ?? searchQuery).trim();
+    if (!q) return;
 
+    // Ensure we record current state, then push new search state
+    try {
+      const currentState: AppState = {
+        view: activeTab,
+        searchQuery,
+        selectedFaction,
+        selectedMatchType,
+        selectedCountry,
+        selectedId,
+      };
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(currentState, '');
+        if (opts?.pushHistory !== false) {
+          const newState: AppState = { view: 'search', searchQuery: q };
+          window.history.pushState(newState, '');
+        }
+      }
+    } catch {}
+
+    setActiveTab('search');
+    setSearchQuery(q);
     setSearchLoading(true);
     setSearchResults([]);
 
     try {
-      // Call the search API endpoint
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery.trim() })
+        body: JSON.stringify({ query: q })
       });
-
       if (response.ok) {
         const data = await response.json();
         setSearchResults(data.results || []);
@@ -393,25 +460,7 @@ export default function Home() {
   const runSearchByName = async (name: string) => {
     const q = (name || '').trim();
     if (!q) return;
-    setActiveTab('search');
-    setSearchQuery(q);
-    setSearchLoading(true);
-    setSearchResults([]);
-    try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data.results || []);
-      }
-    } catch (e) {
-      console.error('Search failed:', e);
-    } finally {
-      setSearchLoading(false);
-    }
+    await handlePlayerSearch(q, { pushHistory: true });
   };
 
   return (
@@ -808,7 +857,7 @@ export default function Home() {
                   onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
                 />
                 <button
-                  onClick={handlePlayerSearch}
+                  onClick={() => handlePlayerSearch()}
                   disabled={searchLoading || !searchQuery.trim()}
                   className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 disabled:bg-neutral-600 disabled:cursor-not-allowed text-white font-bold rounded-md shadow-lg border border-neutral-500 transition-all duration-300 transform hover:scale-105"
                 >
