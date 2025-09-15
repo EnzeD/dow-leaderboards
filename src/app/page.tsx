@@ -762,7 +762,7 @@ export default function Home() {
             <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
-                Search for a player by their Steam name or alias to find their profile ID and statistics across all leaderboards.
+                Exact search by in-game profile name (alias). This looks up recent match history to resolve the Relic profile ID and Steam ID without scanning leaderboards.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -793,9 +793,7 @@ export default function Home() {
                           <div>
                             <h4 className="text-white font-medium">{result.playerName}</h4>
                             <p className="text-neutral-400 text-sm">Profile ID: {result.profileId}</p>
-                            {result.steamProfile && (
-                              <p className="text-neutral-400 text-sm">Steam: {result.steamProfile.personaname}</p>
-                            )}
+                            <p className="text-neutral-400 text-sm">Steam ID: {result.steamId || 'Not available'}</p>
                           </div>
                           <button
                             onClick={() => handleViewPlayerStats(result.playerName)}
@@ -804,33 +802,6 @@ export default function Home() {
                             View Stats
                           </button>
                         </div>
-
-                        {/* Leaderboard appearances */}
-                        {result.leaderboardAppearances && result.leaderboardAppearances.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-neutral-600/40">
-                            <h5 className="text-sm text-neutral-300 mb-2">Leaderboard Appearances:</h5>
-                            <div className="grid gap-2">
-                              {result.leaderboardAppearances.slice(0, 3).map((appearance: any, appIndex: number) => (
-                                <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                  <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
-                                    <span className="text-orange-300">
-                                      {appearance.faction} {appearance.matchType}
-                                    </span>
-                                    <div className="flex gap-3">
-                                      <span className={getRankColor(appearance.rank)}>#{appearance.rank}</span>
-                                      <span className="text-white">{appearance.rating} ELO</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                              {result.leaderboardAppearances.length > 3 && (
-                                <p className="text-xs text-neutral-400">
-                                  +{result.leaderboardAppearances.length - 3} more leaderboards
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>

@@ -1,149 +1,103 @@
-import { fetchLeaderboards, fetchTop100, resolveNames } from "@/lib/relic";
+// Exact search by in-game alias using recent match history
+// This avoids scanning all leaderboards and derives profile_id and SteamID from the response.
 
 type SearchResult = {
   profileId: string;
-  playerName: string;
-  steamProfile?: any;
-  leaderboardAppearances: Array<{
-    leaderboardId: number;
-    leaderboardName: string;
-    rank: number;
-    rating: number;
-    faction?: string;
-    matchType?: string;
-  }>;
+  playerName: string; // exact alias
+  steamId?: string;   // SteamID64 parsed from `/steam/<id>` when available
 };
 
-// Enhanced fetch that can get more than top 100
-async function fetchPlayers(leaderboardId: number, count: number = 200): Promise<any[]> {
-  const batchSize = 100;
-  const allRows: any[] = [];
-
-  for (let start = 1; start <= count; start += batchSize) {
-    const currentCount = Math.min(batchSize, count - start + 1);
-    const url = `https://dow-api.reliclink.com/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=${start}&count=${currentCount}&sortBy=1`;
-
-    try {
-      const response = await fetch(url, { cache: "no-store" });
-      const data = await response.json();
-
-      if (data?.statGroups && data?.leaderboardStats) {
-        const groups = data.statGroups;
-        const stats = data.leaderboardStats;
-        const groupsById = new Map(groups.map((g: any) => [g.id, g]));
-
-        const rows = stats.map((s: any) => {
-          const group = groupsById.get(s.statgroup_id) as any;
-          const member = group?.members?.[0];
-          return {
-            rank: s.rank,
-            profileId: String(member?.profile_id || ""),
-            playerName: member?.alias || "",
-            rating: s.rating || 0,
-            wins: s.wins || 0,
-            losses: s.losses || 0,
-            streak: s.streak || 0
-          };
-        }).filter((r: any) => r.profileId);
-
-        allRows.push(...rows);
-      }
-    } catch (error) {
-      console.error(`Error fetching leaderboard ${leaderboardId} batch ${start}-${start + currentCount - 1}:`, error);
-      break; // Stop on error to avoid hammering the API
-    }
-
-    // Small delay to respect rate limits
-    if (start + batchSize <= count) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  }
-
-  return allRows;
+function parseSteamIdFromProfileName(name?: string): string | undefined {
+  if (!name) return undefined;
+  // Expected format: "/steam/7656119..." — extract the numeric tail
+  const m = name.match(/\/steam\/(\d{17})/);
+  return m?.[1];
 }
 
-async function searchProfiles(query: string): Promise<SearchResult[]> {
+async function searchByExactAlias(alias: string): Promise<SearchResult[]> {
+  const trimmed = alias.trim();
+  if (!trimmed) return [];
+
+  const aliasesParam = encodeURIComponent(JSON.stringify([trimmed]));
+  const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&aliases=${aliasesParam}`;
+
   try {
-    const { items: leaderboards } = await fetchLeaderboards();
-    const searchResults = new Map<string, SearchResult>();
-    const queryLower = query.toLowerCase();
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data: any = await res.json();
 
-    console.log(`🔍 Searching for "${query}" across ${leaderboards.length} leaderboards`);
+    // Collect any objects within top-level arrays that include both profile_id and alias
+    const candidates: Array<{ profile_id?: number | string; alias?: string; name?: string }> = [];
+    for (const [k, v] of Object.entries<any>(data || {})) {
+      if (Array.isArray(v)) {
+        for (const el of v) {
+          if (el && typeof el === 'object' && ('profile_id' in el) && ('alias' in el)) {
+            candidates.push({ profile_id: (el as any).profile_id, alias: (el as any).alias, name: (el as any).name });
+          }
+        }
+      }
+    }
 
-    // Search through key 1v1 leaderboards first (where most activity is)
-    const priorityLeaderboards = leaderboards.filter(lb =>
-      lb.matchType === '1v1' || lb.name.includes('1v1')
-    ).slice(0, 5);
+    // Filter to exact alias matches
+    const exact = candidates.filter(c => (c.alias ?? '').trim() === trimmed);
 
-    for (const leaderboard of priorityLeaderboards) {
-      try {
-        console.log(`Searching ${leaderboard.name}...`);
+    // Map to SearchResult with Steam ID parsed from "name" ("/steam/<id>")
+    const results: SearchResult[] = [];
+    const seen = new Set<string>();
+    for (const c of exact) {
+      const pid = String(c.profile_id ?? '');
+      if (!pid || seen.has(pid)) continue;
+      seen.add(pid);
+      results.push({
+        profileId: pid,
+        playerName: trimmed,
+        steamId: parseSteamIdFromProfileName(c.name)
+      });
+    }
 
-        // Get top 200 players from this leaderboard
-        const rows = await fetchPlayers(leaderboard.id, 200);
-
-        if (rows.length === 0) continue;
-
-        // Get Steam names for all players
-        const profileIds = rows.map(r => r.profileId).filter(Boolean);
-        const nameMap = await resolveNames(profileIds);
-
-        let matches = 0;
-        for (const row of rows) {
-          const steamName = nameMap[row.profileId] || "";
-          const alias = row.playerName || "";
-
-          // Check for matches
-          const steamMatch = steamName.toLowerCase().includes(queryLower);
-          const aliasMatch = alias.toLowerCase().includes(queryLower);
-
-          if (steamMatch || aliasMatch) {
-            matches++;
-            console.log(`✅ Found: ${steamName || alias} (${row.profileId}) - Rank ${row.rank}`);
-
-            const existing = searchResults.get(row.profileId);
-            const appearance = {
-              leaderboardId: leaderboard.id,
-              leaderboardName: leaderboard.name,
-              rank: row.rank,
-              rating: row.rating,
-              faction: leaderboard.faction,
-              matchType: leaderboard.matchType
-            };
-
-            if (existing) {
-              existing.leaderboardAppearances.push(appearance);
-            } else {
-              searchResults.set(row.profileId, {
-                profileId: row.profileId,
-                playerName: steamName || alias || "Unknown",
-                steamProfile: steamName ? { personaname: steamName } : undefined,
-                leaderboardAppearances: [appearance]
-              });
+    // If not found, attempt a secondary join using objects that have profile_id+name
+    if (results.length === 0) {
+      // Build mapping of profile_id → name ("/steam/<id>")
+      const idToName = new Map<string, string | undefined>();
+      for (const [k, v] of Object.entries<any>(data || {})) {
+        if (Array.isArray(v)) {
+          for (const el of v) {
+            if (el && typeof el === 'object' && ('profile_id' in el) && ('name' in el)) {
+              idToName.set(String((el as any).profile_id), (el as any).name);
             }
           }
         }
+      }
 
-        console.log(`📊 ${leaderboard.name}: ${matches} matches from ${rows.length} players`);
+      // Also gather objects that have alias and some id field we can link via profile_id later
+      const aliasOnly: Array<{ profile_id?: number | string; alias?: string }> = [];
+      for (const [k, v] of Object.entries<any>(data || {})) {
+        if (Array.isArray(v)) {
+          for (const el of v) {
+            if (el && typeof el === 'object' && ('alias' in el)) {
+              aliasOnly.push({ profile_id: (el as any).profile_id, alias: (el as any).alias });
+            }
+          }
+        }
+      }
 
-      } catch (error) {
-        console.error(`Error searching ${leaderboard.name}:`, error);
+      for (const a of aliasOnly) {
+        const pid = String(a.profile_id ?? '');
+        if (!pid) continue;
+        if ((a.alias ?? '').trim() === trimmed && !seen.has(pid)) {
+          seen.add(pid);
+          results.push({
+            profileId: pid,
+            playerName: trimmed,
+            steamId: parseSteamIdFromProfileName(idToName.get(pid))
+          });
+        }
       }
     }
 
-    const results = Array.from(searchResults.values())
-      .sort((a, b) => {
-        const aBestRank = Math.min(...a.leaderboardAppearances.map(app => app.rank));
-        const bBestRank = Math.min(...b.leaderboardAppearances.map(app => app.rank));
-        return aBestRank - bBestRank;
-      })
-      .slice(0, 20);
-
-    console.log(`🎯 Search complete: ${results.length} unique players found`);
     return results;
-
-  } catch (error) {
-    console.error("Search error:", error);
+  } catch (err) {
+    console.error("Exact alias search failed:", err);
     return [];
   }
 }
@@ -151,27 +105,20 @@ async function searchProfiles(query: string): Promise<SearchResult[]> {
 export async function POST(request: Request) {
   try {
     const { query } = await request.json();
+    const q = (typeof query === "string" ? query : "").trim();
 
-    if (!query || typeof query !== 'string' || query.trim().length < 2) {
-      return Response.json({
-        results: [],
-        error: "Query must be at least 2 characters long"
-      }, { status: 400 });
+    if (!q) {
+      return Response.json({ results: [], error: "Alias required" }, { status: 400 });
     }
 
-    const results = await searchProfiles(query.trim());
-
+    const results = await searchByExactAlias(q);
     return Response.json({
       results,
-      query: query.trim(),
+      query: q,
       timestamp: new Date().toISOString()
     });
-
   } catch (error) {
     console.error("Search API error:", error);
-    return Response.json({
-      results: [],
-      error: "Search failed"
-    }, { status: 500 });
+    return Response.json({ results: [], error: "Search failed" }, { status: 500 });
   }
 }
