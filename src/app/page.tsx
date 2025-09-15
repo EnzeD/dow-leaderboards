@@ -360,7 +360,7 @@ export default function Home() {
       // Fetch single leaderboard data
       if (!selectedId) return;
       setLoading(true);
-      fetch(`/api/ladder?leaderboard_id=${selectedId}`)
+      fetch(`/api/cache/leaderboard/${selectedId}`)
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -440,14 +440,11 @@ export default function Home() {
     setSearchResults([]);
 
     try {
-      const response = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q })
-      });
+      const response = await fetch(`/api/cache/player/by-alias/${encodeURIComponent(q)}`);
       if (response.ok) {
         const data = await response.json();
-        setSearchResults(data.results || []);
+        // Expect { results: [ ... ] }
+        setSearchResults(Array.isArray(data?.results) ? data.results : []);
       }
     } catch (error) {
       console.error('Search failed:', error);
