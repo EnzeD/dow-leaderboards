@@ -34,6 +34,7 @@
   - Clear description with motivation and screenshots of UI changes (`.screenshots/` helpful).
   - Linked issue (if applicable) and notes on API/cache behavior.
   - Checklist: `npm run lint` passes; no type errors; docs updated when endpoints/UX change.
+- **Push**: Do NOT push unless the user ask for it (it will deploy automatically)
 
 ## Security & Configuration Tips
 - Do not add secrets; the app uses public Relic/Steam endpoints. Respect rate limits (soft-throttling already implemented in `relic.ts`).
