@@ -185,9 +185,9 @@ export default function Home() {
     )
   );
   const matchTypeSet = new Set(leaderboards.map(lb => lb.matchType).filter(Boolean));
-  const matchTypeOrder = ['1v1', '2v2', '3v3', '4v4', 'Custom'];
+  const matchTypeOrder = ['1v1', '2v2', '3v3', '4v4'];
   const matchTypes = matchTypeOrder.filter(type => matchTypeSet.has(type));
-  const showFactionFilter = selectedMatchType !== 'Custom';
+  const showFactionFilter = true;
   const factions = selectedMatchType === "1v1"
     ? ["All factions", ...availableFactions]
     : availableFactions;
@@ -202,8 +202,8 @@ export default function Home() {
 
   // Filter leaderboards based on selection (not used in combined mode)
   const filteredLeaderboards = leaderboards.filter(lb =>
-    (selectedFaction === "All factions" || lb.faction === selectedFaction) &&
-    (selectedMatchType ? lb.matchType === selectedMatchType : true)
+    (!selectedMatchType || lb.matchType === selectedMatchType) &&
+    (selectedFaction === "All factions" || lb.faction === selectedFaction)
   );
 
   useEffect(() => {
@@ -262,7 +262,7 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-switch away from "All factions" for non-1v1 match types
+  // Auto-switch faction when match type changes
   useEffect(() => {
     if (!selectedMatchType) return;
     if (selectedMatchType === '1v1') {
