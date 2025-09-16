@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import SupportButton from "@/app/_components/SupportButton";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 
 type LadderData = {
@@ -141,11 +142,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'contribute';
+type TabType = 'leaderboards' | 'search' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'contribute';
+    view: 'leaderboards' | 'search' | 'support';
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -474,6 +475,16 @@ export default function Home() {
               >
                 Search
               </button>
+              <button
+                onClick={() => setActiveTab('support')}
+                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
+                  activeTab === 'support'
+                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                }`}
+              >
+                Support
+              </button>
             </div>
             <div className="flex">
               <a
@@ -522,6 +533,16 @@ export default function Home() {
               }`}
             >
               Search
+            </button>
+            <button
+              onClick={() => setActiveTab('support')}
+              className={`px-6 py-3 font-medium transition-all duration-300 ${
+                activeTab === 'support'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              Support
             </button>
             <a
               href="https://github.com/EnzeD/dow-leaderboards"
@@ -1009,6 +1030,22 @@ export default function Home() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Support Tab Content */}
+        {activeTab === 'support' && (
+          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl text-center space-y-4">
+            <h2 className="text-2xl font-bold text-white">Support the Chapter</h2>
+            <p className="text-neutral-300">
+              May these tactical readouts aid your crusade. A modest tithe keeps the machine-spirits purring, the data flowing, and new wargear (features) in the forge.
+            </p>
+            <p className="text-neutral-400 text-sm">
+              The Emperor protects, your support sustains.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <SupportButton className="w-full sm:w-auto" />
             </div>
           </div>
         )}
