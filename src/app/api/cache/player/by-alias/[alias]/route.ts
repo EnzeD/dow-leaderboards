@@ -156,12 +156,16 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
     const newRating = typeof me?.newrating === 'number' ? me.newrating : undefined;
     const ratingDiff = (typeof oldRating === 'number' && typeof newRating === 'number') ? (newRating - oldRating) : undefined;
     const outcome: 'Win' | 'Loss' | 'Unknown' = me?.outcome === 1 ? 'Win' : (me?.outcome === 0 ? 'Loss' : 'Unknown');
-    const players = members.map((p: any) => ({
-      profileId: String(p?.profile_id ?? ''),
-      alias: aliasMap.get(String(p?.profile_id ?? '')),
-      teamId: typeof p?.teamid === 'number' ? p.teamid : undefined,
-      raceId: Number.isFinite(Number(p?.race_id)) && Number(p?.race_id) > 0 ? Number(p?.race_id) : undefined,
-    }));
+    const players = members.map((p: any) => {
+      const raceIdNum = Number(p?.race_id);
+      const teamId = typeof p?.teamid === 'number' ? p.teamid : undefined;
+      return {
+        profileId: String(p?.profile_id ?? ''),
+        alias: aliasMap.get(String(p?.profile_id ?? '')),
+        teamId,
+        raceId: Number.isFinite(raceIdNum) && raceIdNum >= 0 && typeof teamId === 'number' && teamId >= 0 ? raceIdNum : undefined,
+      };
+    }).filter(p => typeof p.teamId === 'number' && p.teamId >= 0);
     const meRaceIdNum = Number(me?.race_id);
     matches.push({
       matchId: Number(m?.id ?? 0) || 0,
@@ -175,7 +179,7 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
       newRating,
       ratingDiff,
       teamId: typeof me?.teamid === 'number' ? me.teamid : undefined,
-      raceId: Number.isFinite(meRaceIdNum) && meRaceIdNum > 0 ? meRaceIdNum : undefined,
+      raceId: Number.isFinite(meRaceIdNum) && meRaceIdNum >= 0 ? meRaceIdNum : undefined,
       players,
     });
   }

@@ -204,21 +204,22 @@ const getFactionColor = (faction: string): string => {
   return factionColors[faction] || 'text-orange-300';
 };
 
-// Map raceId from match history to faction name
+const RACE_ID_TO_FACTION: Record<number, string> = {
+  0: 'Chaos Marine',
+  1: 'Dark Eldar',
+  2: 'Eldar',
+  3: 'Imperial Guard',
+  4: 'Necron',
+  5: 'Ork',
+  6: 'Sisters of Battle',
+  7: 'Space Marine',
+  8: 'Tau',
+};
+
+// Map raceId from match history to faction name as defined by relic API payloads
 const raceIdToFaction = (raceId?: number): string => {
-  const map: Record<number, string> = {
-    1: 'Space Marine',
-    2: 'Chaos Marine',
-    3: 'Ork',
-    4: 'Eldar',
-    5: 'Imperial Guard',
-    6: 'Necron',
-    7: 'Tau',
-    8: 'Sisters of Battle',
-    9: 'Dark Eldar',
-  };
-  if (!raceId) return 'Unknown';
-  return map[raceId] || 'Unknown';
+  if (raceId === undefined || raceId === null || raceId < 0) return 'Unknown';
+  return RACE_ID_TO_FACTION[raceId] || 'Unknown';
 };
 
 // Get rank color based on position
@@ -883,7 +884,7 @@ export default function Home() {
             <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
-                Exact search by in-game profile name (alias). It's case-sensitive.
+                Exact search by in-game profile name (alias). It&apos;s case-sensitive.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-6">
                 <input
