@@ -30,6 +30,7 @@
 
 ## Commit & Pull Request Guidelines
 - **Commits**: Prefer Conventional Commits (seen in history): `feat:`, `fix:`, `doc:`, etc. Keep messages imperative and scoped (e.g., `feat: add country filtering`). Ask for commit after every substantial development. Never ask for push.
+- **Validation step**: Before running tests or staging files, share the proposed changes with the user and wait for their explicit validation. Do not run `typecheck`, `lint`, or `build`, and do not commit, until the user confirms the work looks correct.
 - **PRs**: Include:
   - Clear description with motivation and screenshots of UI changes (`.screenshots/` helpful).
   - Linked issue (if applicable) and notes on API/cache behavior.
@@ -60,3 +61,4 @@ Notes:
 - If a push is requested mid-failure, inform the user what fails (type/lint/build), propose a fix, implement it, and re-run the checks before pushing.
 - Avoid pushing if Next.js type validation fails in production mode even when `npm run dev` works locally.
 - Keep these checks lightweight and fast; prioritize type correctness and a clean production build over exhaustive testing.
+- After committing changes, always ask the user for permission before pushing (`git push`) to avoid triggering an unintended production deployment.
