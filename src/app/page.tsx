@@ -184,10 +184,13 @@ export default function Home() {
         .filter(faction => faction && faction !== 'Unknown')
     )
   );
-  const factions = selectedMatchType === "1v1" || selectedMatchType === "All Types"
+  const matchTypeSet = new Set(leaderboards.map(lb => lb.matchType).filter(Boolean));
+  const matchTypeOrder = ['1v1', '2v2', '3v3', '4v4', 'Custom'];
+  const matchTypes = matchTypeOrder.filter(type => matchTypeSet.has(type));
+  const showFactionFilter = selectedMatchType !== 'Custom';
+  const factions = selectedMatchType === "1v1"
     ? ["All factions", ...availableFactions]
     : availableFactions;
-  const matchTypes = ["1v1", "All Types", ...Array.from(new Set(leaderboards.map(lb => lb.matchType).filter(Boolean).filter(type => type !== "1v1")))];
 
   // Get unique countries from current ladder data
   const availableCountries = Array.from(new Set(
@@ -200,8 +203,15 @@ export default function Home() {
   // Filter leaderboards based on selection (not used in combined mode)
   const filteredLeaderboards = leaderboards.filter(lb =>
     (selectedFaction === "All factions" || lb.faction === selectedFaction) &&
-    (selectedMatchType === "All Types" || lb.matchType === selectedMatchType)
+    (selectedMatchType ? lb.matchType === selectedMatchType : true)
   );
+
+  useEffect(() => {
+    if (matchTypes.length === 0) return;
+    if (!matchTypes.includes(selectedMatchType)) {
+      setSelectedMatchType(matchTypes[0]);
+    }
+  }, [matchTypes, selectedMatchType]);
 
   // Load leaderboards on mount
   useEffect(() => {
@@ -254,27 +264,28 @@ export default function Home() {
 
   // Auto-switch away from "All factions" for non-1v1 match types
   useEffect(() => {
-    if (selectedFaction === "All factions" && selectedMatchType !== "1v1" && selectedMatchType !== "All Types") {
-      // Switch to the first available faction for this match type
-      const factionsForMatchType = leaderboards
-        .filter(lb => lb.matchType === selectedMatchType)
-        .map(lb => lb.faction)
-        .filter(faction => faction && faction !== 'Unknown');
-      if (factionsForMatchType.length > 0 && factionsForMatchType[0]) {
-        setSelectedFaction(factionsForMatchType[0]);
+    if (!selectedMatchType) return;
+    if (selectedMatchType === '1v1') {
+      if (selectedFaction !== 'All factions' && !availableFactions.includes(selectedFaction)) {
+        setSelectedFaction('All factions');
       }
+      return;
     }
-  }, [selectedMatchType, leaderboards, selectedFaction]);
+
+    const fallback = leaderboards.find(lb => lb.matchType === selectedMatchType && lb.faction && lb.faction !== 'Unknown');
+    if (fallback?.faction && fallback.faction !== selectedFaction) {
+      setSelectedFaction(fallback.faction);
+    }
+  }, [selectedMatchType, leaderboards, selectedFaction, availableFactions]);
 
   // Update selected ID when filters change OR when leaderboards first load
   useEffect(() => {
-    if (filteredLeaderboards.length > 0) {
-      const newId = filteredLeaderboards[0].id;
-      if (newId !== selectedId) {
-        setSelectedId(newId);
-      }
+    if (filteredLeaderboards.length === 0) return;
+    const newId = filteredLeaderboards[0].id;
+    if (newId !== selectedId) {
+      setSelectedId(newId);
     }
-  }, [selectedFaction, selectedMatchType, leaderboards]);
+  }, [filteredLeaderboards, selectedId]);
 
   // Load ladder when selection changes
   useEffect(() => {
@@ -556,19 +567,21 @@ export default function Home() {
                 ))}
               </select>
             </div>
-            <div className="flex flex-col">
-              <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
-              <select
-                value={selectedFaction}
-                onChange={(e) => setSelectedFaction(e.target.value)}
-                className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
-                disabled={loading}
-              >
-                {factions.map(faction => (
-                  <option key={faction} value={faction}>{faction}</option>
-                ))}
-              </select>
-            </div>
+            {showFactionFilter && (
+              <div className="flex flex-col">
+                <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
+                <select
+                  value={selectedFaction}
+                  onChange={(e) => setSelectedFaction(e.target.value)}
+                  className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                  disabled={loading}
+                >
+                  {factions.map(faction => (
+                    <option key={faction} value={faction}>{faction}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex flex-col">
               <label className="text-sm text-neutral-300 mb-2 font-medium">Country</label>
               <select
@@ -588,21 +601,7 @@ export default function Home() {
         {/* Specific Leaderboard Selection & Search */}
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-neutral-900/30 rounded-lg border border-neutral-700/30" style={{backdropFilter: 'blur(10px)'}}>
           <div className="flex flex-col gap-4">
-            {!isCombinedMode && (
-              <div className="flex flex-col">
-                <label className="text-xs text-neutral-400 mb-1">Specific Leaderboard</label>
-                <select
-                  value={selectedId}
-                  onChange={(e) => setSelectedId(Number(e.target.value))}
-                  className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
-                  disabled={loading}
-                >
-                  {filteredLeaderboards.map(lb => (
-                    <option key={lb.id} value={lb.id}>{lb.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Specific Leaderboard selection removed: faction + match type drive selection */}
 
             <div className="flex flex-col">
               <label className="text-xs text-neutral-400 mb-1">Search Players</label>
