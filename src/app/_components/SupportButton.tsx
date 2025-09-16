@@ -16,7 +16,7 @@ export default function SupportButton({ className = "" }: SupportButtonProps) {
       href={tipUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold shadow-lg bg-yellow-300 text-neutral-900 hover:brightness-95 transition ${className}`.trim()}
+      className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold shadow-lg bg-red-600 text-white hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300 transition ${className}`.trim()}
       aria-label="Fuel the Crusade"
     >
       <span className="mr-2" role="img" aria-hidden="true">
