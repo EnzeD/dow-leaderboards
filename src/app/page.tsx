@@ -883,9 +883,8 @@ export default function Home() {
             <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
-                Exact search by in-game profile name (alias). This looks up recent match history to resolve the Relic profile ID and Steam ID without scanning leaderboards.
+                Exact search by in-game profile name (alias). It's case-sensitive.
               </p>
-
               <div className="flex flex-col sm:flex-row gap-4 mb-6">
                 <input
                   type="text"
