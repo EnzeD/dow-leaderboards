@@ -267,7 +267,13 @@ export default function Home() {
 
   // Get unique factions and match types
   // Only show "All factions" for 1v1 match type
-  const availableFactions = Array.from(new Set(leaderboards.map(lb => lb.faction).filter(Boolean)));
+  const availableFactions = Array.from(
+    new Set(
+      leaderboards
+        .map(lb => lb.faction)
+        .filter(faction => faction && faction !== 'Unknown')
+    )
+  );
   const factions = selectedMatchType === "1v1" || selectedMatchType === "All Types"
     ? ["All factions", ...availableFactions]
     : availableFactions;
@@ -347,7 +353,7 @@ export default function Home() {
       const factionsForMatchType = leaderboards
         .filter(lb => lb.matchType === selectedMatchType)
         .map(lb => lb.faction)
-        .filter(Boolean);
+        .filter(faction => faction && faction !== 'Unknown');
       if (factionsForMatchType.length > 0 && factionsForMatchType[0]) {
         setSelectedFaction(factionsForMatchType[0]);
       }
