@@ -38,24 +38,28 @@ const FlagIcon = ({ countryCode, compact = false }: { countryCode: string; compa
   if (!normalized) return null;
   const isoCode = normalized.toUpperCase();
   const label = getCountryName(countryCode) || isoCode;
-  const flagHeight = compact ? '0.7rem' : '0.85rem';
+  const flagHeight = compact ? '0.7rem' : '0.9rem';
   const flagWidth = `calc(${flagHeight} * 4 / 3)`;
 
   return (
     <span
-      className={`inline-flex items-center ${compact ? 'gap-1 px-1.5 py-0.5' : 'gap-1.5 px-2 py-0.5'} rounded-full bg-neutral-900/80 border border-neutral-700/40 shadow-sm`}
+      className={`inline-flex items-center ${compact ? 'gap-1 px-1.5 py-0.5' : 'gap-1.5 px-2 py-1'} bg-neutral-700/80 rounded-md border border-neutral-600/50 shadow-sm backdrop-blur-sm`}
       title={label}
     >
       <span
         className={`fi fi-${normalized}`}
         aria-hidden="true"
-        style={{ width: flagWidth, minWidth: flagWidth, height: flagHeight }}
+        style={{
+          width: flagWidth,
+          minWidth: flagWidth,
+          height: flagHeight,
+          boxShadow: '0 0 0 1px rgba(0,0,0,0.35)',
+          borderRadius: '0.25rem'
+        }}
       />
-      {!compact && (
-        <span className="uppercase tracking-wide font-semibold text-[0.7rem] text-neutral-100">
-          {isoCode}
-        </span>
-      )}
+      <span className={`uppercase tracking-wide font-mono font-semibold text-neutral-200 ${compact ? 'text-[0.6rem]' : 'text-[0.7rem]'}`}>
+        {isoCode}
+      </span>
     </span>
   );
 };
