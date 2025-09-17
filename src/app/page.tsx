@@ -1078,7 +1078,13 @@ export default function Home() {
                 Dawn of War: Definitive Edition Leaderboards &amp; Player Stats
               </p>
               <p className="text-neutral-400">
-                Track competitive Dawn of War rankings, faction win rates, and player match histories in real time. Search commanders, review ELO trends, and study meta shifts across Chaos, Eldar, Space Marines, Tau, and more.
+                Monitor competitive Dawn of War ladder rankings, faction win rates, and player match histories in real time. Analyze commanders, review ELO trends, and study meta shifts across Chaos, Eldar, Space Marines, Tau, and more.
+              </p>
+              <p className="text-neutral-400">
+                Dedicated coverage of the global 1v1 Dawn of War leaderboard, 2v2 through 4v4 ladders, and community meta reports keeps you battle ready with tournament-grade statistics, matchup breakdowns, and balance insights.
+              </p>
+              <p className="text-neutral-400">
+                Use the searchable Dawn of War leaderboards to scout opponents, compare ladder positions, and download historical statistics before your next ranked match.
               </p>
               <p className="text-neutral-400">
                 Consider supporting to cover costs for this free community website.{' '}
@@ -1102,21 +1108,21 @@ export default function Home() {
                   onClick={() => activateTabFromFooter('leaderboards')}
                   className="w-fit text-left transition hover:text-white"
                 >
-                  Leaderboards Overview
+                  Dawn of War Ladder Overview
                 </button>
                 <button
                   type="button"
                   onClick={() => activateTabFromFooter('search')}
                   className="w-fit text-left transition hover:text-white"
                 >
-                  Player Search Portal
+                  Player Search & Statistics Portal
                 </button>
                 <button
                   type="button"
                   onClick={handleSupportLink}
                   className="w-fit text-left transition hover:text-white"
                 >
-                  Support Options
+                  Support & Hosting Options
                 </button>
                 <a
                   href="https://github.com/EnzeD/dow-leaderboards"
@@ -1162,6 +1168,9 @@ export default function Home() {
                 </a>{' '}
                 keeping the Adeptus Astartes community informed with accurate Dawn of War data.
               </p>
+              <p className="leading-relaxed text-neutral-400">
+                Explore long-form Dawn of War ladder analysis, balance discussions, and statistics archives curated by the community to help you conquer ranked seasons and tournament brackets.
+              </p>
               <div className="flex flex-wrap items-center gap-3">
                 <a
                   href="https://nicolas-zullo.com/"
@@ -1183,6 +1192,7 @@ export default function Home() {
                     alt="X Logo"
                     className="h-4 w-4"
                     loading="lazy"
+                    style={{ filter: 'invert(1)' }}
                   />
                 </a>
               </div>
