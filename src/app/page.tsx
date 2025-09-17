@@ -994,7 +994,7 @@ export default function Home() {
                       {isCombinedMode && (
                         <td className={`px-4 py-3 font-semibold border-r border-neutral-600/20 ${getFactionColor(row.faction || '')}`}>
                           <div className="flex items-center gap-2 min-w-0">
-                            <FactionLogo faction={row.faction || undefined} size={16} />
+                            <FactionLogo faction={row.faction || undefined} size={18} />
                             <span className="truncate">{row.faction || 'Unknown'}</span>
                           </div>
                         </td>
@@ -1040,7 +1040,7 @@ export default function Home() {
                       </button>
                       {isCombinedMode && (
                         <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
-                          <FactionLogo faction={row.faction || undefined} size={12} />
+                          <FactionLogo faction={row.faction || undefined} size={14} />
                           {row.faction ? row.faction.slice(0, 3) : 'Unk'}
                         </span>
                       )}
@@ -1183,6 +1183,9 @@ export default function Home() {
                                     <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
                                       <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
                                         <div className="flex items-center gap-2 min-w-0">
+                                          <span className={`${getFactionColor(faction)} inline-flex items-center`}>
+                                            <FactionLogo faction={faction} size={14} />
+                                          </span>
                                           <span className="text-orange-300 truncate" title={name}>
                                             {faction} {type}
                                           </span>
@@ -1285,7 +1288,10 @@ export default function Home() {
                                                 >
                                                   {p.alias || p.profileId}
                                                   {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)}`}>({f})</span>
+                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center gap-1`}>
+                                                      <FactionLogo faction={f} size={12} />
+                                                      ({f})
+                                                    </span>
                                                   )}
                                                   {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
                                                 </button>
@@ -1309,7 +1315,10 @@ export default function Home() {
                                                 >
                                                   {p.alias || p.profileId}
                                                   {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)}`}>({f})</span>
+                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center gap-1`}>
+                                                      <FactionLogo faction={f} size={12} />
+                                                      ({f})
+                                                    </span>
                                                   )}
                                                   {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
                                                 </button>
