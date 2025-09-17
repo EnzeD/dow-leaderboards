@@ -2,6 +2,8 @@
 
 A modern, mobile-friendly leaderboard website for Dawn of War: Definitive Edition, displaying live rankings and player statistics from Relic's Community API.
 
+Live: https://www.dow-de.com
+
 ![Dawn of War: Definitive Edition Leaderboards](./image.png)
 
 ## 🚀 Features
@@ -13,6 +15,9 @@ A modern, mobile-friendly leaderboard website for Dawn of War: Definitive Editio
 - **Mobile-Friendly**: Responsive design optimized for all devices
 - **Advanced Filtering**: Sort by rank, rating, wins, losses, winrate, and more
 - **Flag System**: CSS-based country flags for international players
+- **Shareable URLs**: Filters/search/support reflected in the URL; default leaderboards keep a clean root (`/`). Copy-link buttons in the UI.
+- **Smarter Search UX**: On leaderboards, no-match searches auto-expand results (top 200 → top 1000) and revert when cleared; suggest profile search if still none.
+- **Faction Logos**: Color‑matched icons in Faction columns and search sections for quick visual parsing.
 
 ## 🛠 Tech Stack
 
@@ -43,6 +48,8 @@ npm run dev
 ```
 
 Visit `http://localhost:3000` to see the application.
+
+Production is available at `https://www.dow-de.com`.
 
 ### Build for Production
 
@@ -104,6 +111,7 @@ We welcome contributions! Here are some ways you can help:
 - Steam name enrichment working
 - Mobile-responsive design
 - Rate limiting and error handling
+- Basic 'exact-match' search
 
 **🚧 Potential Enhancements**
 - Player profile pages
@@ -116,14 +124,15 @@ We welcome contributions! Here are some ways you can help:
 
 ### Data Flow
 1. **Leaderboards**: Cached for 24h from `GetAvailableLeaderboards`
-2. **Ladder Data**: Real-time from `getLeaderBoard2` (Top-100)
+2. **Ladder Data**: Cached for 30min from `getLeaderBoard2` (Top-200)
 3. **Steam Names**: Batch resolution via `proxysteamuserrequest`
 
 ### API Endpoints
-- `/api/leaderboards` - Available leaderboard list
-- `/api/ladder?leaderboard_id=X` - Top-100 players for specific leaderboard
-- `/api/combined` - Combined 1v1 rankings across all factions
-- `/api/search` - Player search functionality
+- `/api/leaderboards` — Available leaderboard list
+- `/api/cache/leaderboard/[id]` — Cached leaderboard rows (default 200)
+- `/api/cache/leaderboard/[id]/[limit]` — Extended rows (e.g., 1000)
+- `/api/cache/combined-1v1` and `/api/cache/combined-1v1/[limit]` — Combined 1v1 across factions
+- `/api/cache/player/by-alias/[alias]` — Player profile + stats + recent matches
 
 ## 📝 License
 
