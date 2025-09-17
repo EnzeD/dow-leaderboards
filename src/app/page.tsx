@@ -657,7 +657,7 @@ export default function Home() {
 
   const handleSupportLink = () => activateTabFromFooter('support');
 
-  // Fetch and poll current Steam player count (every 30 minutes)
+  // Fetch and poll current Steam player count (every 5 minutes)
   useEffect(() => {
     let cancelled = false;
     const load = () => {
@@ -677,7 +677,7 @@ export default function Home() {
         });
     };
     load();
-    const id = setInterval(load, 30 * 60_000);
+    const id = setInterval(load, 5 * 60_000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 

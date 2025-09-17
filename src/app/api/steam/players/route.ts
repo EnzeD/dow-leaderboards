@@ -21,7 +21,7 @@ export async function GET() {
         lastUpdated: new Date().toISOString(),
         error: "upstream_error",
       },
-      { status: 502, headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=600" } }
+      { status: 502, headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
     );
     }
 
@@ -36,7 +36,7 @@ export async function GET() {
         success,
         lastUpdated: new Date().toISOString(),
       },
-      { headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=600" } }
+      { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
     );
   } catch (e) {
     return Response.json(
@@ -47,7 +47,7 @@ export async function GET() {
         lastUpdated: new Date().toISOString(),
         error: "fetch_failed",
       },
-      { status: 502, headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=600" } }
+      { status: 502, headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
     );
   }
 }
