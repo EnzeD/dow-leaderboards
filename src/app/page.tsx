@@ -3,6 +3,18 @@
 import { useState, useEffect } from "react";
 import SupportButton from "@/app/_components/SupportButton";
 import { LadderRow, Leaderboard } from "@/lib/relic";
+// Faction icons (bundled assets). If you move icons to public/assets/factions,
+// you can reference them via URL instead.
+import chaosIcon from "../../assets/factions/chaos.png";
+import darkEldarIcon from "../../assets/factions/darkeldar.png";
+import eldarIcon from "../../assets/factions/eldar.png";
+import imperialGuardIcon from "../../assets/factions/imperialguard.png";
+import necronIcon from "../../assets/factions/necron.png";
+import orkIcon from "../../assets/factions/ork.png";
+import sistersIcon from "../../assets/factions/sister.png";
+import spaceMarineIcon from "../../assets/factions/spacemarine.png";
+import tauIcon from "../../assets/factions/tau.png";
+import type { StaticImageData } from 'next/image';
 
 type LadderData = {
   leaderboardId: number;
@@ -113,6 +125,46 @@ const getFactionColor = (faction: string): string => {
     'Sisters of Battle': 'text-pink-400'
   };
   return factionColors[faction] || 'text-orange-300';
+};
+
+// Map faction → icon path (bundled)
+const FACTION_ICON_MAP: Record<string, StaticImageData | string> = {
+  'Chaos Marine': chaosIcon,
+  'Dark Eldar': darkEldarIcon,
+  'Eldar': eldarIcon,
+  'Imperial Guard': imperialGuardIcon,
+  'Necron': necronIcon,
+  'Ork': orkIcon,
+  'Sisters of Battle': sistersIcon,
+  'Space Marine': spaceMarineIcon,
+  'Tau': tauIcon,
+};
+
+const FactionLogo = ({ faction, size = 16, className = '' }: { faction?: string; size?: number; className?: string }) => {
+  const icon = faction ? FACTION_ICON_MAP[faction] : undefined;
+  if (!icon) return null;
+  const url = typeof icon === 'string' ? icon : (icon as any).src || '';
+  const dim = `${size}px`;
+  return (
+    <span
+      aria-hidden
+      className={`inline-block align-middle ${className}`}
+      style={{
+        width: dim,
+        height: dim,
+        backgroundColor: 'currentColor',
+        WebkitMaskImage: `url(${url})`,
+        maskImage: `url(${url})`,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+        display: 'inline-block',
+      }}
+    />
+  );
 };
 
 const RACE_ID_TO_FACTION: Record<number, string> = {
@@ -941,7 +993,10 @@ export default function Home() {
                       </td>
                       {isCombinedMode && (
                         <td className={`px-4 py-3 font-semibold border-r border-neutral-600/20 ${getFactionColor(row.faction || '')}`}>
-                          <span className="truncate">{row.faction || 'Unknown'}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FactionLogo faction={row.faction || undefined} size={16} />
+                            <span className="truncate">{row.faction || 'Unknown'}</span>
+                          </div>
                         </td>
                       )}
                       <td className="px-4 py-3 text-white font-bold border-r border-neutral-600/20">{row.rating}</td>
@@ -984,7 +1039,8 @@ export default function Home() {
                         {row.playerName}
                       </button>
                       {isCombinedMode && (
-                        <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')}`}>
+                        <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
+                          <FactionLogo faction={row.faction || undefined} size={12} />
                           {row.faction ? row.faction.slice(0, 3) : 'Unk'}
                         </span>
                       )}
