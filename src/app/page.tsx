@@ -1249,10 +1249,6 @@ export default function Home() {
                                         <span className="text-white truncate" title={m.mapName}>{m.mapName || 'Unknown Map'}</span>
                                         <span className="text-neutral-500">•</span>
                                         <span className="text-orange-300">{matchType}</span>
-                                        <>
-                                          <span className="text-neutral-500">•</span>
-                                          <span className={`${myFaction === 'Unknown' ? 'text-neutral-400' : getFactionColor(myFaction)}`}>{myFaction}</span>
-                                        </>
                                         {start && (
                                           <>
                                             <span className="text-neutral-500">•</span>
