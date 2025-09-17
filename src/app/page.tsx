@@ -1280,7 +1280,35 @@ export default function Home() {
                                         <div className="flex-1 min-w-0">
                                           <span className="text-neutral-400 mr-1">Team:</span>
                                           <span className="text-neutral-200 sm:truncate break-words">
-                                            {allies.slice(0,3).map((p: any, i: number) => {
+                                            {/* Self first */}
+                                            {(() => {
+                                              const selfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
+                                              const selfFaction = myFaction;
+                                              return (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => selfAlias && runSearchByName(selfAlias)}
+                                                    className={`hover:underline ${selfAlias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                    title={selfAlias}
+                                                  >
+                                                    {selfAlias}
+                                                    {selfFaction !== 'Unknown' && (
+                                                      <span className={`ml-1 ${getFactionColor(selfFaction)} inline-flex items-center`}>
+                                                        (
+                                                        <FactionLogo faction={selfFaction} size={11} yOffset={0} className="mx-1" />
+                                                        <span>{selfFaction}</span>
+                                                        )
+                                                      </span>
+                                                    )}
+                                                  </button>
+                                                  {allies.length > 0 && ', '}
+                                                </>
+                                              );
+                                            })()}
+
+                                            {/* Allies (limit to keep line compact) */}
+                                            {allies.slice(0,2).map((p: any, i: number) => {
                                               const f = raceIdToFaction(p.raceId);
                                               return (
                                                 <button
@@ -1299,11 +1327,11 @@ export default function Home() {
                                                       )
                                                     </span>
                                                   )}
-                                                  {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
+                                                  {i < Math.min(allies.length, 2) - 1 ? ', ' : ''}
                                                 </button>
                                               );
                                             })}
-                                            {allies.length > 3 && ` +${allies.length - 3}`}
+                                            {allies.length > 2 && ` +${allies.length - 2}`}
                                           </span>
                                         </div>
                                         <div className="flex-1 min-w-0 sm:text-right">
