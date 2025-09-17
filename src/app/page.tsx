@@ -1224,6 +1224,14 @@ export default function Home() {
                   </div>
                 </div>
               )}
+              {!searchLoading && searchQuery.trim() && searchResults.length === 0 && (
+                <div className="mt-4 text-sm text-neutral-300 bg-neutral-900/40 border border-neutral-700/40 rounded-md p-4">
+                  <span className="font-semibold text-white">No Results.</span>{' '}
+                  <span>
+                    Hint: enter the exact name you are using in your multiplayer profile. It&apos;s case-sensitive.
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
