@@ -235,6 +235,7 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
+  const [lbExpanded, setLbExpanded] = useState(false);
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
@@ -440,6 +441,40 @@ export default function Home() {
   });
 
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
+
+  // Auto-expand search on leaderboards tab when no results are found
+  useEffect(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) { setLbExpanded(false); return; }
+    if (!ladderData?.rows?.length) return;
+
+    const hasMatch = ladderData.rows.some(r => r.playerName.toLowerCase().includes(q));
+    if (hasMatch) return; // no need to expand
+
+    // Try to expand once per search/filter combo
+    if (lbExpanded) return;
+
+    if (isCombinedMode) {
+      if (combinedLimit < 1000) {
+        setCombinedLimit(1000);
+        setLbExpanded(true);
+      }
+    } else if (selectedId) {
+      // Fetch extended rows for this specific leaderboard (up to 1000)
+      setLbExpanded(true);
+      fetch(`/api/cache/leaderboard/${selectedId}/1000`)
+        .then(r => r.json())
+        .then(data => {
+          setLadderData(data);
+        })
+        .catch(() => {});
+    }
+  }, [search, ladderData, isCombinedMode, combinedLimit, selectedId, lbExpanded]);
+
+  // Reset expansion flag when filters change or user clears search
+  useEffect(() => {
+    setLbExpanded(false);
+  }, [selectedMatchType, selectedFaction, selectedCountry, selectedId, activeTab]);
 
   // Search functionality
   const handlePlayerSearch = async (qOverride?: string, opts?: { pushHistory?: boolean }) => {
@@ -774,7 +809,25 @@ export default function Home() {
                 className="w-full px-4 py-3 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
               />
             </div>
-            
+            {search.trim() && filteredRows.length === 0 && lbExpanded && (
+              <div className="text-xs sm:text-sm text-neutral-300 bg-neutral-900/40 border border-neutral-700/40 rounded-md p-3">
+                <span className="font-semibold text-white">No results on this leaderboard.</span>{' '}
+                <span>
+                  Try a profile search — use the exact multiplayer profile name (case-sensitive).
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('search');
+                    setSearchQuery(search.trim());
+                    handlePlayerSearch(search.trim(), { pushHistory: true });
+                  }}
+                  className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded border border-neutral-600/40 bg-neutral-800/60 hover:bg-neutral-700/60 text-white transition-colors font-semibold"
+                >
+                  Go to Profile Search
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
