@@ -140,11 +140,13 @@ const FACTION_ICON_MAP: Record<string, StaticImageData | string> = {
   'Tau': tauIcon,
 };
 
-const FactionLogo = ({ faction, size = 16, className = '' }: { faction?: string; size?: number; className?: string }) => {
+const FactionLogo = ({ faction, size = 16, className = '', yOffset }: { faction?: string; size?: number; className?: string; yOffset?: number }) => {
   const icon = faction ? FACTION_ICON_MAP[faction] : undefined;
   if (!icon) return null;
   const url = typeof icon === 'string' ? icon : (icon as any).src || '';
   const dim = `${size}px`;
+  // Small vertical tweak to better align optically with text baselines
+  const offset = typeof yOffset === 'number' ? yOffset : Math.max(1, Math.round(size * 0.06));
   return (
     <span
       aria-hidden
@@ -162,6 +164,8 @@ const FactionLogo = ({ faction, size = 16, className = '' }: { faction?: string;
         WebkitMaskSize: 'contain',
         maskSize: 'contain',
         display: 'inline-block',
+        position: 'relative',
+        top: `${offset}px`,
       }}
     />
   );
@@ -1184,7 +1188,7 @@ export default function Home() {
                                       <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
                                         <div className="flex items-center gap-2 min-w-0">
                                           <span className={`${getFactionColor(faction)} inline-flex items-center`}>
-                                            <FactionLogo faction={faction} size={14} />
+                                            <FactionLogo faction={faction} size={12} yOffset={0} />
                                           </span>
                                           <span className="text-orange-300 truncate" title={name}>
                                             {faction} {type}
@@ -1288,9 +1292,11 @@ export default function Home() {
                                                 >
                                                   {p.alias || p.profileId}
                                                   {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center gap-1`}>
-                                                      <FactionLogo faction={f} size={12} />
-                                                      ({f})
+                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
+                                                      (
+                                                      <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
+                                                      <span>{f}</span>
+                                                      )
                                                     </span>
                                                   )}
                                                   {i < Math.min(allies.length, 3) - 1 ? ', ' : ''}
@@ -1315,9 +1321,11 @@ export default function Home() {
                                                 >
                                                   {p.alias || p.profileId}
                                                   {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center gap-1`}>
-                                                      <FactionLogo faction={f} size={12} />
-                                                      ({f})
+                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
+                                                      (
+                                                      <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
+                                                      <span>{f}</span>
+                                                      )
                                                     </span>
                                                   )}
                                                   {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
