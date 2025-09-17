@@ -51,6 +51,15 @@ Visit `http://localhost:3000` to see the application.
 
 Production is available at `https://www.dow-de.com`.
 
+### Steam Player Count
+
+The site shows the live Steam player count in the header. It uses Steam’s
+`GetNumberOfCurrentPlayers` and defaults to the Dawn of War: Definitive Edition
+App ID `3556750` — no configuration required.
+
+If you want to override it for another app, you may set `STEAM_APP_ID_DOW_DE`
+in your environment, but this is optional.
+
 ### Build for Production
 
 ```bash

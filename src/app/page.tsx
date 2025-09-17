@@ -293,6 +293,10 @@ export default function Home() {
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
 
+  // Live Steam player count (DoW:DE)
+  const [playerCount, setPlayerCount] = useState<number | null>(null);
+  const [playerCountLoading, setPlayerCountLoading] = useState<boolean>(false);
+
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
   const [selectedMatchType, setSelectedMatchType] = useState<string>("1v1");
@@ -653,6 +657,30 @@ export default function Home() {
 
   const handleSupportLink = () => activateTabFromFooter('support');
 
+  // Fetch and poll current Steam player count (every 30 minutes)
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      setPlayerCountLoading(true);
+      fetch('/api/steam/players')
+        .then(r => r.json())
+        .then(data => {
+          if (cancelled) return;
+          const count = typeof data?.playerCount === 'number' ? data.playerCount : null;
+          setPlayerCount(count);
+          setPlayerCountLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setPlayerCount(null);
+          setPlayerCountLoading(false);
+        });
+    };
+    load();
+    const id = setInterval(load, 30 * 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
   return (
     <div className="min-h-screen text-white">
       <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
@@ -674,11 +702,18 @@ export default function Home() {
               <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
                 BETA
               </span>
+              <div className="mt-1 inline-flex items-center px-2 py-1 bg-neutral-800/60 border border-neutral-600/50 rounded-md shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" aria-hidden></span>
+                <span className="text-[11px] text-neutral-300">Players</span>
+                <span className="ml-1.5 text-[11px] font-semibold text-white">
+                  {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
+                </span>
+              </div>
             </div>
           </div>
 
           {/* Desktop Header */}
-          <div className="hidden sm:flex items-center">
+          <div className="hidden sm:flex items-center justify-between">
             <div className="flex items-center">
               <div className="mr-4">
                 <img
@@ -693,6 +728,15 @@ export default function Home() {
                 </h1>
                 <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
                   BETA
+                </span>
+              </div>
+            </div>
+            <div className="ml-6 flex items-center gap-3">
+              <div className="hidden md:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-green-500 mr-2" aria-hidden></span>
+                <span className="text-sm text-neutral-300">Players online</span>
+                <span className="ml-2 text-sm font-semibold text-white">
+                  {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
                 </span>
               </div>
             </div>
