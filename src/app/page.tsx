@@ -153,6 +153,74 @@ export default function Home() {
     selectedCountry?: string;
     selectedId?: number;
   };
+  
+  // Build a URL string that reflects the given state via query params
+  const buildUrl = (state: AppState): string => {
+    if (typeof window === 'undefined') return '';
+    const url = new URL(window.location.href);
+    const p = url.searchParams;
+    // reset known params first
+    p.delete('tab');
+    p.delete('match');
+    p.delete('faction');
+    p.delete('country');
+    p.delete('q');
+
+    if (state.view === 'leaderboards') {
+      // leaderboards is the default tab; keep root clean by omitting defaults
+      if (state.selectedMatchType && state.selectedMatchType !== '1v1') {
+        p.set('match', state.selectedMatchType);
+      }
+      if (state.selectedFaction && state.selectedFaction !== 'All factions') {
+        p.set('faction', state.selectedFaction);
+      }
+      if (state.selectedCountry && state.selectedCountry !== 'Global') {
+        p.set('country', state.selectedCountry);
+      }
+      // no 'tab' param for default view
+    } else if (state.view === 'search') {
+      p.set('tab', 'search');
+      if (state.searchQuery) p.set('q', state.searchQuery);
+    } else if (state.view === 'support') {
+      p.set('tab', 'support');
+    }
+
+    const qp = p.toString();
+    url.search = qp ? `?${qp}` : '';
+    return url.toString();
+  };
+
+  // Replace the current history entry with a URL that matches current state
+  const syncUrl = (state: AppState) => {
+    try {
+      if (typeof window === 'undefined') return;
+      const newUrl = buildUrl(state);
+      window.history.replaceState(state, '', newUrl);
+    } catch {}
+  };
+
+  // Parse AppState from the current URL (query params)
+  const parseStateFromUrl = (): AppState => {
+    if (typeof window === 'undefined') return { view: 'leaderboards' };
+    const p = new URLSearchParams(window.location.search);
+    const tab = (p.get('tab') || 'leaderboards') as AppState['view'];
+    if (tab === 'search') {
+      const q = (p.get('q') || '').trim();
+      return { view: 'search', searchQuery: q };
+    }
+    if (tab === 'support') {
+      return { view: 'support' };
+    }
+    const match = p.get('match') || '1v1';
+    const faction = p.get('faction') || 'All factions';
+    const country = p.get('country') || 'Global';
+    return {
+      view: 'leaderboards',
+      selectedMatchType: match,
+      selectedFaction: faction,
+      selectedCountry: country,
+    };
+  };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
@@ -224,38 +292,57 @@ export default function Home() {
       });
   }, []);
 
-  // Initialize browser history state and handle back/forward within the SPA
+  // Initialize from URL and handle back/forward
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const initialState = {
-      view: activeTab,
-      searchQuery,
-      selectedFaction,
-      selectedMatchType,
-      selectedCountry,
+    // 1) Apply URL params to local state on first load
+    const initialFromUrl = parseStateFromUrl();
+    if (initialFromUrl.view === 'search') {
+      setActiveTab('search');
+      if (typeof initialFromUrl.searchQuery === 'string') setSearchQuery(initialFromUrl.searchQuery);
+      // kick off search on first load if q is present
+      if (initialFromUrl.searchQuery) {
+        try {
+          // run without pushing history
+          handlePlayerSearch(initialFromUrl.searchQuery, { pushHistory: false });
+        } catch {}
+      }
+    } else if (initialFromUrl.view === 'leaderboards') {
+      setActiveTab('leaderboards');
+      if (typeof initialFromUrl.selectedMatchType === 'string') setSelectedMatchType(initialFromUrl.selectedMatchType);
+      if (typeof initialFromUrl.selectedFaction === 'string') setSelectedFaction(initialFromUrl.selectedFaction);
+      if (typeof initialFromUrl.selectedCountry === 'string') setSelectedCountry(initialFromUrl.selectedCountry);
+    } else if (initialFromUrl.view === 'support') {
+      setActiveTab('support');
+    }
+
+    // 2) Ensure the URL matches state (normalizes missing defaults)
+    const initialState: AppState = {
+      view: initialFromUrl.view || activeTab,
+      searchQuery: initialFromUrl.searchQuery ?? searchQuery,
+      selectedFaction: initialFromUrl.selectedFaction ?? selectedFaction,
+      selectedMatchType: initialFromUrl.selectedMatchType ?? selectedMatchType,
+      selectedCountry: initialFromUrl.selectedCountry ?? selectedCountry,
       selectedId,
     };
-    try {
-      window.history.replaceState(initialState, '');
-    } catch {}
+    syncUrl(initialState);
 
     const onPopState = (e: PopStateEvent) => {
-      const s = (e.state || {}) as any;
-      if (!s || typeof s !== 'object') return;
-      if (s.view) setActiveTab(s.view);
-      if (s.view === 'search') {
-        const q = (s.searchQuery || s.query || '').trim();
+      // Prefer URL params for source of truth
+      const fromUrl = parseStateFromUrl();
+      if (fromUrl.view) setActiveTab(fromUrl.view);
+      if (fromUrl.view === 'search') {
+        const q = (fromUrl.searchQuery || '').trim();
         setSearchQuery(q);
         setSearchResults([]);
         if (q) {
           // Re-run search without pushing history
           handlePlayerSearch(q, { pushHistory: false });
         }
-      } else if (s.view === 'leaderboards') {
-        if (typeof s.selectedFaction === 'string') setSelectedFaction(s.selectedFaction);
-        if (typeof s.selectedMatchType === 'string') setSelectedMatchType(s.selectedMatchType);
-        if (typeof s.selectedCountry === 'string') setSelectedCountry(s.selectedCountry);
-        if (typeof s.selectedId === 'number') setSelectedId(s.selectedId);
+      } else if (fromUrl.view === 'leaderboards') {
+        if (typeof fromUrl.selectedFaction === 'string') setSelectedFaction(fromUrl.selectedFaction);
+        if (typeof fromUrl.selectedMatchType === 'string') setSelectedMatchType(fromUrl.selectedMatchType);
+        if (typeof fromUrl.selectedCountry === 'string') setSelectedCountry(fromUrl.selectedCountry);
       }
     };
     window.addEventListener('popstate', onPopState);
@@ -370,10 +457,12 @@ export default function Home() {
         selectedId,
       };
       if (typeof window !== 'undefined') {
-        window.history.replaceState(currentState, '');
+        const currentUrl = buildUrl(currentState);
+        window.history.replaceState(currentState, '', currentUrl);
         if (opts?.pushHistory !== false) {
           const newState: AppState = { view: 'search', searchQuery: q };
-          window.history.pushState(newState, '');
+          const nextUrl = buildUrl(newState);
+          window.history.pushState(newState, '', nextUrl);
         }
       }
     } catch {}
@@ -396,6 +485,37 @@ export default function Home() {
       setSearchLoading(false);
     }
   };
+
+  // Keep URL in sync as state changes (without pushing)
+  useEffect(() => {
+    const state: AppState = {
+      view: activeTab,
+      searchQuery,
+      selectedFaction,
+      selectedMatchType,
+      selectedCountry,
+      selectedId,
+    };
+    syncUrl(state);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId]);
+
+  // Share handler and ephemeral copied state for the info bar button
+  const [shareCopied, setShareCopied] = useState(false);
+  const handleShare = async () => {
+    if (typeof window === 'undefined') return;
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 1200);
+    } catch {}
+  };
+
+  // Ephemeral copied indicator for per-result share buttons
+  const [searchCardCopied, setSearchCardCopied] = useState<number | null>(null);
+  // Ephemeral copied indicator for the search results header button
+  const [searchHeaderCopied, setSearchHeaderCopied] = useState(false);
 
   // Trigger a search for a specific alias (stays in Search tab)
   const runSearchByName = async (name: string) => {
@@ -654,21 +774,37 @@ export default function Home() {
                 className="w-full px-4 py-3 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
               />
             </div>
+            
           </div>
         </div>
 
         {/* Current Selection Info */}
         {(selectedLeaderboard || isCombinedMode || selectedFaction === "All factions") && (
           <div className="mb-4 text-sm text-neutral-300 font-medium p-3 bg-neutral-900/40 rounded-md border border-neutral-700/30" style={{backdropFilter: 'blur(5px)'}}>
-            Showing: {isCombinedMode ? "Combined 1v1 Rankings - All factions" : (selectedFaction === "All factions" ? `All factions • ${selectedMatchType}` : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`)}
-            {ladderData && (
-              <>
-                {" • "}Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
-                {ladderData.stale && (
-                  <span className="ml-2 px-2 py-1 bg-yellow-600 text-yellow-100 rounded">Stale Data</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                Showing: {isCombinedMode ? "Combined 1v1 Rankings - All factions" : (selectedFaction === "All factions" ? `All factions • ${selectedMatchType}` : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`)}
+                {ladderData && (
+                  <>
+                    {" • "}Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
+                    {ladderData.stale && (
+                      <span className="ml-2 px-2 py-1 bg-yellow-600 text-yellow-100 rounded">Stale Data</span>
+                    )}
+                  </>
                 )}
-              </>
-            )}
+              </div>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                title="Share this view"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+                </svg>
+                <span className={`text-xs font-semibold ${shareCopied ? 'text-green-400' : ''}`}>{shareCopied ? 'Link copied' : 'Copy link'}</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -858,7 +994,27 @@ export default function Home() {
 
               {searchResults.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Search Results</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-white">Search Results</h3>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const url = buildUrl({ view: 'search', searchQuery });
+                          await navigator.clipboard.writeText(url);
+                          setSearchHeaderCopied(true);
+                          setTimeout(() => setSearchHeaderCopied(false), 1200);
+                        } catch {}
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                      title="Copy link to this search"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+                      </svg>
+                      <span className={`text-xs font-semibold ${searchHeaderCopied ? 'text-green-400' : ''}`}>{searchHeaderCopied ? 'Link copied' : 'Copy link'}</span>
+                    </button>
+                  </div>
                   <div className="grid gap-4 grid-cols-1">
                     {searchResults.map((result, index) => (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
@@ -883,6 +1039,24 @@ export default function Home() {
                               </div>
                             )}
                           </div>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const url = buildUrl({ view: 'search', searchQuery });
+                                await navigator.clipboard.writeText(url);
+                                setSearchCardCopied(index);
+                                setTimeout(() => setSearchCardCopied(null), 1200);
+                              } catch {}
+                            }}
+                            className="self-start sm:self-auto inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                            title="Copy link to this player search"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+                            </svg>
+                            <span className={`text-xs font-semibold ${searchCardCopied === index ? 'text-green-400' : ''}`}>{searchCardCopied === index ? 'Link copied' : 'Copy link'}</span>
+                          </button>
                         </div>
 
                         {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
