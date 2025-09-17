@@ -476,6 +476,26 @@ export default function Home() {
     setLbExpanded(false);
   }, [selectedMatchType, selectedFaction, selectedCountry, selectedId, activeTab]);
 
+  // When search is cleared, revert to default dataset size (top 200)
+  useEffect(() => {
+    const q = search.trim();
+    if (q) return;
+    if (isCombinedMode) {
+      if (combinedLimit !== 200) setCombinedLimit(200);
+    } else if (selectedId) {
+      if (lbExpanded) {
+        try {
+          fetch(`/api/cache/leaderboard/${selectedId}`)
+            .then(r => r.json())
+            .then(data => setLadderData(data))
+            .catch(() => {});
+        } finally {
+          setLbExpanded(false);
+        }
+      }
+    }
+  }, [search, isCombinedMode, combinedLimit, selectedId, lbExpanded]);
+
   // Search functionality
   const handlePlayerSearch = async (qOverride?: string, opts?: { pushHistory?: boolean }) => {
     const q = (qOverride ?? searchQuery).trim();
