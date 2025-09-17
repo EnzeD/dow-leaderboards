@@ -569,8 +569,6 @@ export default function Home() {
 
   // Ephemeral copied indicator for per-result share buttons
   const [searchCardCopied, setSearchCardCopied] = useState<number | null>(null);
-  // Ephemeral copied indicator for the search results header button
-  const [searchHeaderCopied, setSearchHeaderCopied] = useState(false);
 
   // Trigger a search for a specific alias (stays in Search tab)
   const runSearchByName = async (name: string) => {
@@ -1067,27 +1065,7 @@ export default function Home() {
 
               {searchResults.length > 0 && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">Search Results</h3>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const url = buildUrl({ view: 'search', searchQuery });
-                          await navigator.clipboard.writeText(url);
-                          setSearchHeaderCopied(true);
-                          setTimeout(() => setSearchHeaderCopied(false), 1200);
-                        } catch {}
-                      }}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
-                      title="Copy link to this search"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
-                      </svg>
-                      <span className={`text-xs font-semibold ${searchHeaderCopied ? 'text-green-400' : ''}`}>{searchHeaderCopied ? 'Link copied' : 'Copy link'}</span>
-                    </button>
-                  </div>
+                  <h3 className="text-lg font-semibold text-white">Search Results</h3>
                   <div className="grid gap-4 grid-cols-1">
                     {searchResults.map((result, index) => (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
