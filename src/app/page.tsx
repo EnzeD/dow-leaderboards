@@ -404,6 +404,26 @@ export default function Home() {
     await handlePlayerSearch(q, { pushHistory: true });
   };
 
+  const activateTabFromFooter = (tab: TabType) => {
+    setActiveTab(tab);
+    if (typeof window !== 'undefined') {
+      try {
+        if (tab === 'support') {
+          const supportEl = document.getElementById('support');
+          if (supportEl) {
+            supportEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+          }
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch {
+        // Ignore scroll failures (e.g. older browsers)
+      }
+    }
+  };
+
+  const handleSupportLink = () => activateTabFromFooter('support');
+
   return (
     <div className="min-h-screen text-white">
       <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
@@ -1036,7 +1056,7 @@ export default function Home() {
 
         {/* Support Tab Content */}
         {activeTab === 'support' && (
-          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl text-center space-y-4">
+          <div id="support" className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl text-center space-y-4">
             <h2 className="text-2xl font-bold text-white">Support the Chapter</h2>
             <p className="text-neutral-300">
               May these tactical readouts aid your crusade. A modest tithe keeps the machine-spirits purring, the data flowing, and new wargear (features) in the forge.
@@ -1050,6 +1070,126 @@ export default function Home() {
           </div>
         )}
       </div>
+      <footer className="border-t border-neutral-800/70 bg-neutral-900/90 backdrop-blur-sm">
+        <div className="container mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          <div className="grid gap-8 text-sm text-neutral-300 md:grid-cols-[2fr_1fr] lg:grid-cols-[2fr_1fr_1fr]">
+            <div className="space-y-3 leading-relaxed">
+              <p className="text-base font-semibold tracking-wide text-white">
+                Dawn of War: Definitive Edition Leaderboards &amp; Player Stats
+              </p>
+              <p className="text-neutral-400">
+                Track competitive Dawn of War rankings, faction win rates, and player match histories in real time. Search commanders, review ELO trends, and study meta shifts across Chaos, Eldar, Space Marines, Tau, and more.
+              </p>
+              <p className="text-neutral-400">
+                Consider supporting to cover costs for this free community website.{' '}
+                <button
+                  type="button"
+                  onClick={handleSupportLink}
+                  className="font-semibold text-blue-300 transition hover:text-blue-200"
+                >
+                  Go to Support
+                </button>
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                Quick Access
+              </span>
+              <div className="grid gap-2 text-neutral-300">
+                <button
+                  type="button"
+                  onClick={() => activateTabFromFooter('leaderboards')}
+                  className="w-fit text-left transition hover:text-white"
+                >
+                  Leaderboards Overview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => activateTabFromFooter('search')}
+                  className="w-fit text-left transition hover:text-white"
+                >
+                  Player Search Portal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSupportLink}
+                  className="w-fit text-left transition hover:text-white"
+                >
+                  Support Options
+                </button>
+                <a
+                  href="https://github.com/EnzeD/dow-leaderboards"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-fit transition hover:text-white"
+                >
+                  Project GitHub Repository
+                </a>
+                <a
+                  href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-fit transition hover:text-white"
+                >
+                  Community Feedback Thread
+                </a>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
+                Community &amp; Credits
+              </span>
+              <p className="leading-relaxed text-neutral-400">
+                Crafted by{' '}
+                <a
+                  href="https://nicolas-zullo.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-white transition hover:text-blue-200"
+                >
+                  Nicolas Zullo
+                </a>{' '}
+                and{' '}
+                <a
+                  href="https://github.com/EnzeD/dow-leaderboards/graphs/contributors"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-blue-300 transition hover:text-blue-200"
+                >
+                  public contributors
+                </a>{' '}
+                keeping the Adeptus Astartes community informed with accurate Dawn of War data.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <a
+                  href="https://nicolas-zullo.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border border-neutral-700/70 px-3 py-1.5 text-neutral-200 transition hover:border-neutral-400 hover:text-white"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em]">Portfolio</span>
+                </a>
+                <a
+                  href="https://x.com/NicolasZu"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-neutral-700/80 bg-neutral-900/80 transition hover:border-neutral-400"
+                  aria-label="Follow Nicolas Zullo on X"
+                >
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/c/ce/X_logo_2023.svg"
+                    alt="X Logo"
+                    className="h-4 w-4"
+                    loading="lazy"
+                  />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
