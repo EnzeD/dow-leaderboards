@@ -12,7 +12,6 @@ export async function GET() {
     const res = await fetch(url, {
       signal: controller.signal,
       cache: "no-store",
-      next: { revalidate: 0 },
     });
     clearTimeout(timeout);
 
