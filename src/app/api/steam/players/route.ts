@@ -9,7 +9,11 @@ export async function GET() {
     const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${encodeURIComponent(
       appId
     )}`;
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      cache: "no-store",
+      next: { revalidate: 0 },
+    });
     clearTimeout(timeout);
 
     if (!res.ok) {
@@ -21,7 +25,7 @@ export async function GET() {
         lastUpdated: new Date().toISOString(),
         error: "upstream_error",
       },
-      { status: 502, headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
+      { status: 502, headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
     );
     }
 
@@ -36,7 +40,7 @@ export async function GET() {
         success,
         lastUpdated: new Date().toISOString(),
       },
-      { headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
+      { headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
     );
   } catch (e) {
     return Response.json(
@@ -47,7 +51,7 @@ export async function GET() {
         lastUpdated: new Date().toISOString(),
         error: "fetch_failed",
       },
-      { status: 502, headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=120" } }
+      { status: 502, headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
     );
   }
 }

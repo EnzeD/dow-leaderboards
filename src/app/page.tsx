@@ -688,7 +688,7 @@ export default function Home() {
     let cancelled = false;
     const load = () => {
       setPlayerCountLoading(true);
-      fetch('/api/steam/players')
+      fetch('/api/steam/players', { cache: 'no-store' })
         .then(r => r.json())
         .then(data => {
           if (cancelled) return;
@@ -703,7 +703,7 @@ export default function Home() {
         });
     };
     load();
-    const id = setInterval(load, 5 * 60_000);
+    const id = setInterval(load, 60_000);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
