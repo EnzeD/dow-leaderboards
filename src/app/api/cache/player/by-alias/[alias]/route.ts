@@ -19,6 +19,7 @@ type RecentMatch = {
 
 type PlayerPayload = {
   alias: string;
+  playerName?: string;
   profileId?: string;
   steamId?: string;
   personalStats?: {
@@ -39,6 +40,7 @@ type PlayerPayload = {
     }>;
   };
   recentMatches?: RecentMatch[];
+  lastUpdated?: string;
 };
 
 function parseSteamIdFromProfileName(name?: string): string | undefined {
@@ -193,24 +195,29 @@ export async function GET(_req: NextRequest, ctx: { params: { alias: string } })
   try {
     const ident = await findExactAlias(alias);
     if (!ident?.profileId) {
-      return Response.json({ results: [] }, { headers: { 'Cache-Control': 'public, s-maxage=300' } });
+      const timestamp = new Date().toISOString();
+      return Response.json({ results: [], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=30' } });
     }
 
     // personal stats via steam id (if available)
     const personalStats = ident.steamId ? await fetchPersonalStats(ident.steamId) : undefined;
     const recentMatches = await fetchRecentMatches(alias, ident.profileId, 10);
 
+    const timestamp = new Date().toISOString();
     const payload: PlayerPayload = {
       alias,
+      playerName: personalStats?.profile?.alias || alias,
       profileId: ident.profileId,
       steamId: ident.steamId,
       personalStats,
       recentMatches,
+      lastUpdated: timestamp,
     };
 
-    return Response.json({ results: [payload] }, { headers: { 'Cache-Control': 'public, s-maxage=300' } });
+    return Response.json({ results: [payload], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=30' } });
   } catch (e) {
     console.error('cache/player/by-alias failed:', e);
-    return Response.json({ results: [] }, { status: 502, headers: { 'Cache-Control': 'public, s-maxage=60' } });
+    const timestamp = new Date().toISOString();
+    return Response.json({ results: [], lastUpdated: timestamp }, { status: 502, headers: { 'Cache-Control': 'public, s-maxage=30' } });
   }
 }

@@ -21,7 +21,7 @@ export async function GET(_req: Request, ctx: { params: { id: string; limit: str
       stale: false,
       rows
     }, {
-      headers: { "Cache-Control": "public, s-maxage=3600" }
+      headers: { "Cache-Control": "public, s-maxage=300" }
     });
   } catch (e) {
     console.error("cache/leaderboard/[id]/[limit] fetch failed:", e);
@@ -36,4 +36,3 @@ export async function GET(_req: Request, ctx: { params: { id: string; limit: str
     );
   }
 }
-

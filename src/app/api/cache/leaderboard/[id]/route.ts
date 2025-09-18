@@ -17,7 +17,7 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
       stale: false,
       rows
     }, {
-      headers: { "Cache-Control": "public, s-maxage=3600" }
+      headers: { "Cache-Control": "public, s-maxage=300" }
     });
   } catch (e) {
     console.error("cache/leaderboard fetch failed:", e);

@@ -17,7 +17,7 @@ export async function GET(_req: Request, ctx: { params: { limit?: string } }) {
       stale: false,
       rows: limited
     }, {
-      headers: { "Cache-Control": "public, s-maxage=3600" }
+      headers: { "Cache-Control": "public, s-maxage=300" }
     });
   } catch (e) {
     console.error("cache/combined-1v1/[limit] fetch failed:", e);
@@ -32,4 +32,3 @@ export async function GET(_req: Request, ctx: { params: { limit?: string } }) {
     );
   }
 }
-

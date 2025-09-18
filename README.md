@@ -133,7 +133,7 @@ We welcome contributions! Here are some ways you can help:
 
 ### Data Flow
 1. **Leaderboards**: Cached for 24h from `GetAvailableLeaderboards`
-2. **Ladder Data**: Cached for 30min from `getLeaderBoard2` (Top-200)
+2. **Ladder Data**: Cached for 5 minutes from `getLeaderBoard2` (Top-200)
 3. **Steam Names**: Batch resolution via `proxysteamuserrequest`
 
 ### API Endpoints

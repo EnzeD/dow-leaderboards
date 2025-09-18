@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       stale: false,
       rows: limited
     }, {
-      headers: { "Cache-Control": "public, s-maxage=3600" }
+      headers: { "Cache-Control": "public, s-maxage=300" }
     });
   } catch (e) {
     console.error("cache/combined-1v1 fetch failed:", e);
