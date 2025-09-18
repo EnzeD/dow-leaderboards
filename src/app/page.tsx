@@ -541,17 +541,18 @@ export default function Home() {
     const q = search.trim();
     if (q) return;
     if (isCombinedMode) {
+      if (!lbExpanded) return;
       if (combinedLimit !== 200) setCombinedLimit(200);
+      setLbExpanded(false);
     } else if (selectedId) {
-      if (lbExpanded) {
-        try {
-          fetch(`/api/cache/leaderboard/${selectedId}`)
-            .then(r => r.json())
-            .then(data => setLadderData(data))
-            .catch(() => {});
-        } finally {
-          setLbExpanded(false);
-        }
+      if (!lbExpanded) return;
+      try {
+        fetch(`/api/cache/leaderboard/${selectedId}`)
+          .then(r => r.json())
+          .then(data => setLadderData(data))
+          .catch(() => {});
+      } finally {
+        setLbExpanded(false);
       }
     }
   }, [search, isCombinedMode, combinedLimit, selectedId, lbExpanded]);
