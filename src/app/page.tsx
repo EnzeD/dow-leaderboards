@@ -102,6 +102,13 @@ const formatLastMatch = (dateInput?: Date | string): string => {
   return "Just now";
 };
 
+const formatTimestamp = (iso?: string | null): string | null => {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+};
+
 // Get tier indicator based on rank
 const getTierIndicator = (rank: number): string => {
   if (rank <= 5) return "🏆"; // Top 5
@@ -289,6 +296,7 @@ export default function Home() {
   // Search tab state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
@@ -587,13 +595,24 @@ export default function Home() {
     setSearchQuery(q);
     setSearchLoading(true);
     setSearchResults([]);
+    setSearchLastUpdated(null);
 
     try {
       const response = await fetch(`/api/cache/player/by-alias/${encodeURIComponent(q)}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Expect { results: [ ... ] }
-        setSearchResults(Array.isArray(data?.results) ? data.results : []);
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch {}
+      const results = Array.isArray(data?.results) ? data.results : [];
+      setSearchResults(results);
+      const updated = typeof data?.lastUpdated === 'string'
+        ? data.lastUpdated
+        : (() => {
+          const first = results.find((r: any) => typeof r?.lastUpdated === 'string');
+          return first?.lastUpdated;
+        })();
+      if (updated) {
+        setSearchLastUpdated(updated);
       }
     } catch (error) {
       console.error('Search failed:', error);
@@ -637,6 +656,12 @@ export default function Home() {
     if (!q) return;
     await handlePlayerSearch(q, { pushHistory: true });
   };
+
+  const searchUpdatedAt: string | null = (() => {
+    const firstWithTimestamp = searchResults.find(result => typeof (result as any)?.lastUpdated === 'string') as { lastUpdated?: string } | undefined;
+    if (firstWithTimestamp?.lastUpdated) return firstWithTimestamp.lastUpdated;
+    return searchLastUpdated;
+  })();
 
   const activateTabFromFooter = (tab: TabType) => {
     setActiveTab(tab);
@@ -1170,7 +1195,9 @@ export default function Home() {
 
               {searchResults.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-white">Search Results</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <h3 className="text-lg font-semibold text-white">Search Results</h3>
+                  </div>
                   <div className="grid gap-4 grid-cols-1">
                     {searchResults.map((result, index) => (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
@@ -1195,24 +1222,31 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const url = buildUrl({ view: 'search', searchQuery });
-                                await navigator.clipboard.writeText(url);
-                                setSearchCardCopied(index);
-                                setTimeout(() => setSearchCardCopied(null), 1200);
-                              } catch {}
-                            }}
-                            className="self-start sm:self-auto inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
-                            title="Copy link to this player search"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
-                            </svg>
-                            <span className={`text-xs font-semibold ${searchCardCopied === index ? 'text-green-400' : ''}`}>{searchCardCopied === index ? 'Link copied' : 'Copy link'}</span>
-                          </button>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end items-start gap-2 sm:gap-3 sm:text-right">
+                            {(result.lastUpdated || searchUpdatedAt) && (
+                              <span className="text-xs text-neutral-400 text-left sm:text-right">
+                                Last updated: {formatTimestamp(result.lastUpdated || searchUpdatedAt) ?? 'Unknown'}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const url = buildUrl({ view: 'search', searchQuery });
+                                  await navigator.clipboard.writeText(url);
+                                  setSearchCardCopied(index);
+                                  setTimeout(() => setSearchCardCopied(null), 1200);
+                                } catch {}
+                              }}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                              title="Copy link to this player search"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+                              </svg>
+                              <span className={`text-xs font-semibold ${searchCardCopied === index ? 'text-green-400' : ''}`}>{searchCardCopied === index ? 'Link copied' : 'Copy link'}</span>
+                            </button>
+                          </div>
                         </div>
 
                         {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
@@ -1230,8 +1264,8 @@ export default function Home() {
                                   const type = lb?.matchType || '';
                                   return (
                                     <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                      <div className="flex justify-between items-center p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
-                                        <div className="flex items-center gap-2 min-w-0">
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
+                                        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
                                           <span className={`${getFactionColor(faction)} inline-flex items-center`}>
                                             <FactionLogo faction={faction} size={12} yOffset={0} />
                                           </span>
@@ -1241,7 +1275,7 @@ export default function Home() {
                                           <span className="text-neutral-400 hidden sm:inline">•</span>
                                           <span className="text-neutral-300 truncate hidden sm:inline" title={name}>{name}</span>
                                         </div>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto justify-start sm:justify-end">
                                           <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
                                           <span className="text-white">{s.rating} ELO</span>
                                           <span className="text-neutral-300">{s.wins}<span className="text-neutral-500">-</span>{s.losses}</span>
@@ -1423,6 +1457,11 @@ export default function Home() {
                   <span>
                     Hint: enter the exact name you are using in your multiplayer profile. It&apos;s case-sensitive.
                   </span>
+                  {searchUpdatedAt && (
+                    <div className="mt-2 text-xs text-neutral-400">
+                      Last updated: {formatTimestamp(searchUpdatedAt) ?? 'Unknown'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
