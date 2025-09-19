@@ -31,7 +31,40 @@ type RosterEntry = {
   onClick?: () => void;
 };
 
+type FavoriteEntry = {
+  key: string;
+  profileId?: string;
+  alias: string;
+  playerName?: string;
+  country?: string;
+};
+
+type FavoriteDataEntry = {
+  result: any | null;
+  fetchedAt: number;
+  error?: string;
+};
+
 const DEFAULT_RECENT_MATCH_LIMIT = 10;
+const FAVORITES_COOKIE = 'dow_favorites';
+const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
+
+const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
+
+const buildFavoriteKey = (
+  profileId?: string | number | null,
+  alias?: string | null,
+  fallback?: string
+): string | null => {
+  if (profileId !== undefined && profileId !== null) {
+    const pid = String(profileId).trim();
+    if (pid) return `pid:${pid}`;
+  }
+  const normAlias = normalizeAlias(alias);
+  if (normAlias) return `alias:${normAlias.toLowerCase()}`;
+  if (fallback) return `fallback:${fallback}`;
+  return null;
+};
 
 const regionDisplayNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
   ? new Intl.DisplayNames(['en'], { type: 'region' })
@@ -215,11 +248,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'support';
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -254,6 +287,8 @@ export default function Home() {
     } else if (state.view === 'search') {
       p.set('tab', 'search');
       if (state.searchQuery) p.set('q', state.searchQuery);
+    } else if (state.view === 'favorites') {
+      p.set('tab', 'favorites');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -280,6 +315,9 @@ export default function Home() {
     if (tab === 'search') {
       const q = (p.get('q') || '').trim();
       return { view: 'search', searchQuery: q };
+    }
+    if (tab === 'favorites') {
+      return { view: 'favorites' };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -311,10 +349,48 @@ export default function Home() {
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
   const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
+  const [favorites, setFavorites] = useState<Record<string, FavoriteEntry>>({});
+  const [favoriteData, setFavoriteData] = useState<Record<string, FavoriteDataEntry>>({});
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
 
   // Live Steam player count (DoW:DE)
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [playerCountLoading, setPlayerCountLoading] = useState<boolean>(false);
+
+  // Load favourites from cookie on mount
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    try {
+      const cookieEntry = document.cookie.split('; ').find(row => row.startsWith(`${FAVORITES_COOKIE}=`));
+      if (!cookieEntry) return;
+      const rawValue = cookieEntry.substring(FAVORITES_COOKIE.length + 1);
+      const decoded = decodeURIComponent(rawValue || '');
+      const parsed = JSON.parse(decoded);
+      if (!Array.isArray(parsed)) return;
+      const map: Record<string, FavoriteEntry> = {};
+      for (const item of parsed) {
+        if (!item) continue;
+        const aliasRaw = typeof item.alias === 'string' ? item.alias : undefined;
+        const profileIdRaw = item?.profileId !== undefined && item?.profileId !== null ? String(item.profileId) : undefined;
+        const key = buildFavoriteKey(profileIdRaw, aliasRaw);
+        if (!key) continue;
+        const alias = aliasRaw && aliasRaw.trim() ? aliasRaw.trim() : undefined;
+        const playerName = typeof item.playerName === 'string' ? item.playerName : alias;
+        map[key] = {
+          key,
+          profileId: profileIdRaw,
+          alias: alias ?? (playerName ?? key),
+          playerName: playerName ?? alias ?? key,
+          country: typeof item.country === 'string' ? item.country : undefined,
+        };
+      }
+      if (Object.keys(map).length > 0) {
+        setFavorites(map);
+      }
+    } catch (error) {
+      console.warn('Failed to load favourites from cookie', error);
+    }
+  }, []);
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
@@ -371,6 +447,42 @@ export default function Home() {
         // Don't set selectedId here - let the filter effect handle it
       });
   }, []);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const entries = Object.values(favorites).map(({ profileId, alias, playerName, country }) => ({
+      profileId,
+      alias,
+      playerName,
+      country,
+    }));
+    if (entries.length === 0) {
+      document.cookie = `${FAVORITES_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+      return;
+    }
+    try {
+      const serialized = encodeURIComponent(JSON.stringify(entries));
+      document.cookie = `${FAVORITES_COOKIE}=${serialized}; path=/; max-age=${FAVORITES_COOKIE_MAX_AGE}; SameSite=Lax`;
+    } catch (error) {
+      console.warn('Failed to persist favourites', error);
+    }
+  }, [favorites]);
+
+  useEffect(() => {
+    setFavoriteData(prev => {
+      const allowedKeys = new Set(Object.keys(favorites));
+      let mutated = false;
+      const next: typeof prev = {};
+      for (const [key, value] of Object.entries(prev)) {
+        if (allowedKeys.has(key)) {
+          next[key] = value;
+        } else {
+          mutated = true;
+        }
+      }
+      return mutated ? next : prev;
+    });
+  }, [favorites]);
 
   // Initialize from URL and handle back/forward
   useEffect(() => {
@@ -674,6 +786,8 @@ export default function Home() {
     return searchLastUpdated;
   })();
 
+  const favoriteEntries = Object.values(favorites);
+
   const activateTabFromFooter = (tab: TabType) => {
     setActiveTab(tab);
     if (typeof window !== 'undefined') {
@@ -693,6 +807,200 @@ export default function Home() {
   };
 
   const handleSupportLink = () => activateTabFromFooter('support');
+
+  const toggleFavorite = (
+    candidate: { profileId?: string | number | null; alias?: string | null; playerName?: string; country?: string },
+    fullResult?: any
+  ) => {
+    const aliasForKey = normalizeAlias(candidate.alias) || normalizeAlias(candidate.playerName);
+    const profileIdStr = candidate.profileId !== undefined && candidate.profileId !== null
+      ? String(candidate.profileId).trim()
+      : undefined;
+    const key = buildFavoriteKey(profileIdStr, aliasForKey);
+    if (!key) return;
+
+    const displayAlias = candidate.alias && candidate.alias.trim()
+      ? candidate.alias.trim()
+      : (candidate.playerName && candidate.playerName.trim()) || aliasForKey || key;
+    const isAlreadyFavorite = Boolean(favorites[key]);
+
+    if (isAlreadyFavorite) {
+      setFavorites(prev => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setRecentMatchLimits(prev => {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setFavoriteData(prev => {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      return;
+    }
+
+    if (!aliasForKey && !profileIdStr) return;
+
+    setFavorites(prev => ({
+      ...prev,
+      [key]: {
+        key,
+        profileId: profileIdStr,
+        alias: displayAlias,
+        playerName: candidate.playerName ?? displayAlias,
+        country: candidate.country,
+      },
+    }));
+
+    if (fullResult) {
+      setFavoriteData(prev => ({
+        ...prev,
+        [key]: {
+          result: fullResult,
+          fetchedAt: Date.now(),
+        },
+      }));
+    }
+  };
+
+  const refreshFavorite = (key: string) => {
+    setFavoriteData(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const renderLeaderboardStatsBlock = (stats: any[] | undefined, limit: number = 6) => {
+    if (!Array.isArray(stats) || stats.length === 0) return null;
+    const items = stats
+      .slice()
+      .sort((a: any, b: any) => (b.lastmatchdate || 0) - (a.lastmatchdate || 0) || b.rating - a.rating)
+      .slice(0, limit);
+
+    return (
+      <div className="mt-3 pt-3 border-t border-neutral-600/40">
+        <h5 className="text-sm text-neutral-300 mb-2">Stats by Leaderboard:</h5>
+        <div className="grid gap-2">
+          {items.map((s: any, appIndex: number) => {
+            const lb = leaderboards.find(l => l.id === s.leaderboardId);
+            const name = lb?.name || `Leaderboard ${s.leaderboardId}`;
+            const faction = lb?.faction || 'Unknown';
+            const type = lb?.matchType || '';
+            return (
+              <div key={`${s.leaderboardId}-${appIndex}`} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
+                  <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
+                    <span className={`${getFactionColor(faction)} inline-flex items-center`}>
+                      <FactionLogo faction={faction} size={12} yOffset={0} />
+                    </span>
+                    <span className="text-orange-300 truncate" title={name}>
+                      {faction} {type}
+                    </span>
+                    <span className="text-neutral-400 hidden sm:inline">•</span>
+                    <span className="text-neutral-300 truncate hidden sm:inline" title={name}>{name}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto justify-start sm:justify-end">
+                    <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
+                    <span className="text-white">{s.rating} ELO</span>
+                    <span className="text-neutral-300">{s.wins}<span className="text-neutral-500">-</span>{s.losses}</span>
+                    <span className={`font-bold ${s.streak > 0 ? 'text-green-400' : s.streak < 0 ? 'text-red-400' : 'text-neutral-400'}`}>
+                      {s.streak > 0 ? `+${s.streak}` : s.streak}
+                    </span>
+                    {s.lastmatchdate && (
+                      <span className="text-neutral-400" title={new Date(s.lastmatchdate * 1000).toISOString()}>
+                        {formatLastMatch(new Date(s.lastmatchdate * 1000))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'favorites') return;
+    const entries = Object.entries(favorites);
+    if (entries.length === 0) {
+      setFavoritesLoading(false);
+      return;
+    }
+    const missing = entries.filter(([key]) => !favoriteData[key]);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    setFavoritesLoading(true);
+
+    (async () => {
+      const updates = await Promise.all(missing.map(async ([key, entry]) => {
+        try {
+          const res = await fetch(`/api/cache/player/by-alias/${encodeURIComponent(entry.alias)}`);
+          let data: any = null;
+          try {
+            data = await res.json();
+          } catch {}
+          const results = Array.isArray(data?.results) ? data.results : [];
+          const normalizedAlias = normalizeAlias(entry.alias);
+          const matched = results.find((r: any) => {
+            const resultProfileId = r?.profileId ? String(r.profileId) : undefined;
+            const resultAlias = normalizeAlias(r?.personalStats?.profile?.alias ?? r?.playerName);
+            if (entry.profileId && resultProfileId && entry.profileId === resultProfileId) return true;
+            if (normalizedAlias && resultAlias === normalizedAlias) return true;
+            return false;
+          }) || results[0] || null;
+
+          return {
+            key,
+            dataEntry: {
+              result: matched,
+              fetchedAt: Date.now(),
+              error: matched ? undefined : 'not_found',
+            } as FavoriteDataEntry,
+          };
+        } catch (error: any) {
+          return {
+            key,
+            dataEntry: {
+              result: null,
+              fetchedAt: Date.now(),
+              error: error?.message || 'Failed to load',
+            } as FavoriteDataEntry,
+          };
+        }
+      }));
+
+      if (!cancelled) {
+        setFavoriteData(prev => {
+          const next = { ...prev };
+          updates.forEach(({ key, dataEntry }) => {
+            next[key] = dataEntry;
+          });
+          return next;
+        });
+      }
+    })()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          setFavoritesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, favorites, favoriteData]);
 
   // Fetch and poll current Steam player count (every 5 minutes)
   useEffect(() => {
@@ -806,6 +1114,16 @@ export default function Home() {
                 Search
               </button>
               <button
+                onClick={() => setActiveTab('favorites')}
+                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
+                  activeTab === 'favorites'
+                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                }`}
+              >
+                Favourites
+              </button>
+              <button
                 onClick={() => setActiveTab('support')}
                 className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
                   activeTab === 'support'
@@ -863,6 +1181,16 @@ export default function Home() {
               }`}
             >
               Search
+            </button>
+            <button
+              onClick={() => setActiveTab('favorites')}
+              className={`px-6 py-3 font-medium transition-all duration-300 ${
+                activeTab === 'favorites'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              Favourites
             </button>
             <button
               onClick={() => setActiveTab('support')}
@@ -1210,7 +1538,16 @@ export default function Home() {
                     <h3 className="text-lg font-semibold text-white">Search Results</h3>
                   </div>
                   <div className="grid gap-4 grid-cols-1">
-                    {searchResults.map((result, index) => (
+                    {searchResults.map((result, index) => {
+                      const profileIdStr = result?.profileId ? String(result.profileId) : undefined;
+                      const aliasPrimary = result?.personalStats?.profile?.alias ?? result?.playerName ?? result?.alias ?? '';
+                      const aliasFallback = aliasPrimary || searchQuery;
+                      const favoriteKey = buildFavoriteKey(profileIdStr, aliasFallback);
+                      const isFavorite = favoriteKey ? Boolean(favorites[favoriteKey]) : false;
+                      const canFavorite = Boolean(favoriteKey && aliasFallback);
+                      const favoriteCandidateAlias = aliasPrimary || aliasFallback;
+
+                      return (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1234,6 +1571,38 @@ export default function Home() {
                             )}
                           </div>
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end items-start gap-2 sm:gap-3 sm:text-right">
+                            <button
+                              type="button"
+                              onClick={() => canFavorite && toggleFavorite({
+                                profileId: profileIdStr,
+                                alias: favoriteCandidateAlias,
+                                playerName: result.playerName,
+                                country: result.personalStats?.profile?.country,
+                              }, result)}
+                              className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${
+                                isFavorite
+                                  ? 'text-yellow-400 bg-neutral-800/70'
+                                  : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
+                              }`}
+                              aria-pressed={isFavorite}
+                              disabled={!canFavorite}
+                              title={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill={isFavorite ? 'currentColor' : 'none'}
+                                stroke="currentColor"
+                                strokeWidth={isFavorite ? 1 : 1.5}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.317 4.043a1 1 0 00.95.69h4.268c.969 0 1.371 1.24.588 1.81l-3.453 2.507a1 1 0 00-.364 1.118l1.317 4.043c.3.921-.755 1.688-1.54 1.118L12 15.347l-3.534 2.609c-.784.57-1.838-.197-1.539-1.118l1.317-4.043a1 1 0 00-.364-1.118L4.427 9.47c-.783-.57-.38-1.81.588-1.81h4.268a1 1 0 00.95-.69l1.317-4.043z" />
+                              </svg>
+                              <span className="ml-2 hidden text-xs font-semibold sm:inline">
+                                {isFavorite ? 'Remove favourite' : 'Add to favourite'}
+                              </span>
+                            </button>
                             {(result.lastUpdated || searchUpdatedAt) && (
                               <span className="text-xs text-neutral-400 text-left sm:text-right">
                                 Last updated: {formatTimestamp(result.lastUpdated || searchUpdatedAt) ?? 'Unknown'}
@@ -1260,59 +1629,16 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {result.personalStats?.leaderboardStats && result.personalStats.leaderboardStats.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-neutral-600/40">
-                            <h5 className="text-sm text-neutral-300 mb-2">Stats by Leaderboard:</h5>
-                            <div className="grid gap-2">
-                              {result.personalStats.leaderboardStats
-                                .slice()
-                                .sort((a: any, b: any) => (b.lastmatchdate || 0) - (a.lastmatchdate || 0) || b.rating - a.rating)
-                                .slice(0, 6)
-                                .map((s: any, appIndex: number) => {
-                                  const lb = leaderboards.find(l => l.id === s.leaderboardId);
-                                  const name = lb?.name || `Leaderboard ${s.leaderboardId}`;
-                                  const faction = lb?.faction || 'Unknown';
-                                  const type = lb?.matchType || '';
-                                  return (
-                                    <div key={appIndex} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
-                                        <div className="flex items-center gap-2 min-w-0 w-full sm:w-auto">
-                                          <span className={`${getFactionColor(faction)} inline-flex items-center`}>
-                                            <FactionLogo faction={faction} size={12} yOffset={0} />
-                                          </span>
-                                          <span className="text-orange-300 truncate" title={name}>
-                                            {faction} {type}
-                                          </span>
-                                          <span className="text-neutral-400 hidden sm:inline">•</span>
-                                          <span className="text-neutral-300 truncate hidden sm:inline" title={name}>{name}</span>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto justify-start sm:justify-end">
-                                          <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
-                                          <span className="text-white">{s.rating} ELO</span>
-                                          <span className="text-neutral-300">{s.wins}<span className="text-neutral-500">-</span>{s.losses}</span>
-                                          <span className={`font-bold ${s.streak > 0 ? 'text-green-400' : s.streak < 0 ? 'text-red-400' : 'text-neutral-400'}`}>
-                                            {s.streak > 0 ? `+${s.streak}` : s.streak}
-                                          </span>
-                                          {s.lastmatchdate && (
-                                            <span className="text-neutral-400" title={new Date(s.lastmatchdate * 1000).toISOString()}>
-                                              {formatLastMatch(new Date(s.lastmatchdate * 1000))}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        )}
+                        {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
                         {/* Recent Match History */}
                         {result.recentMatches && result.recentMatches.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-neutral-600/40">
                             <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
                             {(() => {
-                              const profileKey = result.profileId ? String(result.profileId) : `result-${index}`;
+                              const aliasForKey = result?.personalStats?.profile?.alias ?? result?.playerName ?? result?.alias;
+                              const fallbackKey = `result-${index}`;
+                              const profileKey = buildFavoriteKey(result.profileId, aliasForKey, fallbackKey) ?? fallbackKey;
                               const sortedMatches = (result.recentMatches || [])
                                 .slice()
                                 .sort((a: any, b: any) => (
@@ -1528,7 +1854,8 @@ export default function Home() {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -1546,6 +1873,142 @@ export default function Home() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Favourites Tab Content */}
+        {activeTab === 'favorites' && (
+          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Favourites</h2>
+                <p className="text-sm text-neutral-400">Star players in search results to track them here.</p>
+              </div>
+              {favoriteEntries.length > 0 && (
+                <span className="text-xs text-neutral-500">Stored securely in your browser cookies.</span>
+              )}
+            </div>
+
+            {favoriteEntries.length === 0 ? (
+              <div className="text-sm text-neutral-300 bg-neutral-800/60 border border-neutral-700/40 rounded-md p-4">
+                <p className="font-semibold text-white mb-1">No favourites yet.</p>
+                <p>Use the star icon next to a player in search results to add them.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1">
+                {favoriteEntries.map(entry => {
+                  const dataEntry = favoriteData[entry.key];
+                  const result = dataEntry?.result;
+                  const error = dataEntry?.error;
+                  const loadingEntry = favoritesLoading && !dataEntry;
+                  const profile = result?.personalStats?.profile;
+                  const displayName = result?.playerName || profile?.alias || entry.playerName || entry.alias;
+                  const countryCode = profile?.country || entry.country;
+                  const level = typeof profile?.level === 'number' ? profile.level : undefined;
+                  const xp = typeof profile?.xp === 'number' ? profile.xp : undefined;
+                  const lastUpdated = result?.lastUpdated;
+                  const isFavorite = Boolean(favorites[entry.key]);
+                  const errorMessage = error === 'not_found'
+                    ? 'No stats available for this player yet.'
+                    : 'Failed to load latest stats.';
+
+                  return (
+                    <div key={entry.key} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-white font-medium">{displayName}</h4>
+                          {countryCode && (
+                            <div className="flex items-center gap-1">
+                              <FlagIcon countryCode={countryCode} />
+                            </div>
+                          )}
+                          {typeof level === 'number' && (
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="text-neutral-400">Level</span>
+                              <span className="text-white">{level}</span>
+                            </div>
+                          )}
+                          {typeof xp === 'number' && (
+                            <div className="flex items-center gap-1 text-xs">
+                              <span className="text-neutral-400">XP</span>
+                              <span className="text-white">{xp.toLocaleString?.() || xp}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end items-start gap-2 sm:gap-3 sm:text-right">
+                          {lastUpdated && (
+                            <span className="text-xs text-neutral-400 text-left sm:text-right">
+                              Last updated: {formatTimestamp(lastUpdated) ?? 'Unknown'}
+                            </span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleFavorite({
+                                profileId: entry.profileId,
+                                alias: entry.alias,
+                                playerName: entry.playerName,
+                                country: entry.country,
+                              })}
+                              className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${
+                                isFavorite
+                                  ? 'text-yellow-400 bg-neutral-800/70'
+                                  : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
+                              }`}
+                              aria-pressed={isFavorite}
+                              title={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+                            >
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill={isFavorite ? 'currentColor' : 'none'}
+                                stroke="currentColor"
+                                strokeWidth={isFavorite ? 1 : 1.5}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.317 4.043a1 1 0 00.95.69h4.268c.969 0 1.371 1.24.588 1.81l-3.453 2.507a1 1 0 00-.364 1.118l1.317 4.043c.3.921-.755 1.688-1.54 1.118L12 15.347l-3.534 2.609c-.784.57-1.838-.197-1.539-1.118l1.317-4.043a1 1 0 00-.364-1.118L4.427 9.47c-.783-.57-.38-1.81.588-1.81h4.268a1 1 0 00.95-.69l1.317-4.043z" />
+                              </svg>
+                              <span className="ml-2 hidden text-xs font-semibold sm:inline">
+                                {isFavorite ? 'Remove favourite' : 'Add to favourite'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => runSearchByName(entry.alias)}
+                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors text-xs font-semibold"
+                            >
+                              View in Search
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {loadingEntry && (
+                        <div className="text-xs text-neutral-400 bg-neutral-800/60 border border-neutral-700/40 rounded-md px-3 py-2">
+                          Loading latest stats…
+                        </div>
+                      )}
+
+                      {!loadingEntry && error && (
+                        <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-red-300 bg-red-900/20 border border-red-700/40 rounded-md px-3 py-2">
+                          <span className="sm:text-left text-center w-full sm:w-auto">{errorMessage}</span>
+                          <button
+                            type="button"
+                            onClick={() => refreshFavorite(entry.key)}
+                            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-red-800/60 hover:bg-red-700/60 text-red-100 rounded-md border border-red-600/40 transition-colors"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      )}
+
+                      {result && renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 3)}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
