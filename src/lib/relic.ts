@@ -18,14 +18,14 @@ export type Leaderboard = {
 
 // Faction and match type parsing utilities
 export function parseFactionFromName(name: string): string {
-  if (name.includes('chaos_marine')) return 'Chaos Marine';
+  if (name.includes('chaos_marine')) return 'Chaos';
   if (name.includes('dark_eldar')) return 'Dark Eldar';
   if (name.includes('eldar') && !name.includes('dark')) return 'Eldar';
   if (name.includes('guard')) return 'Imperial Guard';
-  if (name.includes('necron')) return 'Necron';
-  if (name.includes('ork')) return 'Ork';
+  if (name.includes('necron')) return 'Necrons';
+  if (name.includes('ork')) return 'Orks';
   if (name.includes('sisters')) return 'Sisters of Battle';
-  if (name.includes('space_marine')) return 'Space Marine';
+  if (name.includes('space_marine')) return 'Space Marines';
   if (name.includes('tau')) return 'Tau';
   return 'Unknown';
 }

@@ -164,29 +164,29 @@ const getTierIndicator = (rank: number): string => {
 // Get faction-specific colors
 const getFactionColor = (faction: string): string => {
   const factionColors: Record<string, string> = {
-    'Eldar': 'text-blue-400',
+    'Chaos': 'text-red-400',
     'Dark Eldar': 'text-purple-400',
-    'Ork': 'text-green-400',
-    'Space Marine': 'text-blue-300',
-    'Chaos Marine': 'text-red-400',
+    'Eldar': 'text-blue-400',
     'Imperial Guard': 'text-yellow-400',
-    'Necron': 'text-emerald-300',
-    'Tau': 'text-cyan-400',
-    'Sisters of Battle': 'text-pink-400'
+    'Necrons': 'text-emerald-300',
+    'Orks': 'text-green-400',
+    'Sisters of Battle': 'text-pink-400',
+    'Space Marines': 'text-blue-300',
+    'Tau': 'text-cyan-400'
   };
   return factionColors[faction] || 'text-orange-300';
 };
 
 // Map faction → icon path (bundled)
 const FACTION_ICON_MAP: Record<string, StaticImageData | string> = {
-  'Chaos Marine': chaosIcon,
+  'Chaos': chaosIcon,
   'Dark Eldar': darkEldarIcon,
   'Eldar': eldarIcon,
   'Imperial Guard': imperialGuardIcon,
-  'Necron': necronIcon,
-  'Ork': orkIcon,
+  'Necrons': necronIcon,
+  'Orks': orkIcon,
   'Sisters of Battle': sistersIcon,
-  'Space Marine': spaceMarineIcon,
+  'Space Marines': spaceMarineIcon,
   'Tau': tauIcon,
 };
 
@@ -222,14 +222,14 @@ const FactionLogo = ({ faction, size = 16, className = '', yOffset }: { faction?
 };
 
 const RACE_ID_TO_FACTION: Record<number, string> = {
-  0: 'Chaos Marine',
+  0: 'Chaos',
   1: 'Dark Eldar',
   2: 'Eldar',
   3: 'Imperial Guard',
-  4: 'Necron',
-  5: 'Ork',
+  4: 'Necrons',
+  5: 'Orks',
   6: 'Sisters of Battle',
-  7: 'Space Marine',
+  7: 'Space Marines',
   8: 'Tau',
 };
 
