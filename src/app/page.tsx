@@ -825,6 +825,13 @@ export default function Home() {
     const isAlreadyFavorite = Boolean(favorites[key]);
 
     if (isAlreadyFavorite) {
+      const removalPayload = {
+        action: 'remove' as const,
+        profileId: profileIdStr,
+        alias: displayAlias,
+        playerName: candidate.playerName ?? displayAlias,
+        occurredAt: new Date().toISOString(),
+      };
       setFavorites(prev => {
         const next = { ...prev };
         delete next[key];
@@ -842,6 +849,12 @@ export default function Home() {
         delete next[key];
         return next;
       });
+      fetch('/api/log-favorite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(removalPayload),
+        keepalive: true,
+      }).catch(() => {});
       return;
     }
 
@@ -867,6 +880,21 @@ export default function Home() {
         },
       }));
     }
+
+    const additionPayload = {
+      action: 'add' as const,
+      profileId: profileIdStr,
+      alias: displayAlias,
+      playerName: candidate.playerName ?? displayAlias,
+      occurredAt: new Date().toISOString(),
+    };
+
+    fetch('/api/log-favorite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(additionPayload),
+      keepalive: true,
+    }).catch(() => {});
   };
 
   const refreshFavorite = (key: string) => {
