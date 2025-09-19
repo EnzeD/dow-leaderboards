@@ -911,6 +911,12 @@ export default function Home() {
                     <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
                     <span className="text-white">{s.rating} ELO</span>
                     <span className="text-neutral-300">{s.wins}<span className="text-neutral-500">-</span>{s.losses}</span>
+                    <span className="text-neutral-200">{(() => {
+                      const total = (s.wins ?? 0) + (s.losses ?? 0);
+                      if (!total) return '0%';
+                      const pct = Math.round((s.wins / total) * 1000) / 10;
+                      return `${pct}%`;
+                    })()}</span>
                     <span className={`font-bold ${s.streak > 0 ? 'text-green-400' : s.streak < 0 ? 'text-red-400' : 'text-neutral-400'}`}>
                       {s.streak > 0 ? `+${s.streak}` : s.streak}
                     </span>
