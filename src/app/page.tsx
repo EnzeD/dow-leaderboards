@@ -1036,7 +1036,7 @@ export default function Home() {
     };
   }, [activeTab, favorites, favoriteData]);
 
-  // Fetch and poll current Steam player count (every 5 minutes)
+  // Fetch and poll current Steam player count (every minute)
   useEffect(() => {
     let cancelled = false;
     const load = () => {

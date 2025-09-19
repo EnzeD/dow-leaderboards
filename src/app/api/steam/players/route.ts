@@ -1,56 +1,120 @@
-export async function GET() {
-  const appId = process.env.STEAM_APP_ID_DOW_DE || process.env.STEAM_APP_ID || "3556750"; // DoW:DE default
+const CACHE_TTL_MS = 60_000;
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30",
+};
 
-  // No .env required; default appId is provided above.
+type SteamPayload = {
+  appId: string;
+  playerCount: number | null;
+  success: boolean;
+  lastUpdated: string;
+  error?: string;
+};
+
+type CacheEntry = {
+  timestamp: number;
+  payload: SteamPayload;
+  status: number;
+};
+
+let cachedEntry: CacheEntry | null = null;
+let inflightRequest: Promise<CacheEntry> | null = null;
+
+function buildResponse(entry: CacheEntry) {
+  return Response.json(entry.payload, {
+    status: entry.status,
+    headers: CACHE_HEADERS,
+  });
+}
+
+async function fetchSteamPlayerCount(appId: string): Promise<CacheEntry> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${encodeURIComponent(
+    appId
+  )}`;
+
+  const now = new Date().toISOString();
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const url = `https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/?appid=${encodeURIComponent(
-      appId
-    )}`;
     const res = await fetch(url, {
       signal: controller.signal,
       cache: "no-store",
     });
-    clearTimeout(timeout);
 
     if (!res.ok) {
-    return Response.json(
-      {
-        appId,
-        playerCount: null,
-        success: false,
-        lastUpdated: new Date().toISOString(),
-        error: "upstream_error",
-      },
-      { status: 502, headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
-    );
+      const entry: CacheEntry = {
+        timestamp: Date.now(),
+        status: 502,
+        payload: {
+          appId,
+          playerCount: null,
+          success: false,
+          lastUpdated: now,
+          error: "upstream_error",
+        },
+      };
+      cachedEntry = entry;
+      return entry;
     }
 
     const data = await res.json();
     const playerCount = typeof data?.response?.player_count === "number" ? data.response.player_count : null;
     const success = data?.response?.result === 1 && typeof playerCount === "number";
 
-    return Response.json(
-      {
+    const entry: CacheEntry = {
+      timestamp: Date.now(),
+      status: 200,
+      payload: {
         appId,
         playerCount,
         success,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
       },
-      { headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
-    );
-  } catch (e) {
-    return Response.json(
-      {
+    };
+    cachedEntry = entry;
+    return entry;
+  } catch (error) {
+    const entry: CacheEntry = {
+      timestamp: Date.now(),
+      status: 502,
+      payload: {
         appId,
         playerCount: null,
         success: false,
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: now,
         error: "fetch_failed",
       },
-      { status: 502, headers: { "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30" } }
-    );
+    };
+    cachedEntry = entry;
+    return entry;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function GET() {
+  const appId = process.env.STEAM_APP_ID_DOW_DE || process.env.STEAM_APP_ID || "3556750"; // DoW:DE default
+
+  // No .env required; default appId is provided above.
+
+  const now = Date.now();
+  if (
+    cachedEntry &&
+    cachedEntry.payload.appId === appId &&
+    now - cachedEntry.timestamp < CACHE_TTL_MS
+  ) {
+    return buildResponse(cachedEntry);
+  }
+
+  if (!inflightRequest) {
+    inflightRequest = fetchSteamPlayerCount(appId);
+  }
+
+  try {
+    const entry = await inflightRequest;
+    return buildResponse(entry);
+  } finally {
+    inflightRequest = null;
   }
 }
