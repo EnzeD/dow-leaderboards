@@ -1304,6 +1304,7 @@ export default function Home() {
               <select
                 id="country-select"
                 name="country"
+                autoComplete="country"
                 value={selectedCountry}
                 onChange={(e) => setSelectedCountry(e.target.value)}
                 className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
