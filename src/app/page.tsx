@@ -922,6 +922,12 @@ export default function Home() {
             const name = lb?.name || `Leaderboard ${s.leaderboardId}`;
             const faction = lb?.faction || 'Unknown';
             const type = lb?.matchType || '';
+            const displayLabel = (() => {
+              if (faction === 'Unknown' && type === 'Custom') return 'Custom';
+              if (!type) return faction;
+              if (faction === 'Unknown') return type;
+              return `${faction} ${type}`;
+            })();
             return (
               <div key={`${s.leaderboardId}-${appIndex}`} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
@@ -930,10 +936,8 @@ export default function Home() {
                       <FactionLogo faction={faction} size={12} yOffset={0} />
                     </span>
                     <span className="text-orange-300 truncate" title={name}>
-                      {faction} {type}
+                      {displayLabel}
                     </span>
-                    <span className="text-neutral-400 hidden sm:inline">•</span>
-                    <span className="text-neutral-300 truncate hidden sm:inline" title={name}>{name}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto justify-start sm:justify-end">
                     <span className={getRankColor(s.rank)}>{s.rank > 0 ? `#${s.rank}` : '-'}</span>
