@@ -1268,8 +1268,10 @@ export default function Home() {
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-neutral-900/50 rounded-lg border border-neutral-700/40" style={{boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)'}}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="flex flex-col">
-              <label className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
+              <label htmlFor="match-type-select" className="text-sm text-neutral-300 mb-2 font-medium">Type</label>
               <select
+                id="match-type-select"
+                name="matchType"
                 value={selectedMatchType}
                 onChange={(e) => setSelectedMatchType(e.target.value)}
                 className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
@@ -1282,8 +1284,10 @@ export default function Home() {
             </div>
             {showFactionFilter && (
               <div className="flex flex-col">
-                <label className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
+                <label htmlFor="faction-select" className="text-sm text-neutral-300 mb-2 font-medium">Faction</label>
                 <select
+                  id="faction-select"
+                  name="faction"
                   value={selectedFaction}
                   onChange={(e) => setSelectedFaction(e.target.value)}
                   className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
@@ -1296,8 +1300,10 @@ export default function Home() {
               </div>
             )}
             <div className="flex flex-col">
-              <label className="text-sm text-neutral-300 mb-2 font-medium">Country</label>
+              <label htmlFor="country-select" className="text-sm text-neutral-300 mb-2 font-medium">Country</label>
               <select
+                id="country-select"
+                name="country"
                 value={selectedCountry}
                 onChange={(e) => setSelectedCountry(e.target.value)}
                 className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
@@ -1317,8 +1323,10 @@ export default function Home() {
             {/* Specific Leaderboard selection removed: faction + match type drive selection */}
 
             <div className="flex flex-col">
-              <label className="text-xs text-neutral-400 mb-1">Search Players</label>
+              <label htmlFor="leaderboard-search" className="text-xs text-neutral-400 mb-1">Search Players</label>
               <input
+                id="leaderboard-search"
+                name="leaderboardSearch"
                 type="text"
                 placeholder="Search players..."
                 value={search}
@@ -1549,7 +1557,10 @@ export default function Home() {
                 Exact search by in-game profile name (alias). It&apos;s case-sensitive.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <label htmlFor="player-search-input" className="sr-only">Player name or Steam alias</label>
                 <input
+                  id="player-search-input"
+                  name="playerSearch"
                   type="text"
                   placeholder="Enter player name or Steam alias..."
                   value={searchQuery}
