@@ -1,6 +1,8 @@
 // AUTO-GENERATED FILE. DO NOT EDIT MANUALLY.
 // Generated from assets/maps.json and public/assets/maps/*.webp
 
+import mapSources from "../../assets/maps.json";
+
 export type MapMetadata = {
   id: string;
   name: string;
@@ -124,11 +126,56 @@ const MAP_METADATA: Record<string, MapMetadata> = {
   "8P_PENAL_COLONY": { id: "8P_PENAL_COLONY", name: `Penal Colony (8)`, imagePath: `/assets/maps/8p_penal_colony_mm.webp`, fallbackName: `Penal Colony` },
   "8P_RHEAN_JUNGLE": { id: "8P_RHEAN_JUNGLE", name: `Rhean Jungle (8)`, imagePath: `/assets/maps/8p_rhean_jungle_mm.webp`, fallbackName: `Rhean Jungle` },
   "8P_THURABIS_PLATEAU": { id: "8P_THURABIS_PLATEAU", name: `Thur'Abis Plateau (8)`, imagePath: `/assets/maps/8p_thurabis_plateau_mm.webp`, fallbackName: `Thurabis Plateau` },
+  "719236": { id: "719236", name: `The Torrents (8)`, fallbackName: `The Torrents` },
+  "719238": { id: "719238", name: `Polar Cap (8)`, fallbackName: `Polar Cap` },
+  "719244": { id: "719244", name: `Lonn V (2)`, fallbackName: `Lonn V` },
+  "719255": { id: "719255", name: `Tyrea (4)`, fallbackName: `Tyrea` },
+  "719258": { id: "719258", name: `Or'es Tash'n (4)`, fallbackName: `Or'es Tash'n` },
+  "719271": { id: "719271", name: `Green Coast (4)`, fallbackName: `Green Coast` },
+  "719272": { id: "719272", name: `Deimos Peninsula (4)`, fallbackName: `Deimos Peninsula` },
+  "719273": { id: "719273", name: `Victory Bay (4)`, fallbackName: `Victory Bay` },
+  "719274": { id: "719274", name: `North Vandea (4)`, fallbackName: `North Vandea` },
+  "4900096": { id: "4900096", name: `Principian Badlands (6)`, fallbackName: `Principian Badlands` },
 };
 
+type MapsJsonEntry = {
+  id?: string;
+  aliases?: string[];
+};
+
+const rawMapSource = mapSources as { mapname?: MapsJsonEntry[] } | undefined;
+const mapSourceEntries: MapsJsonEntry[] = Array.isArray(rawMapSource?.mapname)
+  ? (rawMapSource?.mapname as MapsJsonEntry[])
+  : [];
+
+for (const entry of mapSourceEntries) {
+  const canonicalId = entry?.id;
+  if (!canonicalId) continue;
+
+  const base = MAP_METADATA[canonicalId];
+  if (!base) continue;
+
+  if (!Array.isArray(entry.aliases)) continue;
+
+  for (const alias of entry.aliases) {
+    if (!alias || alias in MAP_METADATA) continue;
+    MAP_METADATA[alias] = {
+      ...base,
+      id: alias,
+    };
+  }
+}
+
 const normalizeId = (mapId?: string | null): string | null => {
-  if (!mapId) return null;
-  return mapId.trim().toUpperCase();
+  if (mapId === null || mapId === undefined) return null;
+
+  const trimmed = String(mapId).trim();
+  if (!trimmed) return null;
+
+  const upper = trimmed.toUpperCase();
+  const sanitized = upper.replace(/^[^A-Z0-9]+/, '');
+
+  return sanitized || upper;
 };
 
 export const getMapMetadata = (mapId?: string | null): MapMetadata | null => {

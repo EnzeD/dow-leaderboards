@@ -1714,8 +1714,18 @@ export default function Home() {
                                 const mePlayer = (m.players || []).find((p: any) => p.profileId === result.profileId);
                                 const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
                                 const rawMapIdCandidate = [m.mapName, m.mapname, m.mapId, m.mapid]
-                                  .find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined;
-                                const normalizedMapId = rawMapIdCandidate?.trim();
+                                  .find((value) => {
+                                    if (typeof value === 'string') {
+                                      return value.trim().length > 0;
+                                    }
+                                    if (typeof value === 'number') {
+                                      return Number.isFinite(value);
+                                    }
+                                    return false;
+                                  });
+                                const normalizedMapId = typeof rawMapIdCandidate === 'number'
+                                  ? String(rawMapIdCandidate)
+                                  : rawMapIdCandidate?.trim();
                                 const mapDisplayName = getMapName(normalizedMapId);
                                 const mapImagePath = getMapImage(normalizedMapId);
                                 const hasRoster = allies.length > 0 || opps.length > 0;
