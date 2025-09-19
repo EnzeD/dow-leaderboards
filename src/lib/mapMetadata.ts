@@ -142,16 +142,34 @@ export const getMapName = (mapId?: string | null): string => {
   if (!meta) {
     if (!mapId) return 'Unknown Map';
 
-    const cleaned = mapId
-      .replace(/^.+?_/, '')
+    const trimmed = mapId.trim();
+    if (!trimmed) return 'Unknown Map';
+
+    const stripped = trimmed
+      .replace(/^.*[\\/]/, '')
+      .replace(/\.(sga|sgb)$/i, '')
       .replace(/_/g, ' ')
       .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
+      .trim();
 
-    if (!cleaned) return 'Unknown Map';
+    if (!stripped) return 'Unknown Map';
 
-    return cleaned.replace(/\b([a-z])/g, (_, letter) => letter.toUpperCase());
+    const alphaCount = (stripped.match(/[A-Za-z]/g) || []).length;
+    const compact = stripped.replace(/\s+/g, '');
+    const hasNumbers = /\d/.test(compact);
+    const looksLikeWorkshopId = /^[A-Za-z]?\d{4,}$/.test(compact);
+    const looksLikeCode = alphaCount <= 1 || looksLikeWorkshopId || (!stripped.includes(' ') && hasNumbers);
+
+    if (looksLikeCode) {
+      return `Custom Map${trimmed ? ` (${trimmed})` : ''}`;
+    }
+
+    return stripped
+      .toLowerCase()
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
   return (meta.name || meta.fallbackName || 'Unknown Map').trim();
 };

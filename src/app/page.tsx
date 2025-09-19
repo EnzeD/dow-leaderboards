@@ -31,6 +31,8 @@ type RosterEntry = {
   onClick?: () => void;
 };
 
+const DEFAULT_RECENT_MATCH_LIMIT = 10;
+
 const regionDisplayNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
   ? new Intl.DisplayNames(['en'], { type: 'region' })
   : undefined;
@@ -308,6 +310,7 @@ export default function Home() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
+  const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
 
   // Live Steam player count (DoW:DE)
   const [playerCount, setPlayerCount] = useState<number | null>(null);
@@ -1308,14 +1311,37 @@ export default function Home() {
                         {result.recentMatches && result.recentMatches.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-neutral-600/40">
                             <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
-                            <div className="grid gap-2">
-                              {result.recentMatches
+                            {(() => {
+                              const profileKey = result.profileId ? String(result.profileId) : `result-${index}`;
+                              const sortedMatches = (result.recentMatches || [])
                                 .slice()
                                 .sort((a: any, b: any) => (
                                   (b.endTime ?? b.startTime ?? 0) - (a.endTime ?? a.startTime ?? 0)
-                                ))
-                                .slice(0, 8)
-                                .map((m: any, mi: number) => {
+                                ));
+                              const maxMatches = Math.min(100, sortedMatches.length);
+                              const baseLimit = recentMatchLimits[profileKey] ?? DEFAULT_RECENT_MATCH_LIMIT;
+                              const currentLimit = maxMatches > 0 ? Math.min(baseLimit, maxMatches) : Math.min(baseLimit, DEFAULT_RECENT_MATCH_LIMIT);
+                              const visibleMatches = sortedMatches.slice(0, Math.min(currentLimit, maxMatches));
+                              const canLoadMore = currentLimit < maxMatches;
+                              const remainingMatches = Math.max(0, maxMatches - currentLimit);
+                              const loadMoreCount = Math.min(10, remainingMatches || 10);
+
+                              const handleLoadMore = () => {
+                                if (!canLoadMore) return;
+                                setRecentMatchLimits(prev => {
+                                  const prevLimit = prev[profileKey] ?? DEFAULT_RECENT_MATCH_LIMIT;
+                                  const nextLimit = Math.min(prevLimit + 10, maxMatches);
+                                  return {
+                                    ...prev,
+                                    [profileKey]: nextLimit,
+                                  };
+                                });
+                              };
+
+                              return (
+                                <>
+                                  <div className="grid gap-2">
+                                    {visibleMatches.map((m: any, mi: number) => {
                                 const myTeam = m.teamId;
                                 const allies = (m.players || []).filter((p: any) => p.teamId === myTeam && p.profileId !== result.profileId);
                                 const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
@@ -1477,7 +1503,28 @@ export default function Home() {
                                   </div>
                                 );
                               })}
-                            </div>
+                                  </div>
+                                  {maxMatches > 0 && (
+                                    canLoadMore ? (
+                                      <div className="mt-3 flex justify-center">
+                                        <button
+                                          type="button"
+                                          onClick={handleLoadMore}
+                                          className="inline-flex items-center justify-center rounded-md border border-neutral-600/40 bg-neutral-800/70 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-neutral-700/70 disabled:cursor-not-allowed disabled:opacity-50"
+                                          disabled={!canLoadMore}
+                                        >
+                                          Load {loadMoreCount} more matches
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-3 text-center text-xs text-neutral-400">
+                                        All {maxMatches} recent matches loaded
+                                      </div>
+                                    )
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         )}
                       </div>
