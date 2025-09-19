@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import SupportButton from "@/app/_components/SupportButton";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
@@ -22,6 +22,13 @@ type LadderData = {
   lastUpdated: string;
   stale: boolean;
   rows: LadderRow[];
+};
+
+type RosterEntry = {
+  key: string;
+  label: string;
+  faction: string;
+  onClick?: () => void;
 };
 
 const regionDisplayNames = typeof Intl !== 'undefined' && 'DisplayNames' in Intl
@@ -1326,11 +1333,87 @@ export default function Home() {
                                 const mapDisplayName = getMapName(normalizedMapId);
                                 const mapImagePath = getMapImage(normalizedMapId);
                                 const hasRoster = allies.length > 0 || opps.length > 0;
+                                const displaySelfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
+                                const teamExtraCount = Math.max(0, allies.length - 2);
+                                const opponentExtraCount = Math.max(0, opps.length - 3);
+
+                                const teamEntries: RosterEntry[] = [
+                                  {
+                                    key: `self-${result.profileId}`,
+                                    label: displaySelfAlias,
+                                    faction: myFaction,
+                                    onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias) : undefined,
+                                  },
+                                  ...allies.slice(0, 2).map((p: any, index: number) => {
+                                    const label = p.alias || String(p.profileId);
+                                    const faction = raceIdToFaction(p.raceId);
+                                    return {
+                                      key: `ally-${p.profileId}-${index}`,
+                                      label,
+                                      faction,
+                                      onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                    } satisfies RosterEntry;
+                                  }),
+                                ];
+
+                                const opponentEntries: RosterEntry[] = opps.slice(0, 3).map((p: any, index: number) => {
+                                  const label = p.alias || String(p.profileId);
+                                  const faction = raceIdToFaction(p.raceId);
+                                  return {
+                                    key: `opp-${p.profileId}-${index}`,
+                                    label,
+                                    faction,
+                                    onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                  } satisfies RosterEntry;
+                                });
+
+                                const renderRosterEntries = (
+                                  entries: RosterEntry[],
+                                  extraCount: number,
+                                  align: 'start' | 'end' = 'start'
+                                ) => (
+                                  <div
+                                    className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-neutral-200 ${
+                                      align === 'end' ? 'sm:justify-end' : ''
+                                    }`}
+                                  >
+                                    {entries.map((entry, index) => (
+                                      <Fragment key={entry.key || `${entry.label}-${index}`}>
+                                        {index > 0 && <span className="text-neutral-500 select-none">•</span>}
+                                        <button
+                                          type="button"
+                                          onClick={entry.onClick}
+                                          className={`hover:underline ${
+                                            entry.onClick ? 'text-blue-300' : 'text-neutral-400 cursor-default'
+                                          }`}
+                                          title={entry.label}
+                                          disabled={!entry.onClick}
+                                        >
+                                          {entry.label}
+                                          {entry.faction !== 'Unknown' && (
+                                            <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
+                                              (
+                                              <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
+                                              <span>{entry.faction}</span>
+                                              )
+                                            </span>
+                                          )}
+                                        </button>
+                                      </Fragment>
+                                    ))}
+                                    {extraCount > 0 && (
+                                      <Fragment>
+                                        {entries.length > 0 && <span className="text-neutral-500 select-none">•</span>}
+                                        <span className="text-neutral-400">+{extraCount}</span>
+                                      </Fragment>
+                                    )}
+                                  </div>
+                                );
 
                                 return (
                                   <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
                                     <div className="flex items-stretch gap-3">
-                                      <div className="relative h-14 w-14 flex-shrink-0 self-start sm:h-16 sm:w-16">
+                                      <div className="relative h-14 w-14 flex-shrink-0 self-center sm:h-16 sm:w-16">
                                         <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
                                         {mapImagePath ? (
                                           <img
@@ -1345,8 +1428,8 @@ export default function Home() {
                                           </div>
                                         )}
                                       </div>
-                                      <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
-                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                      <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 pl-0.5 sm:pl-1">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                                           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                                             <span className={`${outcomeColor} font-semibold`}>{m.outcome || 'Unknown'}</span>
                                             <span className="text-neutral-500">•</span>
@@ -1366,7 +1449,7 @@ export default function Home() {
                                               </>
                                             )}
                                           </div>
-                                          <div className="flex items-center gap-2">
+                                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                             {typeof m.oldRating === 'number' && typeof m.newRating === 'number' && (
                                               <span className="text-neutral-300">{m.oldRating}→{m.newRating}</span>
                                             )}
@@ -1376,92 +1459,16 @@ export default function Home() {
                                           </div>
                                         </div>
                                         {hasRoster && (
-                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="flex-1 min-w-0">
-                                              <span className="text-neutral-400 mr-1">Team:</span>
-                                              <span className="text-neutral-200 sm:truncate break-words">
-                                                {/* Self first */}
-                                                {(() => {
-                                                  const selfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
-                                                  const selfFaction = myFaction;
-                                                  return (
-                                                    <>
-                                                      <button
-                                                        type="button"
-                                                        onClick={() => selfAlias && runSearchByName(selfAlias)}
-                                                        className={`hover:underline ${selfAlias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                        title={selfAlias}
-                                                      >
-                                                        {selfAlias}
-                                                        {selfFaction !== 'Unknown' && (
-                                                          <span className={`ml-1 ${getFactionColor(selfFaction)} inline-flex items-center`}>
-                                                            (
-                                                            <FactionLogo faction={selfFaction} size={11} yOffset={0} className="mx-1" />
-                                                            <span>{selfFaction}</span>
-                                                            )
-                                                          </span>
-                                                        )}
-                                                      </button>
-                                                      {allies.length > 0 && ', '}
-                                                    </>
-                                                  );
-                                                })()}
-
-                                                {/* Allies (limit to keep line compact) */}
-                                                {allies.slice(0, 2).map((p: any, i: number) => {
-                                                  const f = raceIdToFaction(p.raceId);
-                                                  return (
-                                                    <button
-                                                      key={p.profileId + i}
-                                                      type="button"
-                                                      onClick={() => p.alias && runSearchByName(p.alias)}
-                                                      className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                      title={p.alias || p.profileId}
-                                                    >
-                                                      {p.alias || p.profileId}
-                                                      {f !== 'Unknown' && (
-                                                        <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
-                                                          (
-                                                          <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
-                                                          <span>{f}</span>
-                                                          )
-                                                        </span>
-                                                      )}
-                                                      {i < Math.min(allies.length, 2) - 1 ? ', ' : ''}
-                                                    </button>
-                                                  );
-                                                })}
-                                                {allies.length > 2 && ` +${allies.length - 2}`}
-                                              </span>
+                                          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-3">
+                                            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                              <span className="text-neutral-400 text-xs font-semibold uppercase tracking-wide">Team</span>
+                                              {renderRosterEntries(teamEntries, teamExtraCount, 'start')}
                                             </div>
-                                            <div className="flex-1 min-w-0 sm:text-right">
-                                              <span className="text-neutral-400 mr-1">Opponents:</span>
-                                              <span className="text-neutral-200 sm:truncate break-words">
-                                                {opps.slice(0, 3).map((p: any, i: number) => {
-                                                  const f = raceIdToFaction(p.raceId);
-                                                  return (
-                                                    <button
-                                                      key={p.profileId + i}
-                                                      type="button"
-                                                      onClick={() => p.alias && runSearchByName(p.alias)}
-                                                      className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                      title={p.alias || p.profileId}
-                                                    >
-                                                      {p.alias || p.profileId}
-                                                      {f !== 'Unknown' && (
-                                                        <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
-                                                          (
-                                                          <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
-                                                          <span>{f}</span>
-                                                          )
-                                                        </span>
-                                                      )}
-                                                      {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
-                                                    </button>
-                                                  );
-                                                })}
-                                                {opps.length > 3 && ` +${opps.length - 3}`}
-                                              </span>
+                                            <div className="flex min-w-0 flex-1 flex-col gap-1 sm:items-end">
+                                              <span className="text-neutral-400 text-xs font-semibold uppercase tracking-wide sm:text-right">Opponents</span>
+                                              <div className="w-full sm:w-auto">
+                                                {renderRosterEntries(opponentEntries, opponentExtraCount, 'end')}
+                                              </div>
                                             </div>
                                           </div>
                                         )}
