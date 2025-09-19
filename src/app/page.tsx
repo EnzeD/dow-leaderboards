@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import SupportButton from "@/app/_components/SupportButton";
 import { LadderRow, Leaderboard } from "@/lib/relic";
+import { getMapName, getMapImage } from "@/lib/mapMetadata";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -1319,127 +1320,149 @@ export default function Home() {
                                 const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';
                                 const mePlayer = (m.players || []).find((p: any) => p.profileId === result.profileId);
                                 const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
+                                const rawMapIdCandidate = [m.mapName, m.mapname, m.mapId, m.mapid]
+                                  .find((value) => typeof value === 'string' && value.trim().length > 0) as string | undefined;
+                                const normalizedMapId = rawMapIdCandidate?.trim();
+                                const mapDisplayName = getMapName(normalizedMapId);
+                                const mapImagePath = getMapImage(normalizedMapId);
+                                const hasRoster = allies.length > 0 || opps.length > 0;
+
                                 return (
                                   <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                                        <span className={`${outcomeColor} font-semibold`}>{m.outcome || 'Unknown'}</span>
-                                        <span className="text-neutral-500">•</span>
-                                        <span className="text-white truncate" title={m.mapName}>{m.mapName || 'Unknown Map'}</span>
-                                        <span className="text-neutral-500">•</span>
-                                        <span className="text-orange-300">{matchType}</span>
-                                        {start && (
-                                          <>
+                                    <div className="flex items-stretch gap-3">
+                                      {mapImagePath ? (
+                                        <div className="relative h-14 w-14 flex-shrink-0 self-start sm:h-16 sm:w-16">
+                                          <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
+                                          <img
+                                            src={mapImagePath}
+                                            alt={`${mapDisplayName} mini-map`}
+                                            className="relative h-full w-full rotate-45 transform-gpu rounded-lg border border-neutral-600/50 object-cover shadow-lg"
+                                            draggable={false}
+                                          />
+                                        </div>
+                                      ) : null}
+                                      <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span className={`${outcomeColor} font-semibold`}>{m.outcome || 'Unknown'}</span>
                                             <span className="text-neutral-500">•</span>
-                                            <span className="text-neutral-400">{formatLastMatch(start)}</span>
-                                          </>
-                                        )}
-                                        {durStr && (
-                                          <>
+                                            <span className="text-white truncate" title={mapDisplayName}>{mapDisplayName}</span>
                                             <span className="text-neutral-500">•</span>
-                                            <span className="text-neutral-400">{durStr}</span>
-                                          </>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-2 mt-1 sm:mt-0">
-                                        {typeof m.oldRating === 'number' && typeof m.newRating === 'number' && (
-                                          <span className="text-neutral-300">{m.oldRating}→{m.newRating}</span>
-                                        )}
-                                        {typeof m.ratingDiff === 'number' && (
-                                          <span className={`font-semibold ${diffColor}`}>{m.ratingDiff > 0 ? `+${m.ratingDiff}` : m.ratingDiff}</span>
+                                            <span className="text-orange-300">{matchType}</span>
+                                            {start && (
+                                              <>
+                                                <span className="text-neutral-500">•</span>
+                                                <span className="text-neutral-400">{formatLastMatch(start)}</span>
+                                              </>
+                                            )}
+                                            {durStr && (
+                                              <>
+                                                <span className="text-neutral-500">•</span>
+                                                <span className="text-neutral-400">{durStr}</span>
+                                              </>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {typeof m.oldRating === 'number' && typeof m.newRating === 'number' && (
+                                              <span className="text-neutral-300">{m.oldRating}→{m.newRating}</span>
+                                            )}
+                                            {typeof m.ratingDiff === 'number' && (
+                                              <span className={`font-semibold ${diffColor}`}>{m.ratingDiff > 0 ? `+${m.ratingDiff}` : m.ratingDiff}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {hasRoster && (
+                                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex-1 min-w-0">
+                                              <span className="text-neutral-400 mr-1">Team:</span>
+                                              <span className="text-neutral-200 sm:truncate break-words">
+                                                {/* Self first */}
+                                                {(() => {
+                                                  const selfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
+                                                  const selfFaction = myFaction;
+                                                  return (
+                                                    <>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => selfAlias && runSearchByName(selfAlias)}
+                                                        className={`hover:underline ${selfAlias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                        title={selfAlias}
+                                                      >
+                                                        {selfAlias}
+                                                        {selfFaction !== 'Unknown' && (
+                                                          <span className={`ml-1 ${getFactionColor(selfFaction)} inline-flex items-center`}>
+                                                            (
+                                                            <FactionLogo faction={selfFaction} size={11} yOffset={0} className="mx-1" />
+                                                            <span>{selfFaction}</span>
+                                                            )
+                                                          </span>
+                                                        )}
+                                                      </button>
+                                                      {allies.length > 0 && ', '}
+                                                    </>
+                                                  );
+                                                })()}
+
+                                                {/* Allies (limit to keep line compact) */}
+                                                {allies.slice(0, 2).map((p: any, i: number) => {
+                                                  const f = raceIdToFaction(p.raceId);
+                                                  return (
+                                                    <button
+                                                      key={p.profileId + i}
+                                                      type="button"
+                                                      onClick={() => p.alias && runSearchByName(p.alias)}
+                                                      className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                      title={p.alias || p.profileId}
+                                                    >
+                                                      {p.alias || p.profileId}
+                                                      {f !== 'Unknown' && (
+                                                        <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
+                                                          (
+                                                          <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
+                                                          <span>{f}</span>
+                                                          )
+                                                        </span>
+                                                      )}
+                                                      {i < Math.min(allies.length, 2) - 1 ? ', ' : ''}
+                                                    </button>
+                                                  );
+                                                })}
+                                                {allies.length > 2 && ` +${allies.length - 2}`}
+                                              </span>
+                                            </div>
+                                            <div className="flex-1 min-w-0 sm:text-right">
+                                              <span className="text-neutral-400 mr-1">Opponents:</span>
+                                              <span className="text-neutral-200 sm:truncate break-words">
+                                                {opps.slice(0, 3).map((p: any, i: number) => {
+                                                  const f = raceIdToFaction(p.raceId);
+                                                  return (
+                                                    <button
+                                                      key={p.profileId + i}
+                                                      type="button"
+                                                      onClick={() => p.alias && runSearchByName(p.alias)}
+                                                      className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
+                                                      title={p.alias || p.profileId}
+                                                    >
+                                                      {p.alias || p.profileId}
+                                                      {f !== 'Unknown' && (
+                                                        <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
+                                                          (
+                                                          <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
+                                                          <span>{f}</span>
+                                                          )
+                                                        </span>
+                                                      )}
+                                                      {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
+                                                    </button>
+                                                  );
+                                                })}
+                                                {opps.length > 3 && ` +${opps.length - 3}`}
+                                              </span>
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
-                                    {(allies.length > 0 || opps.length > 0) && (
-                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-2 gap-2">
-                                        <div className="flex-1 min-w-0">
-                                          <span className="text-neutral-400 mr-1">Team:</span>
-                                          <span className="text-neutral-200 sm:truncate break-words">
-                                            {/* Self first */}
-                                            {(() => {
-                                              const selfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
-                                              const selfFaction = myFaction;
-                                              return (
-                                                <>
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => selfAlias && runSearchByName(selfAlias)}
-                                                    className={`hover:underline ${selfAlias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                    title={selfAlias}
-                                                  >
-                                                    {selfAlias}
-                                                    {selfFaction !== 'Unknown' && (
-                                                      <span className={`ml-1 ${getFactionColor(selfFaction)} inline-flex items-center`}>
-                                                        (
-                                                        <FactionLogo faction={selfFaction} size={11} yOffset={0} className="mx-1" />
-                                                        <span>{selfFaction}</span>
-                                                        )
-                                                      </span>
-                                                    )}
-                                                  </button>
-                                                  {allies.length > 0 && ', '}
-                                                </>
-                                              );
-                                            })()}
-
-                                            {/* Allies (limit to keep line compact) */}
-                                            {allies.slice(0,2).map((p: any, i: number) => {
-                                              const f = raceIdToFaction(p.raceId);
-                                              return (
-                                                <button
-                                                  key={p.profileId + i}
-                                                  type="button"
-                                                  onClick={() => p.alias && runSearchByName(p.alias)}
-                                                  className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                  title={p.alias || p.profileId}
-                                                >
-                                                  {p.alias || p.profileId}
-                                                  {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
-                                                      (
-                                                      <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
-                                                      <span>{f}</span>
-                                                      )
-                                                    </span>
-                                                  )}
-                                                  {i < Math.min(allies.length, 2) - 1 ? ', ' : ''}
-                                                </button>
-                                              );
-                                            })}
-                                            {allies.length > 2 && ` +${allies.length - 2}`}
-                                          </span>
-                                        </div>
-                                        <div className="flex-1 min-w-0 sm:text-right">
-                                          <span className="text-neutral-400 mr-1">Opponents:</span>
-                                          <span className="text-neutral-200 sm:truncate break-words">
-                                            {opps.slice(0,3).map((p: any, i: number) => {
-                                              const f = raceIdToFaction(p.raceId);
-                                              return (
-                                                <button
-                                                  key={p.profileId + i}
-                                                  type="button"
-                                                  onClick={() => p.alias && runSearchByName(p.alias)}
-                                                  className={`hover:underline ${p.alias ? 'text-blue-300' : 'text-neutral-400 cursor-default'}`}
-                                                  title={p.alias || p.profileId}
-                                                >
-                                                  {p.alias || p.profileId}
-                                                  {f !== 'Unknown' && (
-                                                    <span className={`ml-1 ${getFactionColor(f)} inline-flex items-center`}>
-                                                      (
-                                                      <FactionLogo faction={f} size={11} yOffset={0} className="mx-1" />
-                                                      <span>{f}</span>
-                                                      )
-                                                    </span>
-                                                  )}
-                                                  {i < Math.min(opps.length, 3) - 1 ? ', ' : ''}
-                                                </button>
-                                              );
-                                            })}
-                                            {opps.length > 3 && ` +${opps.length - 3}`}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
                                   </div>
                                 );
                               })}
