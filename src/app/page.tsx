@@ -1330,17 +1330,21 @@ export default function Home() {
                                 return (
                                   <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
                                     <div className="flex items-stretch gap-3">
-                                      {mapImagePath ? (
-                                        <div className="relative h-14 w-14 flex-shrink-0 self-start sm:h-16 sm:w-16">
-                                          <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
+                                      <div className="relative h-14 w-14 flex-shrink-0 self-start sm:h-16 sm:w-16">
+                                        <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
+                                        {mapImagePath ? (
                                           <img
                                             src={mapImagePath}
                                             alt={`${mapDisplayName} mini-map`}
                                             className="relative h-full w-full rotate-45 transform-gpu rounded-lg border border-neutral-600/50 object-cover shadow-lg"
                                             draggable={false}
                                           />
-                                        </div>
-                                      ) : null}
+                                        ) : (
+                                          <div className="relative flex h-full w-full rotate-45 transform-gpu items-center justify-center rounded-lg border border-dashed border-neutral-600/50 bg-neutral-800/40 text-[0.55rem] font-semibold uppercase tracking-wide text-neutral-500 shadow-lg">
+                                            <span className="-rotate-45 select-none">No Map</span>
+                                          </div>
+                                        )}
+                                      </div>
                                       <div className="flex min-w-0 flex-1 flex-col justify-between gap-2">
                                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
