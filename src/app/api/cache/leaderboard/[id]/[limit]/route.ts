@@ -13,7 +13,11 @@ export async function GET(_req: Request, ctx: { params: { id: string; limit: str
     const rows = await fetchLeaderboardRows(idNum, limit);
     const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
-    for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
+    for (const r of rows) {
+      const resolved = map[r.profileId];
+      if (!r.playerName) r.playerName = resolved?.name || "Unknown";
+      if (!r.steamId && resolved?.steamId) r.steamId = resolved.steamId;
+    }
 
     return Response.json({
       leaderboardId: idNum,

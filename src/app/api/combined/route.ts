@@ -5,7 +5,11 @@ export async function GET() {
     const rows = await fetchCombined1v1();
     const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
-    for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
+    for (const r of rows) {
+      const resolved = map[r.profileId];
+      if (!r.playerName) r.playerName = resolved?.name || "Unknown";
+      if (!r.steamId && resolved?.steamId) r.steamId = resolved.steamId;
+    }
 
     return Response.json({
       leaderboardId: "combined-1v1",

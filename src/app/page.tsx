@@ -120,6 +120,42 @@ const FlagIcon = ({ countryCode, compact = false }: { countryCode: string; compa
   );
 };
 
+const SteamProfileLink = ({
+  steamId,
+  label,
+  size = "md",
+  className = "",
+}: {
+  steamId?: string;
+  label?: string;
+  size?: "sm" | "md";
+  className?: string;
+}) => {
+  if (!steamId) return null;
+  const dimension = size === "sm" ? "w-7 h-7" : "w-8 h-8";
+  const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
+  const title = label ? `Open Steam profile for ${label}` : "Open Steam profile";
+  return (
+    <a
+      href={`https://steamcommunity.com/profiles/${steamId}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={title}
+      title={title}
+      className={`inline-flex items-center justify-center rounded-full border border-neutral-600/60 bg-neutral-800/70 text-neutral-300 transition-colors hover:text-white hover:border-neutral-400 hover:bg-neutral-700/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${dimension} ${className}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+        className={`${iconSize}`}
+      >
+        <path d="M12 0a12 12 0 00-11.39 8.64l4.58 1.85a3.06 3.06 0 015.66-.86l3.02 1.23a3.91 3.91 0 113.72 4.89 3.9 3.9 0 01-3.81-3.24l-3.02-1.23a3.06 3.06 0 01-3.31 1.93l-4.13-1.67A12 12 0 1012 0zm4.27 9.6a1.95 1.95 0 101.95 1.95 1.95 1.95 0 00-1.95-1.95zm-7.65 5.09a1.62 1.62 0 101.62 1.62 1.62 1.62 0 00-1.62-1.62z" />
+      </svg>
+    </a>
+  );
+};
+
 // Format last match date
 const formatLastMatch = (dateInput?: Date | string): string => {
   if (!dateInput) return "Never";
@@ -1449,6 +1485,12 @@ export default function Home() {
                           >
                             {row.playerName}
                           </button>
+                          <SteamProfileLink
+                            steamId={row.steamId}
+                            label={row.playerName}
+                            size="sm"
+                            className="shrink-0"
+                          />
                         </div>
                       </td>
                       {isCombinedMode && (
@@ -1488,7 +1530,7 @@ export default function Home() {
                     </div>
 
                     {/* Player Name with Flag */}
-                    <div className={`flex items-center gap-1 min-w-0 flex-1 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white"}`}>
+                    <div className={`flex items-center gap-1.5 min-w-0 flex-1 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white"}`}>
                       {row.country && <FlagIcon countryCode={row.country} compact />}
                       <button
                         type="button"
@@ -1498,6 +1540,12 @@ export default function Home() {
                       >
                         {row.playerName}
                       </button>
+                      <SteamProfileLink
+                        steamId={row.steamId}
+                        label={row.playerName}
+                        size="sm"
+                        className="shrink-0"
+                      />
                       {isCombinedMode && (
                         <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
                           <FactionLogo faction={row.faction || undefined} size={14} />
@@ -1602,6 +1650,11 @@ export default function Home() {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                             <h4 className="text-white font-medium">{result.playerName}</h4>
+                            <SteamProfileLink
+                              steamId={result.steamId}
+                              label={result.playerName}
+                              className="shrink-0"
+                            />
                             {result.personalStats?.profile?.country && (
                               <div className="flex items-center gap-1">
                                 <FlagIcon countryCode={result.personalStats.profile.country} />

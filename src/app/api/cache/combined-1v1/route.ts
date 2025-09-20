@@ -7,7 +7,11 @@ export async function GET(request: Request) {
     const rows = await fetchCombined1v1Max();
     const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
-    for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
+    for (const r of rows) {
+      const resolved = map[r.profileId];
+      if (!r.playerName) r.playerName = resolved?.name || "Unknown";
+      if (!r.steamId && resolved?.steamId) r.steamId = resolved.steamId;
+    }
 
     const url = new URL(request.url);
     const limitParam = Number(url.searchParams.get('limit') || '200');

@@ -6,7 +6,12 @@ type RawStat = { statgroup_id: number, rank: number, rating: number, wins: numbe
 export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
-  country?: string; lastMatchDate?: Date; faction?: string;
+  country?: string; lastMatchDate?: Date; faction?: string; steamId?: string;
+};
+
+type ProfileResolution = {
+  name?: string;
+  steamId?: string;
 };
 
 export type Leaderboard = {
@@ -151,10 +156,10 @@ export async function fetchAllRows(leaderboardId: number, max: number = 10000) {
   return fetchLeaderboardRows(leaderboardId, max);
 }
 
-export async function resolveNames(profileIds: string[]): Promise<Record<string, string>> {
+export async function resolveNames(profileIds: string[]): Promise<Record<string, ProfileResolution>> {
   // Chunk to avoid very long URLs and respect rate limits.
   const uniq = Array.from(new Set(profileIds));
-  const out: Record<string, string> = {};
+  const out: Record<string, ProfileResolution> = {};
   const size = 25;
 
   for (let i = 0; i < uniq.length; i += size) {
@@ -164,7 +169,15 @@ export async function resolveNames(profileIds: string[]): Promise<Record<string,
     const players = data?.steamResults?.response?.players ?? [];
     // Some variants also include avatars[] with profile_id→alias; prefer personaname
     for (const p of players) {
-      if (p?.relic_profile_id && p?.personaname) out[String(p.relic_profile_id)] = p.personaname;
+      const profileId = p?.relic_profile_id ? String(p.relic_profile_id) : undefined;
+      if (!profileId) continue;
+      const personaname = typeof p?.personaname === "string" ? p.personaname.trim() : undefined;
+      const steamId = typeof p?.steamid === "string" ? p.steamid.trim() : undefined;
+      const prev = out[profileId] ?? {};
+      out[profileId] = {
+        name: personaname || prev.name,
+        steamId: steamId || prev.steamId,
+      };
     }
     await new Promise(r => setTimeout(r, 120)); // soft throttle (≤ ~8 req/s)
   }
