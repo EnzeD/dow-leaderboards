@@ -248,11 +248,126 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'support';
+type TabType =
+  | 'leaderboards'
+  | 'search'
+  | 'favorites'
+  | 'stats'
+  | 'replays'
+  | 'mods'
+  | 'support';
+
+type TabMeta = {
+  id: TabType;
+  label: string;
+  isComingSoon?: boolean;
+};
+
+const TAB_ITEMS: TabMeta[] = [
+  { id: 'leaderboards', label: 'Leaderboards' },
+  { id: 'search', label: 'Search' },
+  { id: 'favorites', label: 'Favourites' },
+  { id: 'stats', label: 'Stats', isComingSoon: true },
+  { id: 'replays', label: 'Replays', isComingSoon: true },
+  { id: 'mods', label: 'Mods', isComingSoon: true },
+  { id: 'support', label: 'Support' },
+];
+
+type ComingSoonHighlight = {
+  title: string;
+  description: string;
+  accent: string;
+  icon?: string;
+};
+
+type ComingSoonSectionProps = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  highlights: ComingSoonHighlight[];
+  onShareIdeas: () => void;
+  ctaLabel?: string;
+};
+
+const ComingSoonSection = ({
+  eyebrow,
+  title,
+  description,
+  highlights,
+  onShareIdeas,
+  ctaLabel = 'Share your ideas',
+}: ComingSoonSectionProps) => (
+  <section className="relative overflow-hidden rounded-3xl border border-neutral-700/60 bg-gradient-to-br from-neutral-950/80 via-neutral-900/60 to-neutral-950/70 px-6 py-8 sm:px-10 sm:py-12">
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div className="absolute -top-32 -left-24 h-64 w-64 rounded-full bg-emerald-500/15 blur-3xl" />
+      <div className="absolute -bottom-24 -right-20 h-56 w-56 rounded-full bg-sky-500/10 blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-700/20" />
+    </div>
+    <div className="relative grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+      <div className="space-y-6">
+        <div className="inline-flex items-center gap-3 rounded-full border border-neutral-700/60 bg-neutral-900/70 px-4 py-1.5 text-xs uppercase tracking-[0.35em] text-neutral-300">
+          {eyebrow}
+          <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-0.5 text-[10px] font-semibold tracking-widest text-amber-200">Soon</span>
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{title}</h2>
+          <p className="max-w-2xl text-base leading-relaxed text-neutral-300 sm:text-lg">
+            {description}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onShareIdeas}
+          className="inline-flex items-center gap-2 rounded-full border border-neutral-500/60 bg-white/5 px-5 py-2.5 text-sm font-medium text-white shadow-[0_10px_40px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-200/40"
+        >
+          {ctaLabel}
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden
+          >
+            <path
+              d="M5 12h14m0 0-5-5m5 5-5 5"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+        {highlights.map((highlight, index) => (
+          <div
+            key={`${highlight.title}-${index}`}
+            className="group relative overflow-hidden rounded-2xl border border-neutral-700/50 bg-neutral-900/70 p-5 backdrop-blur-sm"
+          >
+            <div className={`absolute inset-0 bg-gradient-to-br ${highlight.accent} opacity-60 transition-opacity duration-300 group-hover:opacity-80`} aria-hidden />
+            <div className="relative flex items-start gap-3">
+              {highlight.icon && (
+                <span className="text-xl sm:text-2xl" aria-hidden>
+                  {highlight.icon}
+                </span>
+              )}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-white">{highlight.title}</h3>
+                <p className="text-sm leading-relaxed text-neutral-200/90">
+                  {highlight.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'support';
+    view: TabType;
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -291,6 +406,12 @@ export default function Home() {
       p.set('tab', 'favorites');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
+    } else if (state.view === 'stats') {
+      p.set('tab', 'stats');
+    } else if (state.view === 'replays') {
+      p.set('tab', 'replays');
+    } else if (state.view === 'mods') {
+      p.set('tab', 'mods');
     }
 
     const qp = p.toString();
@@ -311,16 +432,19 @@ export default function Home() {
   const parseStateFromUrl = (): AppState => {
     if (typeof window === 'undefined') return { view: 'leaderboards' };
     const p = new URLSearchParams(window.location.search);
-    const tab = (p.get('tab') || 'leaderboards') as AppState['view'];
-    if (tab === 'search') {
+    const tabParam = (p.get('tab') || 'leaderboards').toLowerCase();
+    if (tabParam === 'search') {
       const q = (p.get('q') || '').trim();
       return { view: 'search', searchQuery: q };
     }
-    if (tab === 'favorites') {
+    if (tabParam === 'favorites') {
       return { view: 'favorites' };
     }
-    if (tab === 'support') {
+    if (tabParam === 'support') {
       return { view: 'support' };
+    }
+    if (tabParam === 'stats' || tabParam === 'replays' || tabParam === 'mods') {
+      return { view: tabParam as TabType };
     }
     const match = p.get('match') || '1v1';
     const faction = p.get('faction') || 'All factions';
@@ -489,8 +613,9 @@ export default function Home() {
     if (typeof window === 'undefined') return;
     // 1) Apply URL params to local state on first load
     const initialFromUrl = parseStateFromUrl();
-    if (initialFromUrl.view === 'search') {
-      setActiveTab('search');
+    const initialView = initialFromUrl.view || 'leaderboards';
+    setActiveTab(initialView);
+    if (initialView === 'search') {
       if (typeof initialFromUrl.searchQuery === 'string') setSearchQuery(initialFromUrl.searchQuery);
       // kick off search on first load if q is present
       if (initialFromUrl.searchQuery) {
@@ -499,18 +624,15 @@ export default function Home() {
           handlePlayerSearch(initialFromUrl.searchQuery, { pushHistory: false });
         } catch {}
       }
-    } else if (initialFromUrl.view === 'leaderboards') {
-      setActiveTab('leaderboards');
+    } else if (initialView === 'leaderboards') {
       if (typeof initialFromUrl.selectedMatchType === 'string') setSelectedMatchType(initialFromUrl.selectedMatchType);
       if (typeof initialFromUrl.selectedFaction === 'string') setSelectedFaction(initialFromUrl.selectedFaction);
       if (typeof initialFromUrl.selectedCountry === 'string') setSelectedCountry(initialFromUrl.selectedCountry);
-    } else if (initialFromUrl.view === 'support') {
-      setActiveTab('support');
     }
 
     // 2) Ensure the URL matches state (normalizes missing defaults)
     const initialState: AppState = {
-      view: initialFromUrl.view || activeTab,
+      view: initialView,
       searchQuery: initialFromUrl.searchQuery ?? searchQuery,
       selectedFaction: initialFromUrl.selectedFaction ?? selectedFaction,
       selectedMatchType: initialFromUrl.selectedMatchType ?? selectedMatchType,
@@ -1129,58 +1251,102 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="border-b border-neutral-700/60 mb-4 sm:mb-6">
           {/* Mobile Navigation */}
-          <div className="flex flex-col sm:hidden space-y-2">
-            <div className="flex">
-              <button
-                onClick={() => setActiveTab('leaderboards')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'leaderboards'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Leaderboards
-              </button>
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'search'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Search
-              </button>
-              <button
-                onClick={() => setActiveTab('favorites')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'favorites'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Favourites
-              </button>
-              <button
-                onClick={() => setActiveTab('support')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'support'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Support
-              </button>
+          <div className="sm:hidden">
+            <div className="flex flex-col gap-3">
+              <div className="-mx-2 overflow-x-auto pb-1">
+                <div className="flex min-w-max gap-2 px-2">
+                  {TAB_ITEMS.map(tab => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveTab(tab.id)}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm ${
+                          isActive
+                            ? 'border-neutral-300/80 bg-neutral-800/80 text-white shadow-[0_12px_35px_rgba(0,0,0,0.35)]'
+                            : 'border-neutral-700/80 bg-neutral-900/40 text-neutral-300 hover:border-neutral-500/80 hover:bg-neutral-800/40 hover:text-white'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        {tab.isComingSoon && (
+                          <span className={`${
+                            isActive
+                              ? 'border-amber-200/80 bg-amber-400/20 text-amber-100'
+                              : 'border-amber-300/50 bg-amber-400/10 text-amber-200'
+                          } rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.3em]`}>Soon</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="https://github.com/EnzeD/dow-leaderboards"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-700/60 bg-neutral-900/50 px-4 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/80 hover:bg-neutral-800/50 hover:text-white"
+                >
+                  GitHub
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <a
+                  href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-700/60 bg-neutral-900/50 px-4 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/80 hover:bg-neutral-800/50 hover:text-white"
+                >
+                  Feedback
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+              </div>
             </div>
-            <div className="flex">
+          </div>
+
+          {/* Desktop Navigation */}
+          <div className="hidden items-center justify-between sm:flex">
+            <div className="flex items-center gap-2">
+              {TAB_ITEMS.map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`group inline-flex items-center gap-2 rounded-full border px-5 py-2 text-sm font-medium transition-all duration-300 backdrop-blur-sm ${
+                      isActive
+                        ? 'border-neutral-200/70 bg-neutral-800/70 text-white shadow-[0_12px_40px_rgba(0,0,0,0.35)]'
+                        : 'border-transparent text-neutral-300 hover:border-neutral-500/70 hover:bg-neutral-800/40 hover:text-white'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.isComingSoon && (
+                      <span className={`${
+                        isActive
+                          ? 'border-amber-200/70 bg-amber-400/20 text-amber-100'
+                          : 'border-amber-300/50 bg-amber-400/10 text-amber-200'
+                      } rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.32em]`}>Soon</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
               <a
                 href="https://github.com/EnzeD/dow-leaderboards"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+                className="inline-flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/70 hover:bg-neutral-800/40 hover:text-white"
               >
-                GitHub
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                Contribute on GitHub
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
@@ -1188,80 +1354,14 @@ export default function Home() {
                 href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+                className="inline-flex items-center gap-2 rounded-full border border-transparent px-5 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/70 hover:bg-neutral-800/40 hover:text-white"
               >
-                Feedback
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                Provide Feedback
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
             </div>
-          </div>
-
-          {/* Desktop Navigation */}
-          <div className="hidden sm:flex">
-            <button
-              onClick={() => setActiveTab('leaderboards')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'leaderboards'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Leaderboards
-            </button>
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'search'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Search
-            </button>
-            <button
-              onClick={() => setActiveTab('favorites')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'favorites'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Favourites
-            </button>
-            <button
-              onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'support'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Support
-            </button>
-            <a
-              href="https://github.com/EnzeD/dow-leaderboards"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-            >
-              Contribute on GitHub
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-            <a
-              href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-            >
-              Provide Feedback
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
           </div>
         </div>
 
@@ -2070,6 +2170,96 @@ export default function Home() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'stats' && (
+          <ComingSoonSection
+            eyebrow="Stats"
+            title="Insights forged for every commander"
+            description="We&apos;re building an intel layer that turns raw relic data into battle plans. Expect smarter matchup dashboards, personal performance timelines, and effortless season summaries."
+            highlights={[
+              {
+                title: 'Matchup win-rates',
+                description: 'Spot balance trends instantly with faction vs faction breakdowns across every ladder.',
+                accent: 'from-emerald-400/30 via-emerald-500/5 to-transparent',
+                icon: '📈',
+              },
+              {
+                title: 'Player timelines',
+                description: 'Follow rating climbs, streaks, and heatmaps to see how your crusade evolves week over week.',
+                accent: 'from-sky-400/30 via-sky-500/5 to-transparent',
+                icon: '🕰️',
+              },
+              {
+                title: 'Season snapshots',
+                description: 'Celebrate standout commanders with monthly recaps, highlight reels, and shareable stat cards.',
+                accent: 'from-amber-400/25 via-amber-500/5 to-transparent',
+                icon: '✨',
+              },
+            ]}
+            onShareIdeas={handleSupportLink}
+            ctaLabel="Tell us the stats you need"
+          />
+        )}
+
+        {activeTab === 'replays' && (
+          <ComingSoonSection
+            eyebrow="Replays"
+            title="Relive legendary clashes without the grind"
+            description="Commanders crave great replay tools, so we&apos;re crafting a streamlined archive that surfaces the most instructive Dawn of War battles in seconds."
+            highlights={[
+              {
+                title: 'Smart filters',
+                description: 'Search by faction combos, map pools, durations, and skill brackets to scout any matchup.',
+                accent: 'from-purple-400/25 via-purple-500/5 to-transparent',
+                icon: '🎯',
+              },
+              {
+                title: 'Instant watching',
+                description: 'Preview rosters, builds, and key swings before you commit to a full VOD.',
+                accent: 'from-rose-400/25 via-rose-500/5 to-transparent',
+                icon: '▶️',
+              },
+              {
+                title: 'Community playlists',
+                description: 'Follow curated learning paths from casters, clans, and tournament analysts.',
+                accent: 'from-blue-400/25 via-indigo-500/5 to-transparent',
+                icon: '🤝',
+              },
+            ]}
+            onShareIdeas={handleSupportLink}
+            ctaLabel="Request replay tools"
+          />
+        )}
+
+        {activeTab === 'mods' && (
+          <ComingSoonSection
+            eyebrow="Mods"
+            title="A launcher bay for community wargear"
+            description="We&apos;re preparing a modern hub for celebrated Dawn of War mods, complete with install guides, update tracking, and community spotlights."
+            highlights={[
+              {
+                title: 'Curated spotlights',
+                description: 'Discover the must-play experiences with editorial write-ups, screenshots, and faction primers.',
+                accent: 'from-cyan-400/25 via-cyan-500/5 to-transparent',
+                icon: '🧭',
+              },
+              {
+                title: 'Install helpers',
+                description: 'Step-by-step instructions, compatibility notes, and load order tips keep things plug-and-play.',
+                accent: 'from-lime-400/25 via-lime-500/5 to-transparent',
+                icon: '🧰',
+              },
+              {
+                title: 'Update pings',
+                description: 'Follow projects you love and get notified when balance patches or new campaigns drop.',
+                accent: 'from-orange-400/25 via-orange-500/5 to-transparent',
+                icon: '🔔',
+              },
+            ]}
+            onShareIdeas={handleSupportLink}
+            ctaLabel="Share your mod ideas"
+          />
         )}
 
         {/* Support Tab Content */}
