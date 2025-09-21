@@ -248,11 +248,60 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'support';
+type TabType =
+  | 'leaderboards'
+  | 'search'
+  | 'favorites'
+  | 'stats'
+  | 'replays'
+  | 'mods'
+  | 'support';
+
+type TabMeta = {
+  id: TabType;
+  label: string;
+  isComingSoon?: boolean;
+};
+
+const TAB_ITEMS: TabMeta[] = [
+  { id: 'leaderboards', label: 'Leaderboards' },
+  { id: 'search', label: 'Search' },
+  { id: 'favorites', label: 'Favourites' },
+  { id: 'stats', label: 'Stats', isComingSoon: true },
+  { id: 'replays', label: 'Replays', isComingSoon: true },
+  { id: 'mods', label: 'Mods', isComingSoon: true },
+  { id: 'support', label: 'Support' },
+];
+
+const TIP_URL = process.env.NEXT_PUBLIC_TIP_URL ?? "https://ko-fi.com/enzed";
+
+const SoonBadge = () => (
+  <span className="inline-flex items-center rounded-md bg-neutral-700 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.3em] text-neutral-100">
+    Soon
+  </span>
+);
+
+const ComingSoonMessage = ({ label }: { label: string }) => (
+  <div className="rounded-lg border border-neutral-700/60 bg-neutral-900/70 p-6 text-center shadow-2xl sm:p-8">
+    <p className="text-base leading-relaxed text-neutral-200 sm:text-lg">
+      {`The ${label} tab is coming soon — `}
+      <a
+        href={TIP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold text-red-300 underline decoration-dotted underline-offset-4 transition hover:text-red-200"
+      >
+        buy me a coffee
+      </a>
+      {' if you\'d like to support this idea.'}
+    </p>
+  </div>
+);
+
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'support';
+    view: TabType;
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -291,6 +340,12 @@ export default function Home() {
       p.set('tab', 'favorites');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
+    } else if (state.view === 'stats') {
+      p.set('tab', 'stats');
+    } else if (state.view === 'replays') {
+      p.set('tab', 'replays');
+    } else if (state.view === 'mods') {
+      p.set('tab', 'mods');
     }
 
     const qp = p.toString();
@@ -311,16 +366,19 @@ export default function Home() {
   const parseStateFromUrl = (): AppState => {
     if (typeof window === 'undefined') return { view: 'leaderboards' };
     const p = new URLSearchParams(window.location.search);
-    const tab = (p.get('tab') || 'leaderboards') as AppState['view'];
-    if (tab === 'search') {
+    const tabParam = (p.get('tab') || 'leaderboards').toLowerCase();
+    if (tabParam === 'search') {
       const q = (p.get('q') || '').trim();
       return { view: 'search', searchQuery: q };
     }
-    if (tab === 'favorites') {
+    if (tabParam === 'favorites') {
       return { view: 'favorites' };
     }
-    if (tab === 'support') {
+    if (tabParam === 'support') {
       return { view: 'support' };
+    }
+    if (tabParam === 'stats' || tabParam === 'replays' || tabParam === 'mods') {
+      return { view: tabParam as TabType };
     }
     const match = p.get('match') || '1v1';
     const faction = p.get('faction') || 'All factions';
@@ -489,8 +547,9 @@ export default function Home() {
     if (typeof window === 'undefined') return;
     // 1) Apply URL params to local state on first load
     const initialFromUrl = parseStateFromUrl();
-    if (initialFromUrl.view === 'search') {
-      setActiveTab('search');
+    const initialView = initialFromUrl.view || 'leaderboards';
+    setActiveTab(initialView);
+    if (initialView === 'search') {
       if (typeof initialFromUrl.searchQuery === 'string') setSearchQuery(initialFromUrl.searchQuery);
       // kick off search on first load if q is present
       if (initialFromUrl.searchQuery) {
@@ -499,18 +558,15 @@ export default function Home() {
           handlePlayerSearch(initialFromUrl.searchQuery, { pushHistory: false });
         } catch {}
       }
-    } else if (initialFromUrl.view === 'leaderboards') {
-      setActiveTab('leaderboards');
+    } else if (initialView === 'leaderboards') {
       if (typeof initialFromUrl.selectedMatchType === 'string') setSelectedMatchType(initialFromUrl.selectedMatchType);
       if (typeof initialFromUrl.selectedFaction === 'string') setSelectedFaction(initialFromUrl.selectedFaction);
       if (typeof initialFromUrl.selectedCountry === 'string') setSelectedCountry(initialFromUrl.selectedCountry);
-    } else if (initialFromUrl.view === 'support') {
-      setActiveTab('support');
     }
 
     // 2) Ensure the URL matches state (normalizes missing defaults)
     const initialState: AppState = {
-      view: initialFromUrl.view || activeTab,
+      view: initialView,
       searchQuery: initialFromUrl.searchQuery ?? searchQuery,
       selectedFaction: initialFromUrl.selectedFaction ?? selectedFaction,
       selectedMatchType: initialFromUrl.selectedMatchType ?? selectedMatchType,
@@ -1129,58 +1185,41 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="border-b border-neutral-700/60 mb-4 sm:mb-6">
           {/* Mobile Navigation */}
-          <div className="flex flex-col sm:hidden space-y-2">
-            <div className="flex">
-              <button
-                onClick={() => setActiveTab('leaderboards')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'leaderboards'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Leaderboards
-              </button>
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'search'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Search
-              </button>
-              <button
-                onClick={() => setActiveTab('favorites')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'favorites'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Favourites
-              </button>
-              <button
-                onClick={() => setActiveTab('support')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'support'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Support
-              </button>
+          <div className="sm:hidden">
+            <div className="-mx-2 overflow-x-auto pb-2">
+              <div className="flex gap-2 px-2" role="tablist">
+                {TAB_ITEMS.map(tab => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`flex-1 min-w-[140px] shrink-0 rounded-md border-b-2 px-4 py-3 text-sm font-medium transition-all duration-300 ${
+                        isActive
+                          ? 'border-neutral-400 bg-neutral-800/60 text-white shadow-lg'
+                          : 'border-transparent bg-neutral-900/30 text-neutral-300 hover:bg-neutral-800/40 hover:text-white'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        <span>{tab.label}</span>
+                        {tab.isComingSoon && <SoonBadge />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex">
+            <div className="grid grid-cols-2 gap-2">
               <a
                 href="https://github.com/EnzeD/dow-leaderboards"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-700/60 bg-neutral-900/40 px-4 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/80 hover:bg-neutral-800/40 hover:text-white"
               >
                 GitHub
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
@@ -1188,10 +1227,10 @@ export default function Home() {
                 href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-700/60 bg-neutral-900/40 px-4 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/80 hover:bg-neutral-800/40 hover:text-white"
               >
                 Feedback
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </a>
@@ -1199,69 +1238,54 @@ export default function Home() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden sm:flex">
-            <button
-              onClick={() => setActiveTab('leaderboards')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'leaderboards'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Leaderboards
-            </button>
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'search'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Search
-            </button>
-            <button
-              onClick={() => setActiveTab('favorites')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'favorites'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Favourites
-            </button>
-            <button
-              onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'support'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Support
-            </button>
-            <a
-              href="https://github.com/EnzeD/dow-leaderboards"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-            >
-              Contribute on GitHub
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-            <a
-              href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
-            >
-              Provide Feedback
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
+          <div className="hidden items-center justify-between sm:flex">
+            <div className="flex items-center">
+              {TAB_ITEMS.map(tab => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`px-6 py-3 text-sm font-medium transition-all duration-300 border-b-[3px] border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/50 ${
+                      isActive
+                        ? 'border-neutral-400 bg-neutral-800/60 text-white shadow-lg'
+                        : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>{tab.label}</span>
+                      {tab.isComingSoon && <SoonBadge />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href="https://github.com/EnzeD/dow-leaderboards"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-transparent px-5 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/70 hover:bg-neutral-800/40 hover:text-white"
+              >
+                Contribute on GitHub
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+              <a
+                href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-transparent px-5 py-2 text-sm font-medium text-neutral-300 transition-all duration-300 hover:border-neutral-500/70 hover:bg-neutral-800/40 hover:text-white"
+              >
+                Provide Feedback
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -2071,6 +2095,12 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {activeTab === 'stats' && <ComingSoonMessage label="Stats" />}
+
+        {activeTab === 'replays' && <ComingSoonMessage label="Replays" />}
+
+        {activeTab === 'mods' && <ComingSoonMessage label="Mods" />}
 
         {/* Support Tab Content */}
         {activeTab === 'support' && (
