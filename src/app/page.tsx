@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import SupportButton from "@/app/_components/SupportButton";
+import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
@@ -1230,7 +1231,7 @@ export default function Home() {
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
-                    <span>Support</span>
+                    <SupportTabKoFiButton className="h-9" />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
@@ -1371,21 +1372,11 @@ export default function Home() {
                 </span>
               </span>
             </button>
-            <button
-              onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
-                activeTab === 'support'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              Support
-            </button>
             <a
               href="https://github.com/EnzeD/dow-leaderboards"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
+              className="ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
             >
               Contribute on GitHub
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1403,6 +1394,16 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
+            <button
+              onClick={() => setActiveTab('support')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
+                activeTab === 'support'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <SupportTabKoFiButton className="h-9" />
+            </button>
           </div>
         </div>
 
