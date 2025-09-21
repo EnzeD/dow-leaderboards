@@ -248,11 +248,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'mods' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'mods' | 'support';
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -289,6 +289,12 @@ export default function Home() {
       if (state.searchQuery) p.set('q', state.searchQuery);
     } else if (state.view === 'favorites') {
       p.set('tab', 'favorites');
+    } else if (state.view === 'stats') {
+      p.set('tab', 'stats');
+    } else if (state.view === 'replays') {
+      p.set('tab', 'replays');
+    } else if (state.view === 'mods') {
+      p.set('tab', 'mods');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -319,6 +325,15 @@ export default function Home() {
     if (tab === 'favorites') {
       return { view: 'favorites' };
     }
+    if (tab === 'stats') {
+      return { view: 'stats' };
+    }
+    if (tab === 'replays') {
+      return { view: 'replays' };
+    }
+    if (tab === 'mods') {
+      return { view: 'mods' };
+    }
     if (tab === 'support') {
       return { view: 'support' };
     }
@@ -333,6 +348,7 @@ export default function Home() {
     };
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
   const [ladderData, setLadderData] = useState<LadderData | null>(null);
@@ -758,6 +774,11 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId]);
 
+  // Collapse mobile navigation when switching tabs
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeTab]);
+
   // Share handler and ephemeral copied state for the info bar button
   const [shareCopied, setShareCopied] = useState(false);
   const handleShare = async () => {
@@ -967,6 +988,31 @@ export default function Home() {
     );
   };
 
+  const renderComingSoonSection = (title: string, description: string) => (
+    <div className="space-y-6">
+      <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-2xl font-bold text-white">{title}</h2>
+          <span className="px-2.5 py-1 bg-neutral-700/70 text-neutral-200 text-xs font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+            Soon
+          </span>
+        </div>
+        <p className="text-neutral-300 leading-relaxed">{description}</p>
+      </div>
+    </div>
+  );
+
+  const mobileNavButtonClass = (tab: TabType) => `w-full flex items-center justify-between gap-3 px-4 py-3 font-medium rounded-md border transition-colors duration-300 ${
+    activeTab === tab
+      ? 'text-white bg-neutral-800/70 border-neutral-500/60 shadow-lg'
+      : 'text-neutral-200 bg-neutral-900/40 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
+  }`;
+
+  const handleMobileNavSelect = (tab: TabType) => {
+    setActiveTab(tab);
+    setMobileNavOpen(false);
+  };
+
   useEffect(() => {
     if (activeTab !== 'favorites') return;
     const entries = Object.entries(favorites);
@@ -1069,28 +1115,148 @@ export default function Home() {
       <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
         {/* Header */}
         <div className="mb-4 sm:mb-8">
-          {/* Mobile Header */}
-          <div className="flex flex-col sm:hidden items-center text-center mb-4">
-            <div className="mb-3">
-              <img
-                src="/assets/daw-logo.webp"
-                alt="Dawn of War: Definitive Edition"
-                className="h-12 w-auto object-contain mx-auto"
-              />
+          {/* Mobile Header & Navigation */}
+          <div className="sm:hidden sticky top-0 z-50 -mx-3 px-3 pt-3 pb-3 bg-neutral-950/95 border-b border-neutral-800/70 backdrop-blur-md shadow-[0_12px_28px_rgba(0,0,0,0.55)]">
+            <div className="flex items-start gap-3">
+              <div className="flex flex-1 items-center gap-3 min-w-0">
+                <img
+                  src="/assets/daw-logo.webp"
+                  alt="Dawn of War: Definitive Edition"
+                  className="h-10 w-auto flex-shrink-0 object-contain"
+                />
+                <div className="min-w-0">
+                  <h1 className="text-sm font-semibold text-white leading-tight">
+                    Dawn of War: Definitive Edition Leaderboards
+                  </h1>
+                  <div className="mt-1 flex items-center gap-2 text-[0.65rem]">
+                    <span className="px-2 py-0.5 bg-red-600 text-white font-semibold uppercase tracking-wide rounded-md">
+                      BETA
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 bg-neutral-800/60 border border-neutral-600/50 rounded-md shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" aria-hidden></span>
+                      <span className="text-neutral-300">Players</span>
+                      <span className="ml-1.5 font-semibold text-white">
+                        {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(prev => !prev)}
+                className={`flex h-10 w-10 items-center justify-center rounded-md border transition-colors duration-300 ${
+                  mobileNavOpen
+                    ? 'bg-neutral-800/80 border-neutral-500/60 text-white'
+                    : 'bg-neutral-900/60 border-neutral-700/60 text-neutral-200 hover:bg-neutral-900/80'
+                }`}
+                aria-label="Toggle navigation"
+                aria-expanded={mobileNavOpen}
+                aria-controls="mobile-nav-menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
             </div>
-            <div className="flex flex-col items-center gap-2">
-              <h1 className="text-xl font-bold text-white leading-tight px-4">
-                Dawn of War: Definitive Edition Leaderboards
-              </h1>
-              <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
-                BETA
-              </span>
-              <div className="mt-1 inline-flex items-center px-2 py-1 bg-neutral-800/60 border border-neutral-600/50 rounded-md shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" aria-hidden></span>
-                <span className="text-[11px] text-neutral-300">Players</span>
-                <span className="ml-1.5 text-[11px] font-semibold text-white">
-                  {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
-                </span>
+            <div
+              id="mobile-nav-menu"
+              className={`overflow-hidden rounded-lg border border-neutral-700/60 bg-neutral-900/85 shadow-xl transition-all duration-300 ease-in-out transform ${
+                mobileNavOpen ? 'mt-3 opacity-100 translate-y-0' : 'mt-0 opacity-0 -translate-y-2 pointer-events-none'
+              }`}
+              style={{ maxHeight: mobileNavOpen ? '520px' : '0px' }}
+            >
+              <div className="p-3 space-y-3">
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('leaderboards')}
+                    className={mobileNavButtonClass('leaderboards')}
+                  >
+                    <span>Leaderboards</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('search')}
+                    className={mobileNavButtonClass('search')}
+                  >
+                    <span>Search</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('favorites')}
+                    className={mobileNavButtonClass('favorites')}
+                  >
+                    <span>Favourites</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('stats')}
+                    className={mobileNavButtonClass('stats')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Stats
+                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                        Soon
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('replays')}
+                    className={mobileNavButtonClass('replays')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Replays
+                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                        Soon
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('mods')}
+                    className={mobileNavButtonClass('mods')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Mods
+                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                        Soon
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('support')}
+                    className={mobileNavButtonClass('support')}
+                  >
+                    <span>Support</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
+                  <a
+                    href="https://github.com/EnzeD/dow-leaderboards"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-300 transition-colors duration-300 hover:bg-neutral-800/70 hover:text-white"
+                  >
+                    GitHub
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                  <a
+                    href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-300 transition-colors duration-300 hover:bg-neutral-800/70 hover:text-white"
+                  >
+                    Feedback
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -1127,77 +1293,7 @@ export default function Home() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="border-b border-neutral-700/60 mb-4 sm:mb-6">
-          {/* Mobile Navigation */}
-          <div className="flex flex-col sm:hidden space-y-2">
-            <div className="flex">
-              <button
-                onClick={() => setActiveTab('leaderboards')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'leaderboards'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Leaderboards
-              </button>
-              <button
-                onClick={() => setActiveTab('search')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'search'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Search
-              </button>
-              <button
-                onClick={() => setActiveTab('favorites')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'favorites'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Favourites
-              </button>
-              <button
-                onClick={() => setActiveTab('support')}
-                className={`flex-1 px-4 py-3 font-medium transition-all duration-300 text-center ${
-                  activeTab === 'support'
-                    ? 'text-white bg-neutral-800/50 shadow-lg border-b-2 border-neutral-400'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-                }`}
-              >
-                Support
-              </button>
-            </div>
-            <div className="flex">
-              <a
-                href="https://github.com/EnzeD/dow-leaderboards"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-              >
-                GitHub
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-              <a
-                href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 px-4 py-2 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center justify-center gap-2 text-sm"
-              >
-                Feedback
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            </div>
-          </div>
-
+        <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
           {/* Desktop Navigation */}
           <div className="hidden sm:flex">
             <button
@@ -1229,6 +1325,51 @@ export default function Home() {
               }`}
             >
               Favourites
+            </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Stats
+                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                  Soon
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('replays')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'replays'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Replays
+                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                  Soon
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('mods')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'mods'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Mods
+                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
+                  Soon
+                </span>
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('support')}
@@ -2070,6 +2211,21 @@ export default function Home() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'stats' && renderComingSoonSection(
+          'Stats',
+          'We will have maps, matchup stats, and other insights so you can study every battlefield at a glance.'
+        )}
+
+        {activeTab === 'replays' && renderComingSoonSection(
+          'Replays',
+          'Players will be able to upload, download, and vote for the best replays to spotlight epic battles.'
+        )}
+
+        {activeTab === 'mods' && renderComingSoonSection(
+          'Mods',
+          'We want to list the best mods so you can discover fresh ways to experience Dawn of War.'
         )}
 
         {/* Support Tab Content */}
