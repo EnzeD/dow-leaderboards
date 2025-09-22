@@ -249,11 +249,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'mods' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'mods' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
     searchQuery?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
@@ -294,8 +294,6 @@ export default function Home() {
       p.set('tab', 'stats');
     } else if (state.view === 'replays') {
       p.set('tab', 'replays');
-    } else if (state.view === 'mods') {
-      p.set('tab', 'mods');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -331,9 +329,6 @@ export default function Home() {
     }
     if (tab === 'replays') {
       return { view: 'replays' };
-    }
-    if (tab === 'mods') {
-      return { view: 'mods' };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -1216,18 +1211,6 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleMobileNavSelect('mods')}
-                    className={mobileNavButtonClass('mods')}
-                  >
-                    <span className="flex items-center gap-2">
-                      Mods
-                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                        Soon
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
@@ -1352,21 +1335,6 @@ export default function Home() {
             >
               <span className="inline-flex items-center gap-2 whitespace-nowrap">
                 Replays
-                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                  Soon
-                </span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('mods')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'mods'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                Mods
                 <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
                   Soon
                 </span>
@@ -2224,10 +2192,6 @@ export default function Home() {
           'Players will be able to upload, download, and vote for the best replays to spotlight epic battles.'
         )}
 
-        {activeTab === 'mods' && renderComingSoonSection(
-          'Mods',
-          'We want to list the best mods so you can discover fresh ways to experience Dawn of War.'
-        )}
 
         {/* Support Tab Content */}
         {activeTab === 'support' && (
