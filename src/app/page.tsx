@@ -270,6 +270,7 @@ export default function Home() {
   type AppState = {
     view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
     searchQuery?: string;
+    searchProfileId?: string;
     selectedFaction?: string;
     selectedMatchType?: string;
     selectedCountry?: string;
@@ -287,6 +288,7 @@ export default function Home() {
     p.delete('faction');
     p.delete('country');
     p.delete('q');
+    p.delete('pid');
 
     if (state.view === 'leaderboards') {
       // leaderboards is the default tab; keep root clean by omitting defaults
@@ -303,6 +305,7 @@ export default function Home() {
     } else if (state.view === 'search') {
       p.set('tab', 'search');
       if (state.searchQuery) p.set('q', state.searchQuery);
+      if (state.searchProfileId) p.set('pid', state.searchProfileId);
     } else if (state.view === 'favorites') {
       p.set('tab', 'favorites');
     } else if (state.view === 'stats') {
@@ -334,7 +337,12 @@ export default function Home() {
     const tab = (p.get('tab') || 'leaderboards') as AppState['view'];
     if (tab === 'search') {
       const q = (p.get('q') || '').trim();
-      return { view: 'search', searchQuery: q };
+      const pid = p.get('pid');
+      return {
+        view: 'search',
+        searchQuery: q,
+        searchProfileId: pid || undefined
+      };
     }
     if (tab === 'favorites') {
       return { view: 'favorites' };
@@ -370,6 +378,7 @@ export default function Home() {
 
   // Search tab state
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchProfileId, setSearchProfileId] = useState<string | undefined>(undefined);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -520,11 +529,17 @@ export default function Home() {
     if (initialFromUrl.view === 'search') {
       setActiveTab('search');
       if (typeof initialFromUrl.searchQuery === 'string') setSearchQuery(initialFromUrl.searchQuery);
+      if (typeof initialFromUrl.searchProfileId === 'string') setSearchProfileId(initialFromUrl.searchProfileId);
       // kick off search on first load if q is present
       if (initialFromUrl.searchQuery) {
         try {
-          // run without pushing history
-          handlePlayerSearch(initialFromUrl.searchQuery, { pushHistory: false });
+          // If we have a profile ID, use precise search
+          if (initialFromUrl.searchProfileId) {
+            runSearchByName(initialFromUrl.searchQuery, initialFromUrl.searchProfileId);
+          } else {
+            // run without pushing history
+            handlePlayerSearch(initialFromUrl.searchQuery, { pushHistory: false });
+          }
         } catch {}
       }
     } else if (initialFromUrl.view === 'leaderboards') {
@@ -807,18 +822,123 @@ export default function Home() {
   const [searchCardCopied, setSearchCardCopied] = useState<number | null>(null);
 
   // Trigger a search for a specific alias (stays in Search tab)
-  const runSearchByName = async (name: string) => {
+  const runSearchByName = async (name: string, profileId?: string) => {
     const q = (name || '').trim();
     if (!q) return;
-    await handlePlayerSearch(q, { pushHistory: true });
+
+    // If we have a profile ID, use the precise search method
+    if (profileId) {
+      setSearchQuery(q);
+      setSearchProfileId(profileId);
+
+      try {
+        setSearchLoading(true);
+        setActiveTab('search');
+
+        const response = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: q })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const allResults = data.results || [];
+
+          // Filter results to match the specific profile ID
+          const filteredResults = allResults.filter((result: any) =>
+            String(result.profileId) === String(profileId)
+          );
+
+          // If we found the specific player, use that result
+          const finalResults = filteredResults.length > 0 ? filteredResults : allResults.slice(0, 1);
+
+          setSearchResults(finalResults);
+          setSearchLastUpdated(new Date().toISOString());
+
+          // Update URL to reflect the search with profile ID
+          const currentState: AppState = {
+            view: 'search',
+            searchQuery: q,
+            searchProfileId: profileId,
+            selectedFaction,
+            selectedMatchType,
+            selectedCountry,
+            selectedId,
+          };
+          syncUrl(currentState);
+        } else {
+          // Fallback to original search method
+          await handlePlayerSearch(q, { pushHistory: true });
+        }
+      } catch (error) {
+        console.error('Profile search failed:', error);
+        // Fallback to original search method
+        await handlePlayerSearch(q, { pushHistory: true });
+      } finally {
+        setSearchLoading(false);
+      }
+    } else {
+      // No profile ID provided, use original search and clear profile ID
+      setSearchProfileId(undefined);
+      await handlePlayerSearch(q, { pushHistory: true });
+    }
   };
 
   // Handlers for autocomplete search component
   const handleAutocompletePlayerSelect = async (player: PlayerSearchResult) => {
     setSelectedPlayer(player);
-    // Update search query and trigger full API search for complete player data
     setSearchQuery(player.current_alias);
-    await handlePlayerSearch(player.current_alias, { pushHistory: true });
+    setSearchProfileId(player.profile_id);
+
+    // Use the rich existing search API and filter results by profile ID
+    try {
+      setSearchLoading(true);
+
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: player.current_alias })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const allResults = data.results || [];
+
+        // Filter results to match the specific profile ID
+        const filteredResults = allResults.filter((result: any) =>
+          String(result.profileId) === String(player.profile_id)
+        );
+
+        // If we found the specific player, use that result
+        // Otherwise, use the first result as fallback
+        const finalResults = filteredResults.length > 0 ? filteredResults : allResults.slice(0, 1);
+
+        setSearchResults(finalResults);
+        setSearchLastUpdated(new Date().toISOString());
+
+        // Update URL to reflect the search
+        const currentState: AppState = {
+          view: 'search',
+          searchQuery: player.current_alias,
+          searchProfileId: player.profile_id,
+          selectedFaction,
+          selectedMatchType,
+          selectedCountry,
+          selectedId,
+        };
+        syncUrl(currentState);
+      } else {
+        // Fallback to original search method
+        await handlePlayerSearch(player.current_alias, { pushHistory: true });
+      }
+    } catch (error) {
+      console.error('Profile search failed:', error);
+      // Fallback to original search method
+      await handlePlayerSearch(player.current_alias, { pushHistory: true });
+    } finally {
+      setSearchLoading(false);
+    }
   };
 
   const handleExactSearch = () => {
@@ -1581,7 +1701,7 @@ export default function Home() {
                           {row.country && <FlagIcon countryCode={row.country} />}
                           <button
                             type="button"
-                            onClick={() => runSearchByName(row.playerName)}
+                            onClick={() => runSearchByName(row.playerName, row.profileId)}
                             className="truncate text-left hover:underline"
                             title={`Search for ${row.playerName}`}
                           >
@@ -1630,7 +1750,7 @@ export default function Home() {
                       {row.country && <FlagIcon countryCode={row.country} compact />}
                       <button
                         type="button"
-                        onClick={() => runSearchByName(row.playerName)}
+                        onClick={() => runSearchByName(row.playerName, row.profileId)}
                         className="text-xs truncate font-medium text-left hover:underline"
                         title={`Search for ${row.playerName}`}
                       >
@@ -1697,7 +1817,7 @@ export default function Home() {
             <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
-                Start typing to see instant results from our database of 19,000+ players. If no results appear, click Search for live API lookup.
+                Search your alias name. In case there is no result, try typing exactly what is your current in-game alias, case is sensitive.
               </p>
               <div className="mb-6">
                 <AutocompleteSearch
@@ -1790,7 +1910,12 @@ export default function Home() {
                               type="button"
                               onClick={async () => {
                                 try {
-                                  const url = buildUrl({ view: 'search', searchQuery });
+                                  const profileId = result?.profileId ? String(result.profileId) : undefined;
+                                  const url = buildUrl({
+                                    view: 'search',
+                                    searchQuery,
+                                    searchProfileId: profileId
+                                  });
                                   await navigator.clipboard.writeText(url);
                                   setSearchCardCopied(index);
                                   setTimeout(() => setSearchCardCopied(null), 1200);
@@ -1885,7 +2010,7 @@ export default function Home() {
                                           label: displaySelfAlias,
                                           faction: myFaction,
                                           rating: isAutomatch ? selfRating : undefined,
-                                          onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias) : undefined,
+                                          onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias, String(result.profileId)) : undefined,
                                         },
                                         ...allies.slice(0, 2).map((p: any, index: number) => {
                                           const label = p.alias || String(p.profileId);
@@ -1896,7 +2021,7 @@ export default function Home() {
                                             label,
                                             faction,
                                             rating: isAutomatch ? playerRating : undefined,
-                                            onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                            onClick: p.alias ? () => runSearchByName(p.alias, String(p.profileId)) : undefined,
                                           } satisfies RosterEntry;
                                         }),
                                       ];
@@ -2175,7 +2300,7 @@ export default function Home() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => runSearchByName(entry.alias)}
+                              onClick={() => runSearchByName(entry.alias, entry.profileId)}
                               className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors text-xs font-semibold"
                             >
                               View in Search
