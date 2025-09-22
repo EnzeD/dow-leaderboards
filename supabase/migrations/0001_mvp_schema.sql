@@ -43,9 +43,10 @@ CREATE TABLE IF NOT EXISTS races (
     id          smallint PRIMARY KEY,
     slug        text     NOT NULL,
     label       text     NOT NULL,
-    faction_id  smallint,
-    UNIQUE (lower(slug))
+    faction_id  smallint
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS races_slug_idx ON races (lower(slug));
 
 CREATE TABLE IF NOT EXISTS leaderboards (
     id                      integer PRIMARY KEY,
