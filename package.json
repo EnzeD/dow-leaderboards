@@ -8,10 +8,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "seed:leaderboards": "node scripts/seed-leaderboards.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^1.5.0",
+    "dotenv": "^16.4.5",
     "autoprefixer": "^10.4.21",
     "flag-icons": "^7.5.0",
     "next": "14.2.5",

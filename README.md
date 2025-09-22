@@ -67,6 +67,16 @@ npm run build
 npm start
 ```
 
+## 🗄 Supabase Seeding
+
+Once your Supabase project is provisioned (migrations + reference seed applied), you can capture an initial snapshot of every Relic leaderboard and populate the `players` table in one pass.
+
+1. Copy `.env.template` to `.env` and fill in `SUPABASE_URL` plus `SUPABASE_SERVICE_ROLE_KEY` (service role key lives in the Supabase dashboard under Project Settings → API).
+2. Optional: adjust `LEADERBOARD_SNAPSHOT_MAX` (defaults to 200 to match Relic’s cap), `LEADERBOARD_PAGE_SIZE`, or `LEADERBOARD_SNAPSHOT_SOURCE` to tune batch size/source tagging.
+3. Run the seeding script: `npm run seed:leaderboards`
+
+The script pulls every leaderboard directly from the Relic API, inserts/updates matching rows in `leaderboards`, records a snapshot for the current UTC day, and upserts all discovered players (alias + country + last_seen_at) into `players`. It respects Relic’s soft rate limits with a small delay between pages; expect the run to take a minute or two for all 37 ladders.
+
 ## 🤝 Contributing
 
 We welcome contributions! Here are some ways you can help:
