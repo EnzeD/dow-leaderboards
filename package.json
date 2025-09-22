@@ -10,13 +10,17 @@
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed:leaderboards": "node scripts/seed-leaderboards.mjs",
-    "enrich:players": "node scripts/enrich-players.mjs"
+    "enrich:players": "node scripts/enrich-players.mjs",
+    "monitor:enrichment": "node scripts/monitor-enrichment.mjs",
+    "crawl:status": "node scripts/crawl-status.mjs",
+    "crawl:watch": "node scripts/crawl-status.mjs --watch",
+    "crawl:cleanup": "node scripts/crawl-cleanup.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^1.5.0",
-    "dotenv": "^16.4.5",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^16.4.5",
     "flag-icons": "^7.5.0",
     "next": "14.2.5",
     "react": "^18",
