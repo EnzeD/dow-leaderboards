@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "seed:leaderboards": "node scripts/seed-leaderboards.mjs"
+    "seed:leaderboards": "node scripts/seed-leaderboards.mjs",
+    "enrich:players": "node scripts/enrich-players.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

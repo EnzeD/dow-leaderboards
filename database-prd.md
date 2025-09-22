@@ -226,6 +226,22 @@ Establish a persistent Supabase (Postgres) datastore that mirrors and enriches R
    - Deduplicate `crawl_jobs` with unique partial index on `(kind, (payload->>'profile_id')) WHERE kind='player_matches'`.
    - Track `players.last_seen_at` to skip reprocessing the same player within a configurable window (e.g., 6 hours).
 
+### 7.1 Player Personal-Stats Enrichment
+
+- **Goal**: populate `players.steam_id64`, `players.level`, `players.xp`, and refresh leaderboard aggregates for rows missing enrichment data.
+- **Driver**: scheduled worker (hourly) querying Supabase for `players` where any of the enrichment fields is `NULL` (batched at ~400 profiles per run with configurable concurrency).
+- **Workflow**:
+  1. Fetch `players` rows in batches (default 400) ordered by `updated_at` where `steam_id64 IS NULL OR level IS NULL OR xp IS NULL`.
+  2. Process batches through a small worker pool (default concurrency 4, respecting Relic throttling):
+     - Call `getRecentMatchHistoryByProfileId?title=dow1-de&profile_id=<pid>&count=50` to recover the embedded `profiles[]` block (Steam ID, alias, country, level, XP).
+     - Optionally retry with alias → `getRecentMatchHistory` if the profile payload is empty.
+     - Optionally call `getPersonalStat` (feature flag) when deeper leaderboard stats are required.
+     - Upsert `players` with any new enrichment fields, bump `last_seen_at`, and insert alias rows into `player_alias_history`.
+     - When personal stats are enabled, append historical rows to `player_leaderboard_stats` (rank, rating, region rank, etc.).
+  3. Persist crawl diagnostics (success/failure count, last processed `profile_id`) in the worker logs for observability.
+- **Throttling**: configurable delay between Relic requests (default ≥300 ms with concurrency 4) and cap total requests per run to respect the ≤8 req/s soft cap.
+- **Error Handling**: on API failure, increment a retry counter and defer the profile by updating `players.updated_at` (prevents starvation). Profiles with repeated failures (≥5 attempts) are parked for manual review.
+
 ## 8) Leaderboard Snapshot Workflow
 
 - Scheduled daily at 00:05 UTC (after Relic daily rollover, adjust if needed).
@@ -287,4 +303,3 @@ Establish a persistent Supabase (Postgres) datastore that mirrors and enriches R
 - Preferred cadence for leaderboard snapshots (daily vs multiple/day)?
 - Storage sizing: estimate row growth (e.g., matches/day) to validate Supabase tier fits.
 - Need webhook or manual trigger when player requests immediate refresh?
-
