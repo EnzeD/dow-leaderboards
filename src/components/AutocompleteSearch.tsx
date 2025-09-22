@@ -44,11 +44,12 @@ export default function AutocompleteSearch({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasTyped, setHasTyped] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
-  const fetchSuggestions = useCallback(async (query: string) => {
+  const fetchSuggestions = useCallback(async (query: string, fromTyping: boolean = false) => {
     if (query.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -61,7 +62,7 @@ export default function AutocompleteSearch({
       if (response.ok) {
         const data = await response.json();
         setSuggestions(data.results || []);
-        setShowSuggestions((data.results || []).length > 0);
+        setShowSuggestions(fromTyping && (data.results || []).length > 0);
       } else {
         setSuggestions([]);
         setShowSuggestions(false);
@@ -82,7 +83,7 @@ export default function AutocompleteSearch({
     }
 
     debounceRef.current = setTimeout(() => {
-      fetchSuggestions(value);
+      fetchSuggestions(value, hasTyped);
     }, 300);
 
     return () => {
@@ -90,12 +91,13 @@ export default function AutocompleteSearch({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [value, fetchSuggestions]);
+  }, [value, fetchSuggestions, hasTyped]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
     setSelectedIndex(-1);
+    setHasTyped(true); // Mark that user has actively typed
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -120,6 +122,10 @@ export default function AutocompleteSearch({
         if (selectedIndex >= 0 && suggestions[selectedIndex]) {
           handleSelectSuggestion(suggestions[selectedIndex]);
         } else {
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setSelectedIndex(-1);
+          setHasTyped(false); // Reset typing state after exact search
           onExactSearch();
         }
         break;
@@ -132,9 +138,11 @@ export default function AutocompleteSearch({
 
   const handleSelectSuggestion = (player: PlayerSearchResult) => {
     onChange(player.current_alias);
-    onSelect(player);
+    setSuggestions([]);
     setShowSuggestions(false);
     setSelectedIndex(-1);
+    setHasTyped(false); // Reset typing state after selection
+    onSelect(player);
     inputRef.current?.blur();
   };
 
@@ -149,7 +157,8 @@ export default function AutocompleteSearch({
   };
 
   const handleFocus = () => {
-    if (suggestions.length > 0 && value.length >= 2) {
+    // Only show suggestions on focus if user has actively typed and there are results
+    if (hasTyped && suggestions.length > 0 && value.length >= 2) {
       setShowSuggestions(true);
     }
   };

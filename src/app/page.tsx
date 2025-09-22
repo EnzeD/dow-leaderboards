@@ -816,22 +816,9 @@ export default function Home() {
   // Handlers for autocomplete search component
   const handleAutocompletePlayerSelect = async (player: PlayerSearchResult) => {
     setSelectedPlayer(player);
-    // Convert database result to API format for display
-    const apiFormatResult = {
-      profileId: player.profile_id,
-      playerName: player.current_alias,
-      steamId: player.steam_id64,
-      personalStats: {
-        profile: {
-          alias: player.current_alias,
-          country: player.country,
-          level: player.level,
-          xp: player.xp
-        }
-      }
-    };
-    setSearchResults([apiFormatResult]);
-    setSearchLastUpdated(new Date().toISOString());
+    // Update search query and trigger full API search for complete player data
+    setSearchQuery(player.current_alias);
+    await handlePlayerSearch(player.current_alias, { pushHistory: true });
   };
 
   const handleExactSearch = () => {
