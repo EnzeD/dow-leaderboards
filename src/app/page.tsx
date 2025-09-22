@@ -3,7 +3,9 @@
 import { useState, useEffect, Fragment } from "react";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
+import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
+import { PlayerSearchResult } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
@@ -371,6 +373,7 @@ export default function Home() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
   const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
@@ -808,6 +811,31 @@ export default function Home() {
     const q = (name || '').trim();
     if (!q) return;
     await handlePlayerSearch(q, { pushHistory: true });
+  };
+
+  // Handlers for autocomplete search component
+  const handleAutocompletePlayerSelect = async (player: PlayerSearchResult) => {
+    setSelectedPlayer(player);
+    // Convert database result to API format for display
+    const apiFormatResult = {
+      profileId: player.profile_id,
+      playerName: player.current_alias,
+      steamId: player.steam_id64,
+      personalStats: {
+        profile: {
+          alias: player.current_alias,
+          country: player.country,
+          level: player.level,
+          xp: player.xp
+        }
+      }
+    };
+    setSearchResults([apiFormatResult]);
+    setSearchLastUpdated(new Date().toISOString());
+  };
+
+  const handleExactSearch = () => {
+    handlePlayerSearch();
   };
 
   const searchUpdatedAt: string | null = (() => {
@@ -1682,27 +1710,17 @@ export default function Home() {
             <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-4 sm:p-6 shadow-2xl">
               <h2 className="text-xl font-bold text-white mb-4">Player Search</h2>
               <p className="text-neutral-400 mb-6">
-                Exact search by in-game profile name (alias). It&apos;s case-sensitive.
+                Start typing to see instant results from our database of 19,000+ players. If no results appear, click Search for live API lookup.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <label htmlFor="player-search-input" className="sr-only">Player name or Steam alias</label>
-                <input
-                  id="player-search-input"
-                  name="playerSearch"
-                  type="text"
-                  placeholder="Enter player name or Steam alias..."
+              <div className="mb-6">
+                <AutocompleteSearch
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full flex-1 min-w-0 px-4 py-3 bg-neutral-900 border border-neutral-600/40 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/30 transition-all duration-300 shadow-inner text-base"
-                  onKeyPress={(e) => e.key === 'Enter' && handlePlayerSearch()}
+                  onChange={setSearchQuery}
+                  onSelect={handleAutocompletePlayerSelect}
+                  onExactSearch={handleExactSearch}
+                  loading={searchLoading}
+                  placeholder="Type player name for instant results..."
                 />
-                <button
-                  onClick={() => handlePlayerSearch()}
-                  disabled={searchLoading || !searchQuery.trim()}
-                  className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-neutral-600 to-neutral-700 hover:from-neutral-700 hover:to-neutral-800 disabled:bg-neutral-600 disabled:cursor-not-allowed text-white font-bold rounded-md shadow-lg border border-neutral-500 transition-all duration-300 transform hover:scale-105"
-                >
-                  {searchLoading ? 'Searching...' : 'Search'}
-                </button>
               </div>
 
               {searchResults.length > 0 && (
