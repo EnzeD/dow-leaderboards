@@ -234,10 +234,22 @@ const RACE_ID_TO_FACTION: Record<number, string> = {
   8: 'Tau',
 };
 
+const MATCH_TYPE_LABELS: Record<number, string> = {
+  1: 'Automatch 1v1',
+  2: 'Automatch 2v2',
+  3: 'Automatch 3v3',
+  4: 'Automatch 4v4',
+};
+
 // Map raceId from match history to faction name as defined by relic API payloads
 const raceIdToFaction = (raceId?: number): string => {
   if (raceId === undefined || raceId === null || raceId < 0) return 'Unknown';
   return RACE_ID_TO_FACTION[raceId] || 'Unknown';
+};
+
+const formatMatchTypeLabel = (matchTypeId?: number): string => {
+  if (typeof matchTypeId !== 'number') return 'Custom';
+  return MATCH_TYPE_LABELS[matchTypeId] ?? 'Custom';
 };
 
 // Get rank color based on position
@@ -1833,7 +1845,7 @@ export default function Home() {
                                 const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
                                 const outcomeColor = m.outcome === 'Win' ? 'text-green-400' : m.outcome === 'Loss' ? 'text-red-400' : 'text-neutral-300';
                                 const diffColor = (m.ratingDiff ?? 0) > 0 ? 'text-green-400' : (m.ratingDiff ?? 0) < 0 ? 'text-red-400' : 'text-neutral-400';
-                                const matchType = m.matchTypeId === 1 ? '1v1' : m.matchTypeId === 2 ? '2v2' : m.matchTypeId === 3 ? '3v3' : m.matchTypeId === 4 ? '4v4' : 'Match';
+                                const matchType = formatMatchTypeLabel(m.matchTypeId);
                                 const start = m.startTime ? new Date(m.startTime * 1000) : undefined;
                                 const duration = typeof m.durationSec === 'number' ? m.durationSec : undefined;
                                 const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';

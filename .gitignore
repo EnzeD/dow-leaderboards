@@ -36,6 +36,3 @@ next-env.d.ts
 
 # TypeScript
 *.tsbuildinfo
-
-# Screenshots
-*.screenshots/
