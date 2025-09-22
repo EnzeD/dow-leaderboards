@@ -14,7 +14,7 @@ type RecentMatch = {
   ratingDiff?: number;
   teamId?: number;
   raceId?: number;
-  players?: Array<{ profileId: string; alias?: string; teamId?: number; raceId?: number }>;
+  players?: Array<{ profileId: string; alias?: string; teamId?: number; raceId?: number; oldRating?: number; newRating?: number }>;
 };
 
 type PlayerPayload = {
@@ -161,11 +161,17 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
     const players = members.map((p: any) => {
       const raceIdNum = Number(p?.race_id);
       const teamId = typeof p?.teamid === 'number' ? p.teamid : undefined;
+      const oldRatingVal = typeof p?.oldrating === 'number' ? p.oldrating : undefined;
+      const newRatingVal = typeof p?.newrating === 'number' ? p.newrating : undefined;
+      const profileIdRaw = String(p?.profile_id ?? '');
+      const alias = aliasMap.get(profileIdRaw) ?? (typeof p?.alias === 'string' ? p.alias : undefined);
       return {
-        profileId: String(p?.profile_id ?? ''),
-        alias: aliasMap.get(String(p?.profile_id ?? '')),
+        profileId: profileIdRaw,
+        alias,
         teamId,
         raceId: Number.isFinite(raceIdNum) && raceIdNum >= 0 && typeof teamId === 'number' && teamId >= 0 ? raceIdNum : undefined,
+        oldRating: oldRatingVal,
+        newRating: newRatingVal,
       };
     }).filter(p => typeof p.teamId === 'number' && p.teamId >= 0);
     const meRaceIdNum = Number(me?.race_id);

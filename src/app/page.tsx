@@ -29,6 +29,7 @@ type RosterEntry = {
   key: string;
   label: string;
   faction: string;
+  rating?: number;
   onClick?: () => void;
 };
 
@@ -1840,117 +1841,129 @@ export default function Home() {
                                 <>
                                   <div className="grid gap-2">
                                     {visibleMatches.map((m: any, mi: number) => {
-                                const myTeam = m.teamId;
-                                const allies = (m.players || []).filter((p: any) => p.teamId === myTeam && p.profileId !== result.profileId);
-                                const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
-                                const outcomeColor = m.outcome === 'Win' ? 'text-green-400' : m.outcome === 'Loss' ? 'text-red-400' : 'text-neutral-300';
-                                const diffColor = (m.ratingDiff ?? 0) > 0 ? 'text-green-400' : (m.ratingDiff ?? 0) < 0 ? 'text-red-400' : 'text-neutral-400';
-                                const matchType = formatMatchTypeLabel(m.matchTypeId);
-                                const start = m.startTime ? new Date(m.startTime * 1000) : undefined;
-                                const duration = typeof m.durationSec === 'number' ? m.durationSec : undefined;
-                                const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';
-                                const mePlayer = (m.players || []).find((p: any) => p.profileId === result.profileId);
-                                const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
-                                const rawMapIdCandidate = [m.mapName, m.mapname, m.mapId, m.mapid]
-                                  .find((value) => {
-                                    if (typeof value === 'string') {
-                                      return value.trim().length > 0;
-                                    }
-                                    if (typeof value === 'number') {
-                                      return Number.isFinite(value);
-                                    }
-                                    return false;
-                                  });
-                                const normalizedMapId = typeof rawMapIdCandidate === 'number'
-                                  ? String(rawMapIdCandidate)
-                                  : rawMapIdCandidate?.trim();
-                                const mapDisplayName = getMapName(normalizedMapId);
-                                const mapImagePath = getMapImage(normalizedMapId);
-                                const hasRoster = allies.length > 0 || opps.length > 0;
-                                const displaySelfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
-                                const teamExtraCount = Math.max(0, allies.length - 2);
-                                const opponentExtraCount = Math.max(0, opps.length - 3);
+                                      const myTeam = m.teamId;
+                                      const allies = (m.players || []).filter((p: any) => p.teamId === myTeam && p.profileId !== result.profileId);
+                                      const opps = (m.players || []).filter((p: any) => p.teamId !== myTeam);
+                                      const outcomeColor = m.outcome === 'Win' ? 'text-green-400' : m.outcome === 'Loss' ? 'text-red-400' : 'text-neutral-300';
+                                      const diffColor = (m.ratingDiff ?? 0) > 0 ? 'text-green-400' : (m.ratingDiff ?? 0) < 0 ? 'text-red-400' : 'text-neutral-400';
+                                      const matchType = formatMatchTypeLabel(m.matchTypeId);
+                                      const isAutomatch = typeof m.matchTypeId === 'number' && m.matchTypeId >= 1 && m.matchTypeId <= 4;
+                                      const start = m.startTime ? new Date(m.startTime * 1000) : undefined;
+                                      const duration = typeof m.durationSec === 'number' ? m.durationSec : undefined;
+                                      const durStr = duration !== undefined ? `${Math.floor(duration/60)}m${duration%60 ? ' ' + (duration%60) + 's' : ''}` : '';
+                                      const mePlayer = (m.players || []).find((p: any) => p.profileId === result.profileId);
+                                      const myFaction = raceIdToFaction(m.raceId ?? mePlayer?.raceId);
+                                      const rawMapIdCandidate = [m.mapName, m.mapname, m.mapId, m.mapid]
+                                        .find((value) => {
+                                          if (typeof value === 'string') {
+                                            return value.trim().length > 0;
+                                          }
+                                          if (typeof value === 'number') {
+                                            return Number.isFinite(value);
+                                          }
+                                          return false;
+                                        });
+                                      const normalizedMapId = typeof rawMapIdCandidate === 'number'
+                                        ? String(rawMapIdCandidate)
+                                        : rawMapIdCandidate?.trim();
+                                      const mapDisplayName = getMapName(normalizedMapId);
+                                      const mapImagePath = getMapImage(normalizedMapId);
+                                      const hasRoster = allies.length > 0 || opps.length > 0;
+                                      const displaySelfAlias = mePlayer?.alias || result.playerName || String(result.profileId);
+                                      const teamExtraCount = Math.max(0, allies.length - 2);
+                                      const opponentExtraCount = Math.max(0, opps.length - 3);
+                                      const selfRating = typeof m.newRating === 'number' ? m.newRating : (typeof m.oldRating === 'number' ? m.oldRating : undefined);
 
-                                const teamEntries: RosterEntry[] = [
-                                  {
-                                    key: `self-${result.profileId}`,
-                                    label: displaySelfAlias,
-                                    faction: myFaction,
-                                    onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias) : undefined,
-                                  },
-                                  ...allies.slice(0, 2).map((p: any, index: number) => {
-                                    const label = p.alias || String(p.profileId);
-                                    const faction = raceIdToFaction(p.raceId);
-                                    return {
-                                      key: `ally-${p.profileId}-${index}`,
-                                      label,
-                                      faction,
-                                      onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
-                                    } satisfies RosterEntry;
-                                  }),
-                                ];
+                                      const teamEntries: RosterEntry[] = [
+                                        {
+                                          key: `self-${result.profileId}`,
+                                          label: displaySelfAlias,
+                                          faction: myFaction,
+                                          rating: isAutomatch ? selfRating : undefined,
+                                          onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias) : undefined,
+                                        },
+                                        ...allies.slice(0, 2).map((p: any, index: number) => {
+                                          const label = p.alias || String(p.profileId);
+                                          const faction = raceIdToFaction(p.raceId);
+                                          const playerRating = typeof p?.newRating === 'number' ? p.newRating : (typeof p?.oldRating === 'number' ? p.oldRating : undefined);
+                                          return {
+                                            key: `ally-${p.profileId}-${index}`,
+                                            label,
+                                            faction,
+                                            rating: isAutomatch ? playerRating : undefined,
+                                            onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                          } satisfies RosterEntry;
+                                        }),
+                                      ];
 
-                                const opponentEntries: RosterEntry[] = opps.slice(0, 3).map((p: any, index: number) => {
-                                  const label = p.alias || String(p.profileId);
-                                  const faction = raceIdToFaction(p.raceId);
-                                  return {
-                                    key: `opp-${p.profileId}-${index}`,
-                                    label,
-                                    faction,
-                                    onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
-                                  } satisfies RosterEntry;
-                                });
+                                      const opponentEntries: RosterEntry[] = opps.slice(0, 3).map((p: any, index: number) => {
+                                        const label = p.alias || String(p.profileId);
+                                        const faction = raceIdToFaction(p.raceId);
+                                        const playerRating = typeof p?.newRating === 'number' ? p.newRating : (typeof p?.oldRating === 'number' ? p.oldRating : undefined);
+                                        return {
+                                          key: `opp-${p.profileId}-${index}`,
+                                          label,
+                                          faction,
+                                          rating: isAutomatch ? playerRating : undefined,
+                                          onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                        } satisfies RosterEntry;
+                                      });
 
-                                const renderRosterEntries = (
-                                  entries: RosterEntry[],
-                                  extraCount: number,
-                                  align: 'start' | 'end' = 'start'
-                                ) => (
-                                  <div
-                                    className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-neutral-200 ${
-                                      align === 'end' ? 'sm:justify-end' : ''
-                                    }`}
-                                  >
-                                    {entries.map((entry, index) => (
-                                      <Fragment key={entry.key || `${entry.label}-${index}`}>
-                                        {index > 0 && <span className="text-neutral-500 select-none">•</span>}
-                                        <button
-                                          type="button"
-                                          onClick={entry.onClick}
-                                          className={`hover:underline ${
-                                            entry.onClick ? 'text-blue-300' : 'text-neutral-400 cursor-default'
+                                      const renderRosterEntries = (
+                                        entries: RosterEntry[],
+                                        extraCount: number,
+                                        align: 'start' | 'end' = 'start'
+                                      ) => (
+                                        <div
+                                          className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-neutral-200 ${
+                                            align === 'end' ? 'sm:justify-end' : ''
                                           }`}
-                                          title={entry.label}
-                                          disabled={!entry.onClick}
                                         >
-                                          {entry.label}
-                                          {entry.faction !== 'Unknown' && (
-                                            <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
-                                              (
-                                              <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
-                                              <span>{entry.faction}</span>
-                                              )
-                                            </span>
+                                          {entries.map((entry, index) => (
+                                            <Fragment key={entry.key || `${entry.label}-${index}`}>
+                                              {index > 0 && <span className="text-neutral-500 select-none">•</span>}
+                                              <button
+                                                type="button"
+                                                onClick={entry.onClick}
+                                                className={`hover:underline ${
+                                                  entry.onClick ? 'text-blue-300' : 'text-neutral-400 cursor-default'
+                                                }`}
+                                                title={typeof entry.rating === 'number' ? `${entry.label} (${entry.rating})` : entry.label}
+                                                disabled={!entry.onClick}
+                                              >
+                                                {entry.label}
+                                                {typeof entry.rating === 'number' && (
+                                                  <span className="ml-1 text-neutral-400 whitespace-nowrap">
+                                                    {entry.rating}
+                                                  </span>
+                                                )}
+                                                {entry.faction !== 'Unknown' && (
+                                                  <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
+                                                    (
+                                                    <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
+                                                    <span>{entry.faction}</span>
+                                                    )
+                                                  </span>
+                                                )}
+                                              </button>
+                                            </Fragment>
+                                          ))}
+                                          {extraCount > 0 && (
+                                            <Fragment>
+                                              {entries.length > 0 && <span className="text-neutral-500 select-none">•</span>}
+                                              <span className="text-neutral-400">+{extraCount}</span>
+                                            </Fragment>
                                           )}
-                                        </button>
-                                      </Fragment>
-                                    ))}
-                                    {extraCount > 0 && (
-                                      <Fragment>
-                                        {entries.length > 0 && <span className="text-neutral-500 select-none">•</span>}
-                                        <span className="text-neutral-400">+{extraCount}</span>
-                                      </Fragment>
-                                    )}
-                                  </div>
-                                );
+                                        </div>
+                                      );
 
-                                return (
-                                  <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
-                                    <div className="flex items-stretch gap-3">
-                                      <div className="relative h-14 w-14 flex-shrink-0 self-center sm:h-16 sm:w-16">
-                                        <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
-                                        {mapImagePath ? (
-                                          <img
+                                      return (
+                                        <div key={mi} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
+                                          <div className="flex items-stretch gap-3">
+                                            <div className="relative h-14 w-14 flex-shrink-0 self-center sm:h-16 sm:w-16">
+                                              <div className="absolute inset-0 rounded-lg bg-neutral-800/60 shadow-inner" aria-hidden />
+                                              {mapImagePath ? (
+                                                <img
                                             src={mapImagePath}
                                             alt={`${mapDisplayName} mini-map`}
                                             className="relative h-full w-full rotate-45 transform-gpu rounded-lg border border-neutral-600/50 object-cover shadow-lg"
