@@ -103,7 +103,12 @@ export default function AutocompleteSearch({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions) {
       if (e.key === 'Enter') {
-        onExactSearch();
+        // If we have suggestions but dropdown is hidden, use first result
+        if (suggestions.length > 0) {
+          handleSelectSuggestion(suggestions[0]);
+        } else {
+          onExactSearch();
+        }
       }
       return;
     }
@@ -121,6 +126,9 @@ export default function AutocompleteSearch({
         e.preventDefault();
         if (selectedIndex >= 0 && suggestions[selectedIndex]) {
           handleSelectSuggestion(suggestions[selectedIndex]);
+        } else if (suggestions.length > 0) {
+          // Use first suggestion if no specific selection
+          handleSelectSuggestion(suggestions[0]);
         } else {
           setSuggestions([]);
           setShowSuggestions(false);
