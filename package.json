@@ -10,7 +10,11 @@
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed:leaderboards": "node scripts/seed-leaderboards.mjs",
-    "enrich:players": "node scripts/enrich-players.mjs"
+    "enrich:players": "node scripts/enrich-players.mjs",
+    "monitor:enrichment": "node scripts/monitor-enrichment.mjs",
+    "crawl:status": "node scripts/crawl-status.mjs",
+    "crawl:watch": "node scripts/crawl-status.mjs --watch",
+    "crawl:cleanup": "node scripts/crawl-cleanup.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
