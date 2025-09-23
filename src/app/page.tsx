@@ -1247,7 +1247,24 @@ export default function Home() {
   // Fetch and poll current Steam player count (every minute)
   useEffect(() => {
     let cancelled = false;
+    const PLAYER_COUNT_CACHE_KEY = 'dow_player_count';
+    const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
     const load = () => {
+      // Check localStorage cache first
+      try {
+        const cached = localStorage.getItem(PLAYER_COUNT_CACHE_KEY);
+        if (cached) {
+          const { count, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < CACHE_DURATION_MS) {
+            setPlayerCount(count);
+            setPlayerCountLoading(false);
+            return; // Use cached value, skip API call
+          }
+        }
+      } catch {}
+
       setPlayerCountLoading(true);
       fetch('/api/steam/players', { cache: 'no-store' })
         .then(r => r.json())
@@ -1256,6 +1273,16 @@ export default function Home() {
           const count = typeof data?.playerCount === 'number' ? data.playerCount : null;
           setPlayerCount(count);
           setPlayerCountLoading(false);
+
+          // Cache in localStorage
+          if (count !== null) {
+            try {
+              localStorage.setItem(PLAYER_COUNT_CACHE_KEY, JSON.stringify({
+                count,
+                timestamp: Date.now()
+              }));
+            } catch {}
+          }
         })
         .catch(() => {
           if (cancelled) return;
@@ -1264,7 +1291,7 @@ export default function Home() {
         });
     };
     load();
-    const id = setInterval(load, 60_000);
+    const id = setInterval(load, CACHE_DURATION_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 

@@ -1,6 +1,6 @@
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const CACHE_HEADERS = {
-  "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=30",
+  "Cache-Control": "public, max-age=1800, s-maxage=1800, stale-while-revalidate=300",
 };
 
 type SteamPayload = {
