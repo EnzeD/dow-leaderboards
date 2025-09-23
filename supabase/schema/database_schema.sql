@@ -1,0 +1,223 @@
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
+CREATE TABLE public.api_responses (
+  id bigint NOT NULL DEFAULT nextval('api_responses_id_seq'::regclass),
+  endpoint text NOT NULL,
+  request_hash text NOT NULL UNIQUE,
+  status_code integer,
+  fetched_at timestamp with time zone NOT NULL DEFAULT now(),
+  duration_ms integer,
+  payload jsonb NOT NULL,
+  CONSTRAINT api_responses_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.crawl_jobs (
+  id bigint NOT NULL DEFAULT nextval('crawl_jobs_id_seq'::regclass),
+  kind USER-DEFINED NOT NULL,
+  payload jsonb NOT NULL,
+  priority integer NOT NULL DEFAULT 10,
+  run_after timestamp with time zone NOT NULL DEFAULT now(),
+  status USER-DEFINED NOT NULL DEFAULT 'pending'::crawl_job_status,
+  attempts integer NOT NULL DEFAULT 0,
+  last_error text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT crawl_jobs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.crawl_runs (
+  job_id bigint NOT NULL,
+  started_at timestamp with time zone NOT NULL,
+  finished_at timestamp with time zone,
+  success boolean NOT NULL DEFAULT false,
+  request_count integer,
+  error_message text,
+  notes text,
+  CONSTRAINT crawl_runs_pkey PRIMARY KEY (started_at, job_id),
+  CONSTRAINT crawl_runs_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.crawl_jobs(id)
+);
+CREATE TABLE public.leaderboard_mappings (
+  leaderboard_id integer NOT NULL,
+  match_type_id integer NOT NULL,
+  statgroup_type smallint NOT NULL,
+  race_id smallint NOT NULL,
+  CONSTRAINT leaderboard_mappings_pkey PRIMARY KEY (statgroup_type, leaderboard_id, match_type_id, race_id),
+  CONSTRAINT leaderboard_mappings_leaderboard_id_fkey FOREIGN KEY (leaderboard_id) REFERENCES public.leaderboards(id),
+  CONSTRAINT leaderboard_mappings_match_type_id_fkey FOREIGN KEY (match_type_id) REFERENCES public.match_types(id),
+  CONSTRAINT leaderboard_mappings_race_id_fkey FOREIGN KEY (race_id) REFERENCES public.races(id)
+);
+CREATE TABLE public.leaderboard_snapshot_entries (
+  snapshot_id uuid NOT NULL,
+  rank integer NOT NULL,
+  profile_id bigint NOT NULL,
+  statgroup_id bigint,
+  rating integer,
+  wins integer,
+  losses integer,
+  streak integer,
+  disputes integer,
+  drops integer,
+  rank_total integer,
+  rank_level integer,
+  region_rank integer,
+  region_rank_total integer,
+  highest_rank integer,
+  highest_rank_level integer,
+  highest_rating integer,
+  winrate numeric,
+  last_match_at timestamp with time zone,
+  CONSTRAINT leaderboard_snapshot_entries_pkey PRIMARY KEY (snapshot_id, rank),
+  CONSTRAINT leaderboard_snapshot_entries_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.leaderboard_snapshots(id),
+  CONSTRAINT leaderboard_snapshot_entries_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id)
+);
+CREATE TABLE public.leaderboard_snapshots (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  leaderboard_id integer NOT NULL,
+  captured_on date NOT NULL,
+  captured_at timestamp with time zone NOT NULL DEFAULT now(),
+  source text NOT NULL DEFAULT 'cron-daily'::text,
+  total_players integer,
+  CONSTRAINT leaderboard_snapshots_pkey PRIMARY KEY (id),
+  CONSTRAINT leaderboard_snapshots_leaderboard_id_fkey FOREIGN KEY (leaderboard_id) REFERENCES public.leaderboards(id)
+);
+CREATE TABLE public.leaderboards (
+  id integer NOT NULL,
+  name text NOT NULL,
+  display_name text,
+  is_ranked boolean NOT NULL DEFAULT true,
+  default_match_type_id integer,
+  default_race_id smallint,
+  default_statgroup_type smallint,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT leaderboards_pkey PRIMARY KEY (id),
+  CONSTRAINT leaderboards_default_match_type_id_fkey FOREIGN KEY (default_match_type_id) REFERENCES public.match_types(id),
+  CONSTRAINT leaderboards_default_race_id_fkey FOREIGN KEY (default_race_id) REFERENCES public.races(id)
+);
+CREATE TABLE public.match_participants (
+  match_id bigint NOT NULL,
+  profile_id bigint NOT NULL,
+  team_id smallint,
+  race_id smallint,
+  statgroup_id bigint,
+  alias_at_match text,
+  outcome USER-DEFINED NOT NULL DEFAULT 'unknown'::match_outcome,
+  outcome_raw smallint,
+  wins integer,
+  losses integer,
+  streak integer,
+  arbitration smallint,
+  report_type smallint,
+  old_rating integer,
+  new_rating integer,
+  rating_delta integer,
+  is_computer boolean NOT NULL DEFAULT false,
+  CONSTRAINT match_participants_pkey PRIMARY KEY (match_id, profile_id),
+  CONSTRAINT match_participants_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id),
+  CONSTRAINT match_participants_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id),
+  CONSTRAINT match_participants_race_id_fkey FOREIGN KEY (race_id) REFERENCES public.races(id)
+);
+CREATE TABLE public.match_players_raw (
+  match_id bigint NOT NULL,
+  payload jsonb NOT NULL,
+  CONSTRAINT match_players_raw_pkey PRIMARY KEY (match_id),
+  CONSTRAINT match_players_raw_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id)
+);
+CREATE TABLE public.match_report_results (
+  match_id bigint NOT NULL,
+  profile_id bigint NOT NULL,
+  result_type smallint,
+  team_id smallint,
+  race_id smallint,
+  xp_gained integer,
+  counters jsonb,
+  match_start_at timestamp with time zone,
+  CONSTRAINT match_report_results_pkey PRIMARY KEY (match_id, profile_id),
+  CONSTRAINT match_report_results_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id),
+  CONSTRAINT match_report_results_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id),
+  CONSTRAINT match_report_results_race_id_fkey FOREIGN KEY (race_id) REFERENCES public.races(id)
+);
+CREATE TABLE public.match_team_results (
+  match_id bigint NOT NULL,
+  team_id smallint NOT NULL,
+  outcome USER-DEFINED NOT NULL DEFAULT 'unknown'::match_outcome,
+  team_rating_avg numeric,
+  team_rating_sigma numeric,
+  CONSTRAINT match_team_results_pkey PRIMARY KEY (match_id, team_id),
+  CONSTRAINT match_team_results_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id)
+);
+CREATE TABLE public.match_types (
+  id integer NOT NULL,
+  label text NOT NULL,
+  locstring_id integer,
+  CONSTRAINT match_types_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.matches (
+  match_id bigint NOT NULL,
+  match_type_id integer NOT NULL,
+  map_name text,
+  description text,
+  max_players smallint,
+  creator_profile_id bigint,
+  started_at timestamp with time zone,
+  completed_at timestamp with time zone,
+  duration_seconds integer,
+  observer_total integer,
+  crawled_at timestamp with time zone,
+  source_alias text,
+  options_blob text,
+  slot_info_blob text,
+  CONSTRAINT matches_pkey PRIMARY KEY (match_id),
+  CONSTRAINT matches_match_type_id_fkey FOREIGN KEY (match_type_id) REFERENCES public.match_types(id)
+);
+CREATE TABLE public.player_alias_history (
+  profile_id bigint NOT NULL,
+  alias text NOT NULL,
+  first_seen_at timestamp with time zone NOT NULL,
+  last_seen_at timestamp with time zone NOT NULL,
+  CONSTRAINT player_alias_history_pkey PRIMARY KEY (profile_id, alias),
+  CONSTRAINT player_alias_history_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id)
+);
+CREATE TABLE public.player_leaderboard_stats (
+  profile_id bigint NOT NULL,
+  leaderboard_id integer NOT NULL,
+  rating integer,
+  wins integer,
+  losses integer,
+  streak integer,
+  rank integer,
+  rank_total integer,
+  rank_level integer,
+  disputes integer,
+  drops integer,
+  region_rank integer,
+  region_rank_total integer,
+  last_match_at timestamp with time zone,
+  peak_rank integer,
+  peak_rank_level integer,
+  peak_rating integer,
+  snapshot_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT player_leaderboard_stats_pkey PRIMARY KEY (snapshot_at, profile_id, leaderboard_id),
+  CONSTRAINT player_leaderboard_stats_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id),
+  CONSTRAINT player_leaderboard_stats_leaderboard_id_fkey FOREIGN KEY (leaderboard_id) REFERENCES public.leaderboards(id)
+);
+CREATE TABLE public.players (
+  profile_id bigint NOT NULL,
+  current_alias text,
+  country text,
+  steam_id64 text UNIQUE,
+  statgroup_id bigint,
+  level integer,
+  xp integer,
+  first_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_seen_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT players_pkey PRIMARY KEY (profile_id)
+);
+CREATE TABLE public.races (
+  id smallint NOT NULL,
+  slug text NOT NULL,
+  label text NOT NULL,
+  faction_id smallint,
+  CONSTRAINT races_pkey PRIMARY KEY (id)
+);
