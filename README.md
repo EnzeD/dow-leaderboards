@@ -137,7 +137,7 @@ The crawler uses a **job queue system**:
 
 #### Available Commands
 ```bash
-# One-time status check
+# One-time status check (with enhanced coverage metrics)
 npm run crawl:status
 
 # Live monitoring (updates every 15 seconds)
@@ -146,6 +146,25 @@ npm run crawl:watch
 # Clean up stuck jobs
 npm run crawl:cleanup
 ```
+
+#### Enhanced Status Metrics
+The status monitor now provides comprehensive database coverage insights:
+
+**👥 Player Database Coverage:**
+- **Total Players**: All players discovered across leaderboards and matches
+- **Ever Crawled**: Players whose match history has been collected (%)
+- **Never Crawled**: Players still needing match history collection (%)
+- **Recent Activity**: Players seen in last 24h/week
+
+**📈 Match Participant Coverage:**
+- **Total in Matches**: Unique players found in collected match data
+- **Found in Players DB**: How many match participants exist in players table (%)
+- **Missing from DB**: Players appearing in matches but not in players database
+
+These metrics help you understand:
+1. **Crawling Progress**: What percentage of known players have been processed
+2. **Data Completeness**: Whether match participants are properly linked to player profiles
+3. **Discovery Gaps**: Players found in matches but missing from main database
 
 ### 📊 Status Indicators Guide
 
@@ -202,19 +221,39 @@ ENRICH_RELIC_DELAY_MS=100     # Delay between API calls
 ENRICH_RELIC_REQUEST_CAP=50000 # Total API call limit
 ```
 
-**Match Crawling**:
+**Match Crawling** (optimized):
 ```bash
-CRAWL_COOLDOWN_MINUTES=180    # Hours before re-crawling same player
-CRAWL_RELIC_DELAY_MS=350      # Delay between API calls
-CRAWL_CONCURRENCY=4           # Parallel workers (not configurable in current version)
+CRAWL_COOLDOWN_MINUTES=60     # Reduced cooldown (was 180)
+CRAWL_RELIC_DELAY_MS=100      # Faster API calls (was 350)
+CRAWL_RELIC_REQUEST_CAP=50000 # Higher API limit (was 6000)
+CRAWL_UPSERT_CHUNK_SIZE=500   # Larger DB batches (was 300)
 CRAWL_EXIT_ON_IDLE=true       # Auto-exit when no jobs available
+
+# Concurrent crawler settings (npm run crawl:concurrent)
+CRAWL_CONCURRENCY=6           # Parallel workers for concurrent version
+CRAWL_BATCH_SIZE=20          # Jobs processed per batch
 ```
 
 #### Performance Guidelines
-- **Enrichment**: ~20-25 minutes for 25,000 players with optimized settings
-- **Crawling**: Varies by player activity; processes ~2,000 jobs/hour
-- **API limits**: Both stay well under Relic's 50 req/s limit
-- **Safe concurrency**: Can run both enrichment and crawling simultaneously
+
+| Operation | Original | Optimized | Concurrent | Usage |
+|-----------|----------|-----------|------------|--------|
+| **Player Enrichment** | ~2 hours | **~21 minutes** | N/A | `npm run enrich:players` |
+| **Match Crawling** | ~2,000/hour | **~6,000/hour** | **~15,000/hour** | See commands below |
+
+**Crawling Commands:**
+```bash
+# Original crawler (slower but stable)
+node scripts/crawl-player-matches.mjs
+
+# Concurrent crawler (recommended for speed)
+npm run crawl:concurrent
+```
+
+**Safety Notes:**
+- **API limits**: All versions stay well under Relic's 50 req/s limit
+- **Safe concurrency**: Can run enrichment + crawling simultaneously
+- **Database safety**: Concurrent version uses proper transaction handling
 
 ### 🚨 Troubleshooting
 

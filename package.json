@@ -14,7 +14,8 @@
     "monitor:enrichment": "node scripts/monitor-enrichment.mjs",
     "crawl:status": "node scripts/crawl-status.mjs",
     "crawl:watch": "node scripts/crawl-status.mjs --watch",
-    "crawl:cleanup": "node scripts/crawl-cleanup.mjs"
+    "crawl:cleanup": "node scripts/crawl-cleanup.mjs",
+    "crawl:concurrent": "node scripts/crawl-player-matches-concurrent.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
