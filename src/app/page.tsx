@@ -607,7 +607,10 @@ export default function Home() {
 
     if (availableFactionsForMode.length > 0 && !availableFactionsForMode.includes(selectedFaction)) {
       // Only switch if current faction is not available for this match type
-      setSelectedFaction(availableFactionsForMode[0]);
+      const firstAvailable = availableFactionsForMode[0];
+      if (firstAvailable) {
+        setSelectedFaction(firstAvailable);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMatchType, leaderboards]); // Only run when match type or leaderboards change
