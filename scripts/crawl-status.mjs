@@ -57,27 +57,33 @@ function formatTimeUntil(isoString) {
 }
 
 async function getJobStats() {
-  // Overall job status breakdown
-  const { data: statusBreakdown, error: statusError } = await supabase
-    .from("crawl_jobs")
-    .select("status")
-    .eq("kind", JOB_KIND);
+  // Use count queries to avoid hitting row limits
+  const [pendingResult, inProgressResult, doneResult, failedResult, totalResult] = await Promise.all([
+    supabase.from("crawl_jobs").select("*", { count: "exact", head: true })
+      .eq("kind", JOB_KIND).eq("status", "pending"),
+    supabase.from("crawl_jobs").select("*", { count: "exact", head: true })
+      .eq("kind", JOB_KIND).eq("status", "in_progress"),
+    supabase.from("crawl_jobs").select("*", { count: "exact", head: true })
+      .eq("kind", JOB_KIND).eq("status", "done"),
+    supabase.from("crawl_jobs").select("*", { count: "exact", head: true })
+      .eq("kind", JOB_KIND).eq("status", "failed"),
+    supabase.from("crawl_jobs").select("*", { count: "exact", head: true })
+      .eq("kind", JOB_KIND)
+  ]);
 
-  if (statusError) {
-    throw new Error(`Failed to get job status breakdown: ${statusError.message}`);
+  if (pendingResult.error || inProgressResult.error || doneResult.error || failedResult.error || totalResult.error) {
+    const errorMsg = [pendingResult.error, inProgressResult.error, doneResult.error, failedResult.error, totalResult.error]
+      .filter(Boolean).map(err => err.message).join(', ');
+    throw new Error(`Failed to get job status breakdown: ${errorMsg}`);
   }
 
   const stats = {
-    pending: 0,
-    in_progress: 0,
-    done: 0,
-    failed: 0,
-    total: statusBreakdown.length
+    pending: pendingResult.count || 0,
+    in_progress: inProgressResult.count || 0,
+    done: doneResult.count || 0,
+    failed: failedResult.count || 0,
+    total: totalResult.count || 0
   };
-
-  for (const job of statusBreakdown) {
-    stats[job.status] = (stats[job.status] || 0) + 1;
-  }
 
   return stats;
 }
@@ -157,29 +163,112 @@ async function getRunStats() {
 }
 
 async function getPlayerDiscoveryStats() {
-  // Check how many players have been crawled recently
-  const { data: recentPlayers, error: playersError } = await supabase
-    .from("players")
-    .select("last_seen_at")
-    .not("last_seen_at", "is", null)
-    .order("last_seen_at", { ascending: false })
-    .limit(1000);
+  // Use count queries to avoid row limits
+  const [totalResult, everCrawledResult, recentDayResult, recentWeekResult] = await Promise.all([
+    supabase.from("players").select("*", { count: "exact", head: true }),
+    supabase.from("players").select("*", { count: "exact", head: true })
+      .not("last_seen_at", "is", null),
+    supabase.from("players").select("*", { count: "exact", head: true })
+      .not("last_seen_at", "is", null)
+      .gte("last_seen_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+    supabase.from("players").select("*", { count: "exact", head: true })
+      .not("last_seen_at", "is", null)
+      .gte("last_seen_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+  ]);
 
-  if (playersError) {
-    throw new Error(`Failed to get player stats: ${playersError.message}`);
+  if (totalResult.error || everCrawledResult.error || recentDayResult.error || recentWeekResult.error) {
+    const errorMsg = [totalResult.error, everCrawledResult.error, recentDayResult.error, recentWeekResult.error]
+      .filter(Boolean).map(err => err.message).join(', ');
+    throw new Error(`Failed to get player stats: ${errorMsg}`);
   }
 
-  const now = new Date();
-  const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
-  const oneWeekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-
-  const recentDay = recentPlayers.filter(p => new Date(p.last_seen_at) > oneDayAgo);
-  const recentWeek = recentPlayers.filter(p => new Date(p.last_seen_at) > oneWeekAgo);
+  const totalPlayers = totalResult.count || 0;
+  const totalWithActivity = everCrawledResult.count || 0;
+  const recentDay = recentDayResult.count || 0;
+  const recentWeek = recentWeekResult.count || 0;
 
   return {
-    recentDay: recentDay.length,
-    recentWeek: recentWeek.length,
-    totalWithActivity: recentPlayers.length
+    totalPlayers,
+    recentDay,
+    recentWeek,
+    totalWithActivity,
+    neverCrawled: totalPlayers - totalWithActivity
+  };
+}
+
+async function getMatchDataStats() {
+  // Get basic match data counts
+  const [matchesResult, participantsResult, uniqueParticipantsResult] = await Promise.all([
+    supabase.from("matches").select("*", { count: "exact", head: true }),
+    supabase.from("match_participants").select("*", { count: "exact", head: true }),
+    supabase.from("match_participants").select("profile_id", { count: "exact", head: true })
+  ]);
+
+  const totalMatches = matchesResult.count || 0;
+  const totalParticipants = participantsResult.count || 0;
+
+  // Get unique participants (this might be slow but necessary)
+  let uniqueParticipants = 0;
+  let participantsInPlayerDb = 0;
+  let missingFromPlayerDb = 0;
+
+  if (totalParticipants > 0) {
+    try {
+      // Try the efficient RPC function first
+      const { data: rpcResult, error: rpcError } = await supabase
+        .rpc('get_unique_participant_count');
+
+      if (!rpcError && rpcResult) {
+        uniqueParticipants = parseInt(rpcResult.total_participants) || 0;
+        participantsInPlayerDb = parseInt(rpcResult.participants_in_players_db) || 0;
+        missingFromPlayerDb = uniqueParticipants - participantsInPlayerDb;
+      } else {
+        // Fallback to manual query with DISTINCT
+        const { data: distinctResult, error: distinctError } = await supabase
+          .from("match_participants")
+          .select("profile_id")
+          .limit(5000); // Reasonable limit to avoid timeouts
+
+        if (!distinctError && distinctResult) {
+          const uniqueProfiles = [...new Set(distinctResult.map(p => p.profile_id))];
+          uniqueParticipants = uniqueProfiles.length;
+
+          // Check how many exist in players table
+          if (uniqueProfiles.length > 0) {
+            const chunks = [];
+            for (let i = 0; i < uniqueProfiles.length; i += 500) {
+              chunks.push(uniqueProfiles.slice(i, i + 500));
+            }
+
+            let foundCount = 0;
+            for (const chunk of chunks.slice(0, 10)) { // Process up to 5000 profiles
+              const { count } = await supabase
+                .from("players")
+                .select("*", { count: "exact", head: true })
+                .in("profile_id", chunk);
+              foundCount += count || 0;
+            }
+            participantsInPlayerDb = foundCount;
+            missingFromPlayerDb = uniqueParticipants - participantsInPlayerDb;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to calculate participant coverage:", err.message);
+    }
+  }
+
+  const coveragePercent = uniqueParticipants > 0 ?
+    Math.round((participantsInPlayerDb / uniqueParticipants) * 100) : 0;
+
+  return {
+    totalMatches,
+    totalParticipants,
+    uniqueParticipants,
+    participantsInPlayerDb,
+    missingFromPlayerDb,
+    coveragePercent,
+    hasMatchData: totalMatches > 0
   };
 }
 
@@ -210,12 +299,13 @@ async function showStatus() {
     console.log("=" + "=".repeat(48));
     console.log();
 
-    const [jobStats, cooldownStats, runStats, playerStats, stuckStats] = await Promise.all([
+    const [jobStats, cooldownStats, runStats, playerStats, stuckStats, matchDataStats] = await Promise.all([
       getJobStats(),
       getCooldownStats(),
       getRunStats(),
       getPlayerDiscoveryStats(),
-      getStuckJobStats()
+      getStuckJobStats(),
+      getMatchDataStats()
     ]);
 
     // Job Queue Overview
@@ -225,6 +315,11 @@ async function showStatus() {
     console.log(`   ⏳ Pending:           ${formatNumber(jobStats.pending)} (${formatPercent(jobStats.pending, jobStats.total)})`);
     console.log(`   🔄 In Progress:       ${formatNumber(jobStats.in_progress)}`);
     console.log(`   ❌ Failed:            ${formatNumber(jobStats.failed)}`);
+
+    if (jobStats.total < 2000) {
+      console.log(`   💡 Note:              Low job count suggests crawling hasn't grown yet`);
+      console.log(`                         (Successfully completed jobs create new jobs)`);
+    }
     console.log();
 
     // Pending Job Details
@@ -255,10 +350,31 @@ async function showStatus() {
     console.log(`   Processing Rate:      ~${runStats.processingRate} jobs/hour`);
     console.log();
 
-    // Player Discovery
-    console.log("👥 Player Activity:");
+    // Player Discovery & Coverage
+    console.log("👥 Player Database Coverage:");
+    console.log(`   Total Players:        ${formatNumber(playerStats.totalPlayers)}`);
+    console.log(`   Ever Crawled:         ${formatNumber(playerStats.totalWithActivity)} (${formatPercent(playerStats.totalWithActivity, playerStats.totalPlayers)})`);
+    console.log(`   Never Crawled:        ${formatNumber(playerStats.neverCrawled)} (${formatPercent(playerStats.neverCrawled, playerStats.totalPlayers)})`);
     console.log(`   Seen Last 24h:        ${formatNumber(playerStats.recentDay)} players`);
     console.log(`   Seen Last Week:       ${formatNumber(playerStats.recentWeek)} players`);
+    console.log();
+
+    // Match Data & Participant Coverage
+    console.log("📈 Match Data Status:");
+    if (!matchDataStats.hasMatchData) {
+      console.log("   Status:               ⚠️  No match data collected yet");
+      console.log("   Reason:               Jobs failing or not completing successfully");
+      console.log("   Solution:             Fix failing jobs, run cleanup if needed");
+    } else {
+      console.log(`   Total Matches:        ${formatNumber(matchDataStats.totalMatches)}`);
+      console.log(`   Match Participants:   ${formatNumber(matchDataStats.totalParticipants)} total`);
+      console.log(`   Unique Players:       ${formatNumber(matchDataStats.uniqueParticipants)} in matches`);
+      console.log(`   Found in Players DB:  ${formatNumber(matchDataStats.participantsInPlayerDb)} (${matchDataStats.coveragePercent}%)`);
+
+      if (matchDataStats.missingFromPlayerDb > 0) {
+        console.log(`   Missing from DB:      ${formatNumber(matchDataStats.missingFromPlayerDb)} players need to be added`);
+      }
+    }
     console.log();
 
     // Last Run Details
