@@ -6,7 +6,7 @@ type RawStat = { statgroup_id: number, rank: number, rating: number, wins: numbe
 export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
-  country?: string; lastMatchDate?: Date; faction?: string;
+  country?: string; lastMatchDate?: Date; faction?: string; level?: number;
 };
 
 export type Leaderboard = {

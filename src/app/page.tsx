@@ -7,6 +7,7 @@ import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
+import { getLevelFromXP } from "@/lib/xp-levels";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -595,11 +596,24 @@ export default function Home() {
       return;
     }
 
-    const fallback = leaderboards.find(lb => lb.matchType === selectedMatchType && lb.faction && lb.faction !== 'Unknown');
-    if (fallback?.faction && fallback.faction !== selectedFaction) {
-      setSelectedFaction(fallback.faction);
+    // For non-1v1 modes, only switch faction if current faction is not available
+    const availableFactionsForMode = Array.from(
+      new Set(
+        leaderboards
+          .filter(lb => lb.matchType === selectedMatchType && lb.faction && lb.faction !== 'Unknown')
+          .map(lb => lb.faction)
+      )
+    );
+
+    if (availableFactionsForMode.length > 0 && !availableFactionsForMode.includes(selectedFaction)) {
+      // Only switch if current faction is not available for this match type
+      const firstAvailable = availableFactionsForMode[0];
+      if (firstAvailable) {
+        setSelectedFaction(firstAvailable);
+      }
     }
-  }, [selectedMatchType, leaderboards, selectedFaction, availableFactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatchType, leaderboards]); // Only run when match type or leaderboards change
 
   // Update selected ID when filters change OR when leaderboards first load
   useEffect(() => {
@@ -1707,6 +1721,11 @@ export default function Home() {
                           >
                             {row.playerName}
                           </button>
+                          {row.level && (
+                            <span className="text-xs text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">
+                              Lv. {row.level}
+                            </span>
+                          )}
                         </div>
                       </td>
                       {isCombinedMode && (
@@ -1756,6 +1775,11 @@ export default function Home() {
                       >
                         {row.playerName}
                       </button>
+                      {row.level && (
+                        <span className="text-xs text-neutral-400 bg-neutral-800 px-1 py-0.5 rounded">
+                          {row.level}
+                        </span>
+                      )}
                       {isCombinedMode && (
                         <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
                           <FactionLogo faction={row.faction || undefined} size={14} />
@@ -1855,10 +1879,10 @@ export default function Home() {
                                 <FlagIcon countryCode={result.personalStats.profile.country} />
                               </div>
                             )}
-                            {typeof result.personalStats?.profile?.level === 'number' && (
+                            {(typeof result.personalStats?.profile?.xp === 'number') && (
                               <div className="flex items-center gap-1 text-xs">
                                 <span className="text-neutral-400">Level</span>
-                                <span className="text-white">{result.personalStats.profile.level}</span>
+                                <span className="text-white">{getLevelFromXP(result.personalStats.profile.xp)}</span>
                               </div>
                             )}
                             {typeof result.personalStats?.profile?.xp === 'number' && (
@@ -2229,8 +2253,8 @@ export default function Home() {
                   const profile = result?.personalStats?.profile;
                   const displayName = result?.playerName || profile?.alias || entry.playerName || entry.alias;
                   const countryCode = profile?.country || entry.country;
-                  const level = typeof profile?.level === 'number' ? profile.level : undefined;
                   const xp = typeof profile?.xp === 'number' ? profile.xp : undefined;
+                  const level = xp ? getLevelFromXP(xp) : undefined;
                   const lastUpdated = result?.lastUpdated;
                   const isFavorite = Boolean(favorites[entry.key]);
                   const errorMessage = error === 'not_found'
