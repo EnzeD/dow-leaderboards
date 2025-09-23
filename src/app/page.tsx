@@ -379,11 +379,11 @@ export default function Home() {
 
   // Search tab state
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchProfileId, setSearchProfileId] = useState<string | undefined>(undefined);
+  const [_searchProfileId, _setSearchProfileId] = useState<string | undefined>(undefined);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
+  const [_selectedPlayer, _setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [lbExpanded, setLbExpanded] = useState(false);
   const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
@@ -530,7 +530,7 @@ export default function Home() {
     if (initialFromUrl.view === 'search') {
       setActiveTab('search');
       if (typeof initialFromUrl.searchQuery === 'string') setSearchQuery(initialFromUrl.searchQuery);
-      if (typeof initialFromUrl.searchProfileId === 'string') setSearchProfileId(initialFromUrl.searchProfileId);
+      if (typeof initialFromUrl.searchProfileId === 'string') _setSearchProfileId(initialFromUrl.searchProfileId);
       // kick off search on first load if q is present
       if (initialFromUrl.searchQuery) {
         try {
@@ -563,7 +563,7 @@ export default function Home() {
     };
     syncUrl(initialState);
 
-    const onPopState = (e: PopStateEvent) => {
+    const onPopState = (_e: PopStateEvent) => {
       // Prefer URL params for source of truth
       const fromUrl = parseStateFromUrl();
       if (fromUrl.view) setActiveTab(fromUrl.view);
@@ -843,7 +843,7 @@ export default function Home() {
     // If we have a profile ID, use the precise search method
     if (profileId) {
       setSearchQuery(q);
-      setSearchProfileId(profileId);
+      _setSearchProfileId(profileId);
 
       try {
         setSearchLoading(true);
@@ -894,16 +894,16 @@ export default function Home() {
       }
     } else {
       // No profile ID provided, use original search and clear profile ID
-      setSearchProfileId(undefined);
+      _setSearchProfileId(undefined);
       await handlePlayerSearch(q, { pushHistory: true });
     }
   };
 
   // Handlers for autocomplete search component
   const handleAutocompletePlayerSelect = async (player: PlayerSearchResult) => {
-    setSelectedPlayer(player);
+    _setSelectedPlayer(player);
     setSearchQuery(player.current_alias);
-    setSearchProfileId(player.profile_id);
+    _setSearchProfileId(player.profile_id);
 
     // Use the rich existing search API and filter results by profile ID
     try {
