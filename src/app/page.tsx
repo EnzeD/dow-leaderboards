@@ -1266,7 +1266,8 @@ export default function Home() {
       } catch {}
 
       setPlayerCountLoading(true);
-      fetch('/api/steam/players', { cache: 'no-store' })
+      // Fetch static JSON file instead of API endpoint
+      fetch('/player-count.json', { cache: 'no-store' })
         .then(r => r.json())
         .then(data => {
           if (cancelled) return;
