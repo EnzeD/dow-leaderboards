@@ -596,11 +596,21 @@ export default function Home() {
       return;
     }
 
-    const fallback = leaderboards.find(lb => lb.matchType === selectedMatchType && lb.faction && lb.faction !== 'Unknown');
-    if (fallback?.faction && fallback.faction !== selectedFaction) {
-      setSelectedFaction(fallback.faction);
+    // For non-1v1 modes, only switch faction if current faction is not available
+    const availableFactionsForMode = Array.from(
+      new Set(
+        leaderboards
+          .filter(lb => lb.matchType === selectedMatchType && lb.faction && lb.faction !== 'Unknown')
+          .map(lb => lb.faction)
+      )
+    );
+
+    if (availableFactionsForMode.length > 0 && !availableFactionsForMode.includes(selectedFaction)) {
+      // Only switch if current faction is not available for this match type
+      setSelectedFaction(availableFactionsForMode[0]);
     }
-  }, [selectedMatchType, leaderboards, selectedFaction, availableFactions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMatchType, leaderboards]); // Only run when match type or leaderboards change
 
   // Update selected ID when filters change OR when leaderboards first load
   useEffect(() => {
