@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         current_alias,
         country,
         steam_id64,
+        calculated_level,
         level,
         xp
       `)
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
         current_alias: player.current_alias || '',
         country: player.country,
         steam_id64: player.steam_id64,
-        level: player.level,
+        level: player.calculated_level || player.level,
         xp: player.xp
       }))
       .sort((a, b) => {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PlayerSearchResult } from '@/lib/supabase';
+import { getLevelFromXP } from '@/lib/xp-levels';
 
 type AutocompleteSearchProps = {
   value: string;
@@ -223,9 +224,9 @@ export default function AutocompleteSearch({
                 {player.country && (
                   <FlagIcon countryCode={player.country} />
                 )}
-                {player.level && (
+                {(player.level || player.xp) && (
                   <span className="text-xs text-neutral-400">
-                    Lv. {player.level}
+                    Lv. {player.level || getLevelFromXP(player.xp)}
                   </span>
                 )}
               </div>
