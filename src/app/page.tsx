@@ -1248,7 +1248,7 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
     const PLAYER_COUNT_CACHE_KEY = 'dow_player_count';
-    const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes (API caches for 30 min in Supabase)
+    const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes (matches Supabase cron refresh)
 
     const load = () => {
       // Check localStorage cache first for instant display

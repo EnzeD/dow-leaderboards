@@ -53,12 +53,28 @@ Production is available at `https://www.dow-de.com`.
 
 ### Steam Player Count
 
-The site shows the live Steam player count in the header. It uses Steam’s
-`GetNumberOfCurrentPlayers` and defaults to the Dawn of War: Definitive Edition
-App ID `3556750` — no configuration required.
+The live player badge is now backed by a Supabase Edge Function so Vercel only
+serves cached JSON. The `steam-player-count` function polls Steam’s
+`GetNumberOfCurrentPlayers` for the app specified in `STEAM_APP_ID` (defaults to
+`4570`, Dawn of War: DE), writes the result into the `steam_player_count` table,
+and the Next.js route simply reads that cached row.
 
-If you want to override it for another app, you may set `STEAM_APP_ID_DOW_DE`
-in your environment, but this is optional.
+Setup (no CLI required):
+
+1. In the Supabase Dashboard open **Edge Functions → New function**, name it
+   `steam-player-count`, choose **Import from file**, and upload
+   `supabase/functions/steam-player-count/index.ts` from this repo.
+2. Still in the function view, add the secrets under **Settings → Environment
+   variables**: set `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`,
+   `STEAM_APP_ID` (defaults to `4570` if omitted), and optionally
+   `STEAM_TIMEOUT_MS` for a custom Steam request timeout.
+3. Publish the function from the dashboard.
+4. Schedule it via **Edge Functions → Schedules → New schedule**, choose the
+   `steam-player-count` function, and set a cron like `*/5 * * * *` to poll every
+   five minutes.
+
+Once the schedule is active the table stays fresh, and `/api/steam/players`
+becomes a read-only, revalidated cache hit for the UI.
 
 ### Build for Production
 
