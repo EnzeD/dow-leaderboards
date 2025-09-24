@@ -1,4 +1,5 @@
 import { fetchCombined1v1Max, resolveNames } from "@/lib/relic";
+import { getLatestRankMap } from "@/lib/rank-history";
 import { supabase } from "@/lib/supabase";
 import { getLevelFromXP } from "@/lib/xp-levels";
 
@@ -57,6 +58,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
       if (levelMap.has(key)) {
         (r as any).level = levelMap.get(key);
       }
+    }
+
+    const previousRanks = await getLatestRankMap(0);
+    for (const r of limitedRows) {
+      const prevRank = previousRanks.get(String(r.profileId));
+      (r as any).rankDelta = typeof prevRank === "number" ? prevRank - r.rank : null;
     }
 
     return Response.json({

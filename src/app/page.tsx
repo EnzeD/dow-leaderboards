@@ -227,6 +227,76 @@ const FactionLogo = ({ faction, size = 16, className = '', yOffset }: { faction?
   );
 };
 
+type RankDeltaVariant = "up" | "down" | "new" | "same";
+
+const RANK_DELTA_VARIANT_CLASS: Record<RankDeltaVariant, string> = {
+  up: "text-green-300 bg-green-900/40 border border-green-500/30",
+  down: "text-red-300 bg-red-900/40 border border-red-500/30",
+  new: "text-sky-300 bg-sky-900/40 border border-sky-500/30",
+  same: "text-neutral-200 bg-neutral-800/70 border border-neutral-600/40",
+};
+
+type RankDeltaMeta = { text: string; title: string; variant: RankDeltaVariant };
+
+const resolveRankDeltaMeta = (delta?: number | null, allowNew = true): RankDeltaMeta | null => {
+  if (delta === null || delta === undefined) {
+    if (!allowNew) return null;
+    return { text: "NEW", title: "New entry", variant: "new" };
+  }
+
+  if (delta === 0) {
+    return {
+      text: "=",
+      title: "No rank change",
+      variant: "same",
+    };
+  }
+
+  const magnitude = Math.abs(Math.round(delta));
+  if (magnitude === 0) return null;
+
+  if (delta > 0) {
+    return {
+      text: `↑${magnitude}`,
+      title: `Up ${magnitude} place${magnitude === 1 ? '' : 's'}`,
+      variant: "up",
+    };
+  }
+
+  return {
+    text: `↓${magnitude}`,
+    title: `Down ${magnitude} place${magnitude === 1 ? '' : 's'}`,
+    variant: "down",
+  };
+};
+
+const RankDeltaBadge = ({
+  delta,
+  hasHistory,
+  size = "md",
+}: {
+  delta?: number | null;
+  hasHistory: boolean;
+  size?: "md" | "sm";
+}) => {
+  const meta = resolveRankDeltaMeta(delta, hasHistory);
+  if (!meta) return null;
+
+  const sizeClasses = size === "sm"
+    ? "px-1.5 py-0.5 text-[0.65rem]"
+    : "px-2 py-0.5 text-xs";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full font-semibold tracking-tight ${sizeClasses} ${RANK_DELTA_VARIANT_CLASS[meta.variant]}`}
+      title={meta.title}
+      aria-label={meta.title}
+    >
+      {meta.text}
+    </span>
+  );
+};
+
 const RACE_ID_TO_FACTION: Record<number, string> = {
   0: 'Chaos',
   1: 'Dark Eldar',
@@ -656,7 +726,7 @@ export default function Home() {
       setSortDesc(!sortDesc);
     } else {
       setSortField(field);
-      setSortDesc(field === "playerName"); // desc for strings
+      setSortDesc(field === "playerName" || field === "rankDelta");
     }
   };
 
@@ -669,25 +739,33 @@ export default function Home() {
   }) || [];
 
   const sortedRows = [...filteredRows].sort((a, b) => {
-    const aVal = a[sortField];
-    const bVal = b[sortField];
     let comparison = 0;
 
-    if (typeof aVal === "string" && typeof bVal === "string") {
-      comparison = aVal.localeCompare(bVal);
-    } else if (aVal instanceof Date && bVal instanceof Date) {
-      comparison = aVal.getTime() - bVal.getTime();
-    } else if (sortField === "lastMatchDate") {
-      // Special handling for date field
-      const aTime = aVal instanceof Date ? aVal.getTime() : 0;
-      const bTime = bVal instanceof Date ? bVal.getTime() : 0;
+    if (sortField === "lastMatchDate") {
+      const aTime = a.lastMatchDate instanceof Date ? a.lastMatchDate.getTime() : 0;
+      const bTime = b.lastMatchDate instanceof Date ? b.lastMatchDate.getTime() : 0;
       comparison = aTime - bTime;
+    } else if (sortField === "rankDelta") {
+      const normalize = (value: number | null | undefined) =>
+        typeof value === "number" ? value : Number.NEGATIVE_INFINITY;
+      comparison = normalize(a.rankDelta) - normalize(b.rankDelta);
     } else {
-      comparison = (aVal as number) - (bVal as number);
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        comparison = aVal.localeCompare(bVal);
+      } else {
+        const numA = typeof aVal === "number" ? aVal : Number(aVal ?? 0);
+        const numB = typeof bVal === "number" ? bVal : Number(bVal ?? 0);
+        comparison = numA - numB;
+      }
     }
 
     return sortDesc ? -comparison : comparison;
   });
+
+  const hasRankDeltaData = sortedRows.some(row => typeof row.rankDelta === "number");
 
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
 
@@ -1725,6 +1803,7 @@ export default function Home() {
                   <tr>
                     {[
                       { key: "rank", label: "Rank" },
+                      { key: "rankDelta", label: "↑↓" },
                       { key: "playerName", label: "Alias" },
                       ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
                       { key: "rating", label: "ELO" },
@@ -1736,7 +1815,7 @@ export default function Home() {
                     ].map(({ key, label }) => (
                       <th
                         key={key}
-                        className="px-4 py-3 text-left cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 whitespace-nowrap"
+                        className={`py-3 ${key === "rank" || key === "rankDelta" ? "px-3" : "px-4"} ${key === "rankDelta" ? "text-center" : "text-left"} cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 whitespace-nowrap ${key === "rank" || key === "rankDelta" ? "w-16" : ""}`}
                         onClick={() => handleSort(key as keyof LadderRow)}
                       >
                         {label}
@@ -1750,13 +1829,16 @@ export default function Home() {
                 <tbody>
                   {sortedRows.map((row, i) => (
                     <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
-                      <td className={`px-4 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20`}>
-                        <div className="flex items-center gap-2">
+                      <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20 w-16`}> 
+                        <div className="flex items-center gap-1">
                           <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
                           <span className="font-bold">
                             {row.rank}
                           </span>
                         </div>
+                      </td>
+                      <td className="px-3 py-3 border-r border-neutral-600/20 text-center align-middle w-16">
+                        <RankDeltaBadge delta={row.rankDelta} hasHistory={hasRankDeltaData} />
                       </td>
                       <td className={`px-4 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20 min-w-0`}>
                         <div className="flex items-center gap-2">
@@ -1809,8 +1891,10 @@ export default function Home() {
                     {/* Rank */}
                     <div className={`flex items-center gap-1 ${getRankColor(row.rank)} shrink-0`}>
                       <span className="text-xs">{getTierIndicator(row.rank)}</span>
-                      <span className="font-bold text-xs">#{row.rank}</span>
+                      <span className="font-bold text-xs">{row.rank}</span>
                     </div>
+
+                    <RankDeltaBadge delta={row.rankDelta} hasHistory={hasRankDeltaData} size="sm" />
 
                     {/* Player Name with Flag */}
                     <div className={`flex items-center gap-1 min-w-0 flex-1 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white"}`}>

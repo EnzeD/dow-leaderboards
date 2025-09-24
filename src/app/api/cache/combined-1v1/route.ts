@@ -1,4 +1,5 @@
 import { fetchCombined1v1Max, resolveNames } from "@/lib/relic";
+import { getLatestRankMap } from "@/lib/rank-history";
 import { supabase } from "@/lib/supabase";
 import { getLevelFromXP } from "@/lib/xp-levels";
 // This route reads request.url (query params). Mark dynamic to avoid static export errors.
@@ -62,6 +63,11 @@ export async function GET(request: Request) {
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
 
     const limited = rows.slice(0, limit);
+    const previousRanks = await getLatestRankMap(0);
+    for (const r of limited) {
+      const prevRank = previousRanks.get(String(r.profileId));
+      (r as any).rankDelta = typeof prevRank === "number" ? prevRank - r.rank : null;
+    }
 
     return Response.json({
       leaderboardId: "combined-1v1",

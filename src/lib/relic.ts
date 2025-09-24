@@ -51,6 +51,7 @@ export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
   country?: string; lastMatchDate?: Date; faction?: string; level?: number;
+  rankDelta?: number | null;
 };
 
 export type Leaderboard = {

@@ -1,6 +1,7 @@
 import { fetchLeaderboardRows, resolveNames } from "@/lib/relic";
 import { supabase } from "@/lib/supabase";
 import { getLevelFromXP } from "@/lib/xp-levels";
+import { getLatestRankMap } from "@/lib/rank-history";
 
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
   const idNum = Number(ctx.params?.id ?? 0);
@@ -49,6 +50,12 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
       if (levelMap.has(key)) {
         (r as any).level = levelMap.get(key);
       }
+    }
+
+    const previousRanks = await getLatestRankMap(idNum);
+    for (const r of rows) {
+      const prevRank = previousRanks.get(String(r.profileId));
+      (r as any).rankDelta = typeof prevRank === "number" ? prevRank - r.rank : null;
     }
 
     return Response.json({
