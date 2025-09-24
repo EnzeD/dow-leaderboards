@@ -1267,29 +1267,31 @@ export default function Home() {
 
       setPlayerCountLoading(true);
       // Fetch static JSON file instead of API endpoint
-      fetch('/player-count.json', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(data => {
+      // Use client-side fetching with CORS proxy to eliminate edge requests
+      import('../lib/steam-client').then(async ({ fetchPlayerCountClient, cachePlayerCount }) => {
+        if (cancelled) return;
+        try {
+          const { playerCount } = await fetchPlayerCountClient();
           if (cancelled) return;
-          const count = typeof data?.playerCount === 'number' ? data.playerCount : null;
-          setPlayerCount(count);
+          setPlayerCount(playerCount);
           setPlayerCountLoading(false);
 
           // Cache in localStorage
-          if (count !== null) {
+          if (playerCount !== null) {
+            cachePlayerCount(playerCount);
             try {
               localStorage.setItem(PLAYER_COUNT_CACHE_KEY, JSON.stringify({
-                count,
+                count: playerCount,
                 timestamp: Date.now()
               }));
             } catch {}
           }
-        })
-        .catch(() => {
+        } catch {
           if (cancelled) return;
           setPlayerCount(null);
           setPlayerCountLoading(false);
-        });
+        }
+      });
     };
     load();
     const id = setInterval(load, CACHE_DURATION_MS);
