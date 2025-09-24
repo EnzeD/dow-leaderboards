@@ -73,8 +73,10 @@ Setup (no CLI required):
    `steam-player-count` function, and set a cron like `*/5 * * * *` to poll every
    five minutes.
 
-Once the schedule is active the table stays fresh, and `/api/steam/players`
-becomes a read-only, revalidated cache hit for the UI.
+Once the schedule is active the table stays fresh. The UI now reads the
+`steam_player_count` row directly via Supabase, keeping Vercel edge traffic
+minimal. The `/api/steam/players` route remains available if you need an HTTP
+endpoint for other clients.
 
 ### Build for Production
 

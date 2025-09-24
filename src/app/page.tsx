@@ -5,7 +5,7 @@ import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
-import { PlayerSearchResult } from "@/lib/supabase";
+import { PlayerSearchResult, supabase } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 import { getLevelFromXP } from "@/lib/xp-levels";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
@@ -1250,7 +1250,7 @@ export default function Home() {
     const PLAYER_COUNT_CACHE_KEY = 'dow_player_count';
     const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes (matches Supabase cron refresh)
 
-    const load = () => {
+    const load = async () => {
       // Check localStorage cache first for instant display
       try {
         const cached = localStorage.getItem(PLAYER_COUNT_CACHE_KEY);
@@ -1266,34 +1266,42 @@ export default function Home() {
       } catch {}
 
       setPlayerCountLoading(true);
-      // Fetch from API (which uses Supabase cache)
-      fetch('/api/steam/players', { cache: 'no-store' })
-        .then(r => r.json())
-        .then(data => {
-          if (cancelled) return;
-          const count = typeof data?.playerCount === 'number' ? data.playerCount : null;
-          setPlayerCount(count);
-          setPlayerCountLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('steam_player_count')
+          .select('player_count, updated_at')
+          .eq('id', 1)
+          .maybeSingle();
 
-          // Cache in localStorage
-          if (count !== null) {
-            try {
-              localStorage.setItem(PLAYER_COUNT_CACHE_KEY, JSON.stringify({
-                count,
-                timestamp: Date.now()
-              }));
-            } catch {}
-          }
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setPlayerCount(null);
-          setPlayerCountLoading(false);
-        });
+        if (cancelled) return;
+
+        if (error) {
+          throw error;
+        }
+
+        const count = typeof data?.player_count === 'number' ? data.player_count : null;
+        setPlayerCount(count);
+        setPlayerCountLoading(false);
+
+        if (count !== null) {
+          try {
+            localStorage.setItem(PLAYER_COUNT_CACHE_KEY, JSON.stringify({
+              count,
+              timestamp: Date.now()
+            }));
+          } catch {}
+        }
+      } catch {
+        if (cancelled) return;
+        setPlayerCount(null);
+        setPlayerCountLoading(false);
+      }
     };
 
     load();
-    const id = setInterval(load, CACHE_DURATION_MS);
+    const id = setInterval(() => {
+      load();
+    }, CACHE_DURATION_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, []);
 
