@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { supabase, type PlayerSearchResult } from '@/lib/supabase';
+import { getLevelFromXP } from '@/lib/xp-levels';
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,8 +24,6 @@ export async function GET(request: NextRequest) {
         current_alias,
         country,
         steam_id64,
-        calculated_level,
-        level,
         xp
       `)
       .not('current_alias', 'is', null)
@@ -47,7 +46,7 @@ export async function GET(request: NextRequest) {
         current_alias: player.current_alias || '',
         country: player.country,
         steam_id64: player.steam_id64,
-        level: player.calculated_level || player.level,
+        level: getLevelFromXP(player.xp ?? undefined),
         xp: player.xp
       }))
       .sort((a, b) => {

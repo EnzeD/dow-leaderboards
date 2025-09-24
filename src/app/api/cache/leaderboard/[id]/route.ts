@@ -1,5 +1,6 @@
 import { fetchLeaderboardRows, resolveNames } from "@/lib/relic";
 import { supabase } from "@/lib/supabase";
+import { getLevelFromXP } from "@/lib/xp-levels";
 
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
   const idNum = Number(ctx.params?.id ?? 0);
@@ -23,7 +24,7 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
       } else {
         const { data: players, error } = await supabase
           .from('players')
-          .select('profile_id, calculated_level, xp')
+          .select('profile_id, xp')
           .in('profile_id', profileIds);
 
         if (error) {
@@ -31,18 +32,9 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
           console.error('Profile IDs attempted:', profileIds.slice(0, 5));
         } else if (players && players.length > 0) {
         players.forEach(player => {
-          // Use calculated_level from database, not the API
-          const level = player.calculated_level || 1;
+          const level = getLevelFromXP(player.xp ?? undefined);
           levelMap.set(String(player.profile_id), level);
         });
-
-        // Debug: Log level data
-        console.log(`Leaderboard ${idNum}: Found ${players.length} players in DB, levelMap size: ${levelMap.size}`);
-        console.log('Sample player levels:', players.slice(0, 3).map(p => ({
-          id: p.profile_id,
-          calculated_level: p.calculated_level,
-          xp: p.xp
-        })));
         }
       }
     } catch (dbError) {
@@ -53,9 +45,9 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
     // Add level information to each row (will be undefined if DB is down)
     for (const r of rows) {
       // Use database level if available, otherwise don't set level
-      const dbLevel = levelMap.get(String(r.profileId));
-      if (dbLevel) {
-        (r as any).level = dbLevel;
+      const key = String(r.profileId);
+      if (levelMap.has(key)) {
+        (r as any).level = levelMap.get(key);
       }
     }
 

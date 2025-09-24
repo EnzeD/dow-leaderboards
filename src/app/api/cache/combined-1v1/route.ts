@@ -1,5 +1,6 @@
 import { fetchCombined1v1Max, resolveNames } from "@/lib/relic";
 import { supabase } from "@/lib/supabase";
+import { getLevelFromXP } from "@/lib/xp-levels";
 // This route reads request.url (query params). Mark dynamic to avoid static export errors.
 export const dynamic = 'force-dynamic';
 
@@ -29,15 +30,14 @@ export async function GET(request: Request) {
         for (const chunk of chunks) {
           const { data: players, error } = await supabase
             .from('players')
-            .select('profile_id, calculated_level, xp')
+            .select('profile_id, xp')
             .in('profile_id', chunk);
 
           if (error) {
             console.error('Error fetching player levels chunk:', error);
           } else if (players && players.length > 0) {
             players.forEach(player => {
-              // Use calculated_level from database, not the API
-              const level = player.calculated_level || 1;
+              const level = getLevelFromXP(player.xp ?? undefined);
               levelMap.set(String(player.profile_id), level);
             });
           }
@@ -51,9 +51,9 @@ export async function GET(request: Request) {
     // Add level information to each row (will be undefined if DB is down)
     for (const r of rows) {
       // Use database level if available, otherwise don't set level
-      const dbLevel = levelMap.get(String(r.profileId));
-      if (dbLevel) {
-        (r as any).level = dbLevel;
+      const key = String(r.profileId);
+      if (levelMap.has(key)) {
+        (r as any).level = levelMap.get(key);
       }
     }
 
