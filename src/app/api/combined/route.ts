@@ -2,6 +2,8 @@ import { fetchCombined1v1, resolveNames } from "@/lib/relic";
 import { supabase } from "@/lib/supabase";
 import { getLevelFromXP } from "@/lib/xp-levels";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const rows = await fetchCombined1v1();
