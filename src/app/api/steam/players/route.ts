@@ -109,7 +109,7 @@ export async function GET() {
         .eq('id', 1)
         .single();
 
-      if (stale?.player_count !== null) {
+      if (stale && stale.player_count !== null) {
         return Response.json(
           {
             appId: STEAM_APP_ID,

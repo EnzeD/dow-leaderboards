@@ -16,6 +16,12 @@ CREATE POLICY "Allow public read access" ON steam_player_count
   FOR SELECT
   USING (true);
 
+-- Allow public write access (for upsert operations)
+CREATE POLICY "Allow public write access" ON steam_player_count
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
 -- Insert initial row
 INSERT INTO steam_player_count (id, app_id, player_count, success)
 VALUES (1, '3556750', NULL, false)
