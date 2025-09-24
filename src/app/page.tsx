@@ -1317,7 +1317,7 @@ export default function Home() {
               <div className="flex flex-1 items-center gap-3 min-w-0">
                 <Link
                   href="/"
-                  className="flex-shrink-0"
+                  className="flex-shrink-0 block"
                   aria-label="Go to home"
                 >
                   <img
