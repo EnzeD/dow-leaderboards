@@ -391,7 +391,7 @@ export default function Home() {
   const [favoriteData, setFavoriteData] = useState<Record<string, FavoriteDataEntry>>({});
   const [favoritesLoading, setFavoritesLoading] = useState(false);
 
-  // Live Steam player count (DoW:DE)
+  // Live Steam player count (DoW:DE) - Cached via Supabase
   const [playerCount, setPlayerCount] = useState<number | null>(null);
   const [playerCountLoading, setPlayerCountLoading] = useState<boolean>(false);
 
@@ -1244,14 +1244,14 @@ export default function Home() {
     };
   }, [activeTab, favorites, favoriteData]);
 
-  // Fetch and poll current Steam player count (every minute)
+  // Fetch and poll current Steam player count (cached via Supabase)
   useEffect(() => {
     let cancelled = false;
     const PLAYER_COUNT_CACHE_KEY = 'dow_player_count';
-    const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+    const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes (API caches for 30 min in Supabase)
 
     const load = () => {
-      // Check localStorage cache first
+      // Check localStorage cache first for instant display
       try {
         const cached = localStorage.getItem(PLAYER_COUNT_CACHE_KEY);
         if (cached) {
@@ -1266,33 +1266,32 @@ export default function Home() {
       } catch {}
 
       setPlayerCountLoading(true);
-      // Fetch static JSON file instead of API endpoint
-      // Use client-side fetching with CORS proxy to eliminate edge requests
-      import('../lib/steam-client').then(async ({ fetchPlayerCountClient, cachePlayerCount }) => {
-        if (cancelled) return;
-        try {
-          const { playerCount } = await fetchPlayerCountClient();
+      // Fetch from API (which uses Supabase cache)
+      fetch('/api/steam/players', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(data => {
           if (cancelled) return;
-          setPlayerCount(playerCount);
+          const count = typeof data?.playerCount === 'number' ? data.playerCount : null;
+          setPlayerCount(count);
           setPlayerCountLoading(false);
 
           // Cache in localStorage
-          if (playerCount !== null) {
-            cachePlayerCount(playerCount);
+          if (count !== null) {
             try {
               localStorage.setItem(PLAYER_COUNT_CACHE_KEY, JSON.stringify({
-                count: playerCount,
+                count,
                 timestamp: Date.now()
               }));
             } catch {}
           }
-        } catch {
+        })
+        .catch(() => {
           if (cancelled) return;
           setPlayerCount(null);
           setPlayerCountLoading(false);
-        }
-      });
+        });
     };
+
     load();
     const id = setInterval(load, CACHE_DURATION_MS);
     return () => { cancelled = true; clearInterval(id); };
