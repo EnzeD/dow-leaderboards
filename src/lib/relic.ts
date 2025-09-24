@@ -1,5 +1,49 @@
 const BASE = "https://dow-api.reliclink.com";
 
+const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
+const MAX_FETCH_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 400;
+
+type FetchOptions = RequestInit & { next?: { revalidate?: number } };
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchJsonWithRetry<T = unknown>(url: string, init?: FetchOptions, retries = MAX_FETCH_RETRIES): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, init);
+
+      if (!response.ok) {
+        const retriable = RETRYABLE_STATUS_CODES.has(response.status);
+
+        if (!retriable || attempt === retries - 1) {
+          const errorBody = await response.text().catch(() => "");
+          throw new Error(`Request to ${url} failed with ${response.status} ${response.statusText}${errorBody ? `: ${errorBody}` : ""}`);
+        }
+
+        console.warn(`Retryable response ${response.status} from ${url} (attempt ${attempt + 1}/${retries})`);
+        await delay(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+        continue;
+      }
+
+      return await response.json() as T;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === retries - 1) {
+        throw error instanceof Error ? error : new Error(String(error));
+      }
+
+      console.warn(`Fetch attempt ${attempt + 1} for ${url} failed, retrying...`, error);
+      await delay(RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`Request to ${url} failed after ${retries} attempts`);
+}
+
 type RawGroup = { id: number, members: Array<{ profile_id: number, alias?: string, country?: string }> };
 type RawStat = { statgroup_id: number, rank: number, rating: number, wins: number, losses: number, streak: number, lastmatchdate?: number };
 
@@ -46,7 +90,7 @@ export function getFactionFromLeaderboardId(leaderboards: Leaderboard[], leaderb
 
 export async function fetchLeaderboards() {
   const url = `${BASE}/community/leaderboard/GetAvailableLeaderboards?title=dow1-de`;
-  const data = await fetch(url, { cache: "force-cache" }).then(r => r.json());
+  const data = await fetchJsonWithRetry<any>(url, { cache: "force-cache" });
   const items: Leaderboard[] = (data?.leaderboards ?? []).map((l: any) => ({
     id: l.id,
     name: l.name,
@@ -58,7 +102,7 @@ export async function fetchLeaderboards() {
 
 export async function fetchTop100(leaderboardId: number) {
   const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=1&count=100&sortBy=1`;
-  const data = await fetch(url, { next: { revalidate: 60 } }).then(r => r.json());
+  const data = await fetchJsonWithRetry<any>(url, { next: { revalidate: 60 } });
 
   const groups: RawGroup[] = data?.statGroups ?? [];
   // Some games include a parallel "leaderboardStats" array. Prefer it when present.
@@ -122,36 +166,41 @@ export async function fetchLeaderboardRows(leaderboardId: number, count: number 
     const chunkResults = await Promise.all(
       chunk.map(async ({ start, count: currentCount }) => {
         const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=${start}&count=${currentCount}&sortBy=1`;
-        const data = await fetch(url, { next: { revalidate: 60 } }).then(r => r.json());
+        try {
+          const data = await fetchJsonWithRetry<any>(url, { next: { revalidate: 60 } });
 
-        const groups: RawGroup[] = data?.statGroups ?? [];
-        const stats: RawStat[] = data?.leaderboardStats ?? [];
-        if (!groups.length || !stats.length) return [];
+          const groups: RawGroup[] = data?.statGroups ?? [];
+          const stats: RawStat[] = data?.leaderboardStats ?? [];
+          if (!groups.length || !stats.length) return [];
 
-        const groupsById = new Map(groups.map(g => [g.id, g]));
-        const rows: LadderRow[] = stats
-          .filter(s => s?.statgroup_id)
-          .map(s => {
-            const group = groupsById.get(s.statgroup_id);
-            const member = group?.members?.[0];
-            const profileId = String(member?.profile_id ?? "");
-            const alias = member?.alias?.trim();
-            const winrate = (s.wins + s.losses) ? +(((s.wins / (s.wins + s.losses)) * 100).toFixed(1)) : 0;
-            const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
-            return {
-              rank: s.rank ?? 0,
-              profileId,
-              playerName: alias || "",
-              rating: s.rating ?? 0,
-              wins: s.wins ?? 0,
-              losses: s.losses ?? 0,
-              winrate,
-              streak: s.streak ?? 0,
-              country: member?.country,
-              lastMatchDate,
-            };
-          }).filter(r => r.profileId);
-        return rows;
+          const groupsById = new Map(groups.map(g => [g.id, g]));
+          const rows: LadderRow[] = stats
+            .filter(s => s?.statgroup_id)
+            .map(s => {
+              const group = groupsById.get(s.statgroup_id);
+              const member = group?.members?.[0];
+              const profileId = String(member?.profile_id ?? "");
+              const alias = member?.alias?.trim();
+              const winrate = (s.wins + s.losses) ? +(((s.wins / (s.wins + s.losses)) * 100).toFixed(1)) : 0;
+              const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
+              return {
+                rank: s.rank ?? 0,
+                profileId,
+                playerName: alias || "",
+                rating: s.rating ?? 0,
+                wins: s.wins ?? 0,
+                losses: s.losses ?? 0,
+                winrate,
+                streak: s.streak ?? 0,
+                country: member?.country,
+                lastMatchDate,
+              };
+            }).filter(r => r.profileId);
+          return rows;
+        } catch (error) {
+          console.warn(`Failed to fetch leaderboard chunk starting at ${start} (size ${currentCount})`, error);
+          return [];
+        }
       })
     );
 
@@ -181,7 +230,7 @@ export async function resolveNames(profileIds: string[]): Promise<Record<string,
   for (let i = 0; i < uniq.length; i += size) {
     const ids = uniq.slice(i, i + size);
     const url = `${BASE}/community/external/proxysteamuserrequest?title=dow1-de&request=/ISteamUser/GetPlayerSummaries/v0002/&profile_ids=${ids.join(",")}`;
-    const data = await fetch(encodeURI(url)).then(r => r.json());
+    const data = await fetchJsonWithRetry<any>(encodeURI(url));
     const players = data?.steamResults?.response?.players ?? [];
     // Some variants also include avatars[] with profile_id→alias; prefer personaname
     for (const p of players) {
