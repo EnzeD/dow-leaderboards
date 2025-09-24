@@ -116,12 +116,6 @@ CREATE TABLE public.match_participants (
   CONSTRAINT match_participants_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id),
   CONSTRAINT match_participants_race_id_fkey FOREIGN KEY (race_id) REFERENCES public.races(id)
 );
-CREATE TABLE public.match_players_raw (
-  match_id bigint NOT NULL,
-  payload jsonb NOT NULL,
-  CONSTRAINT match_players_raw_pkey PRIMARY KEY (match_id),
-  CONSTRAINT match_players_raw_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id)
-);
 CREATE TABLE public.match_report_results (
   match_id bigint NOT NULL,
   profile_id bigint NOT NULL,

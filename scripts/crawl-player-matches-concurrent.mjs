@@ -248,7 +248,6 @@ function parseMatchPayload(data, sourceAlias) {
   const aliasMap = buildAliasMap(data);
   const matches = [];
   const participants = [];
-  const rawPayloads = [];
   const playerMap = new Map();
   const aliasHistoryMap = new Map();
   const discoveredProfiles = new Set();
@@ -288,7 +287,6 @@ function parseMatchPayload(data, sourceAlias) {
     });
 
     const members = Array.isArray(entry?.matchhistorymember) ? entry.matchhistorymember : [];
-    rawPayloads.push({ match_id: matchId, payload: members.length ? members : entry });
 
     for (const member of members) {
       const profileId = parseBigIntish(member?.profile_id ?? member?.profileId);
@@ -357,7 +355,6 @@ function parseMatchPayload(data, sourceAlias) {
   return {
     matches,
     participants,
-    rawPayloads,
     players: Array.from(playerMap.values()),
     aliasHistory: Array.from(aliasHistoryMap.values()),
     discoveredProfiles: Array.from(discoveredProfiles)
@@ -471,7 +468,7 @@ async function processJob(job) {
   }
 
   const parsed = parseMatchPayload(matchPayload, alias);
-  const { matches, participants, players, aliasHistory: aliasRows, discoveredProfiles, rawPayloads } = parsed;
+  const { matches, participants, players, aliasHistory: aliasRows, discoveredProfiles } = parsed;
   const playerMap = new Map(players.map(p => [p.profile_id, p]));
 
   const seenProfiles = new Set(discoveredProfiles);
@@ -492,10 +489,6 @@ async function processJob(job) {
 
     if (participants.length) {
       await chunkedUpsert("match_participants", participants, { onConflict: "match_id,profile_id" });
-    }
-
-    if (rawPayloads.length) {
-      await chunkedUpsert("match_players_raw", rawPayloads, { onConflict: "match_id" });
     }
 
     if (seenProfiles.size) {

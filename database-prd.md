@@ -148,11 +148,6 @@ Establish a persistent Supabase (Postgres) datastore that mirrors and enriches R
   - `team_rating_sigma` (numeric, nullable)
   - Primary key: `(match_id, team_id)`
 
-- `match_players_raw`
-  - `match_id` (bigint references matches)
-  - `payload` (jsonb, compressed via TOAST)
-  - Stores the relevant `matchhistorymember` array for debugging.
-
 ### 6.4 Leaderboard Snapshots
 
 - `leaderboard_snapshots`
@@ -219,7 +214,6 @@ Establish a persistent Supabase (Postgres) datastore that mirrors and enriches R
    - For each match:
      - Upsert `matches` (skip if `match_id` already present).
      - Insert participants and team rows (conflict on PK → update `alias_at_match`, ratings, outcome).
-     - Store raw JSON in `match_players_raw` for traceability.
    - Extract any new `profile_id` values from participants; enqueue new `crawl_jobs` (guard with NOT EXISTS to avoid flooding).
    - Mark job `done`; on API failure, increment `attempts` and reschedule with exponential backoff respecting rate limits.
 3. **Anti-loop controls**:
