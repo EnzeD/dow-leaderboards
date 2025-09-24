@@ -105,44 +105,65 @@ export async function fetchTop100(leaderboardId: number) {
 // Fetch an arbitrary number of rows from a leaderboard (batched by 100)
 export async function fetchLeaderboardRows(leaderboardId: number, count: number = 200) {
   const batchSize = 100;
+  const concurrentRequests = 5; // Process 5 batches at a time
   const all: LadderRow[] = [];
+
+  // Calculate all batch parameters
+  const batches: Array<{start: number, count: number}> = [];
   for (let start = 1; start <= count; start += batchSize) {
     const currentCount = Math.min(batchSize, count - start + 1);
-    const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=${start}&count=${currentCount}&sortBy=1`;
-    const data = await fetch(url, { next: { revalidate: 60 } }).then(r => r.json());
-
-    const groups: RawGroup[] = data?.statGroups ?? [];
-    const stats: RawStat[] = data?.leaderboardStats ?? [];
-    if (!groups.length || !stats.length) break;
-
-    const groupsById = new Map(groups.map(g => [g.id, g]));
-    const rows: LadderRow[] = stats
-      .filter(s => s?.statgroup_id)
-      .map(s => {
-        const group = groupsById.get(s.statgroup_id);
-        const member = group?.members?.[0];
-        const profileId = String(member?.profile_id ?? "");
-        const alias = member?.alias?.trim();
-        const winrate = (s.wins + s.losses) ? +(((s.wins / (s.wins + s.losses)) * 100).toFixed(1)) : 0;
-        const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
-        return {
-          rank: s.rank ?? 0,
-          profileId,
-          playerName: alias || "",
-          rating: s.rating ?? 0,
-          wins: s.wins ?? 0,
-          losses: s.losses ?? 0,
-          winrate,
-          streak: s.streak ?? 0,
-          country: member?.country,
-          lastMatchDate,
-        };
-      }).filter(r => r.profileId);
-
-    all.push(...rows);
-    if (rows.length < currentCount) break; // last page
-    await new Promise(r => setTimeout(r, 100));
+    batches.push({ start, count: currentCount });
   }
+
+  // Process batches in chunks to maintain rate limiting
+  for (let i = 0; i < batches.length; i += concurrentRequests) {
+    const chunk = batches.slice(i, i + concurrentRequests);
+
+    const chunkResults = await Promise.all(
+      chunk.map(async ({ start, count: currentCount }) => {
+        const url = `${BASE}/community/leaderboard/getLeaderBoard2?title=dow1-de&leaderboard_id=${leaderboardId}&start=${start}&count=${currentCount}&sortBy=1`;
+        const data = await fetch(url, { next: { revalidate: 60 } }).then(r => r.json());
+
+        const groups: RawGroup[] = data?.statGroups ?? [];
+        const stats: RawStat[] = data?.leaderboardStats ?? [];
+        if (!groups.length || !stats.length) return [];
+
+        const groupsById = new Map(groups.map(g => [g.id, g]));
+        const rows: LadderRow[] = stats
+          .filter(s => s?.statgroup_id)
+          .map(s => {
+            const group = groupsById.get(s.statgroup_id);
+            const member = group?.members?.[0];
+            const profileId = String(member?.profile_id ?? "");
+            const alias = member?.alias?.trim();
+            const winrate = (s.wins + s.losses) ? +(((s.wins / (s.wins + s.losses)) * 100).toFixed(1)) : 0;
+            const lastMatchDate = s.lastmatchdate ? new Date(s.lastmatchdate * 1000) : undefined;
+            return {
+              rank: s.rank ?? 0,
+              profileId,
+              playerName: alias || "",
+              rating: s.rating ?? 0,
+              wins: s.wins ?? 0,
+              losses: s.losses ?? 0,
+              winrate,
+              streak: s.streak ?? 0,
+              country: member?.country,
+              lastMatchDate,
+            };
+          }).filter(r => r.profileId);
+        return rows;
+      })
+    );
+
+    // Collect all results from this chunk
+    chunkResults.forEach(rows => all.push(...rows));
+
+    // Rate limiting delay between chunks (not needed for last chunk)
+    if (i + concurrentRequests < batches.length) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+
   return all;
 }
 
@@ -221,7 +242,7 @@ export async function fetchCombined1v1() {
   return deduplicatedRows;
 }
 
-export async function fetchCombined1v1Max() {
+export async function fetchCombined1v1Max(maxPerFaction: number = 500) {
   const { items: leaderboards } = await fetchLeaderboards();
   const oneVsOneLeaderboards = leaderboards.filter(lb =>
     lb.matchType === '1v1' && lb.faction && lb.faction !== 'Unknown'
@@ -229,7 +250,7 @@ export async function fetchCombined1v1Max() {
 
   const allResults = await Promise.allSettled(
     oneVsOneLeaderboards.map(async (lb) => {
-      const rows = await fetchAllRows(lb.id, 10000);
+      const rows = await fetchAllRows(lb.id, maxPerFaction);
       return rows.map(row => ({
         ...row,
         faction: lb.faction,

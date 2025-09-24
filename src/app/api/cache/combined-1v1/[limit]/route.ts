@@ -19,32 +19,19 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
       if (profileIds.length === 0) {
         console.log('No valid profile IDs to query');
       } else {
-        // Process in chunks to avoid potential query size limits
-        const chunkSize = 50;
-        const chunks = [];
-        for (let i = 0; i < profileIds.length; i += chunkSize) {
-          chunks.push(profileIds.slice(i, i + chunkSize));
-        }
+        // Single query for all profile IDs (Supabase can handle up to 1000 items in IN clause)
+        const { data: players, error } = await supabase
+          .from('players')
+          .select('profile_id, calculated_level, xp')
+          .in('profile_id', profileIds);
 
-        let allPlayers: any[] = [];
-        for (const chunk of chunks) {
-          const { data: players, error } = await supabase
-            .from('players')
-            .select('profile_id, calculated_level, xp')
-            .in('profile_id', chunk);
-
-          if (error) {
-            console.error('Error fetching player levels chunk:', error);
-          } else if (players && players.length > 0) {
-            allPlayers = allPlayers.concat(players);
-          }
-        }
-
-        if (allPlayers.length > 0) {
-          allPlayers.forEach(player => {
-          // Use calculated_level from database, not the API
-          const level = player.calculated_level || 1;
-          levelMap.set(String(player.profile_id), level);
+        if (error) {
+          console.error('Error fetching player levels:', error);
+        } else if (players && players.length > 0) {
+          players.forEach(player => {
+            // Use calculated_level from database, not the API
+            const level = player.calculated_level || 1;
+            levelMap.set(String(player.profile_id), level);
           });
         }
       }
