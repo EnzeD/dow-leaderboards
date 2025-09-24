@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
+import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
@@ -1314,11 +1315,17 @@ export default function Home() {
           <div className="sm:hidden sticky top-0 z-50 -mx-3 px-3 pt-3 pb-3 bg-neutral-950/95 border-b border-neutral-800/70 backdrop-blur-md shadow-[0_12px_28px_rgba(0,0,0,0.55)]">
             <div className="flex items-start gap-3">
               <div className="flex flex-1 items-center gap-3 min-w-0">
-                <img
-                  src="/assets/daw-logo.webp"
-                  alt="Dawn of War: Definitive Edition"
-                  className="h-10 w-auto flex-shrink-0 object-contain"
-                />
+                <Link
+                  href="/"
+                  className="flex-shrink-0"
+                  aria-label="Go to home"
+                >
+                  <img
+                    src="/assets/daw-logo.webp"
+                    alt="Dawn of War: Definitive Edition"
+                    className="h-10 w-auto object-contain flex-shrink-0"
+                  />
+                </Link>
                 <div className="min-w-0">
                   <h1 className="text-sm font-semibold text-white leading-tight">
                     Dawn of War: Definitive Edition Leaderboards
@@ -1447,13 +1454,17 @@ export default function Home() {
           {/* Desktop Header */}
           <div className="hidden sm:flex items-center justify-between">
             <div className="flex items-center">
-              <div className="mr-4">
+              <Link
+                href="/"
+                className="mr-4 block"
+                aria-label="Go to home"
+              >
                 <img
                   src="/assets/daw-logo.webp"
                   alt="Dawn of War: Definitive Edition"
                   className="h-16 w-auto object-contain"
                 />
-              </div>
+              </Link>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl md:text-3xl font-bold text-white">
                   Dawn of War: Definitive Edition Leaderboards
