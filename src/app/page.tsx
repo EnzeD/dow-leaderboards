@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
@@ -452,6 +452,8 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [_searchProfileId, _setSearchProfileId] = useState<string | undefined>(undefined);
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [steamProfiles, setSteamProfiles] = useState<Record<string, string | null>>({});
+  const steamProfileFetchesInFlight = useRef<Set<string>>(new Set());
   const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [_selectedPlayer, _setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
@@ -1037,6 +1039,75 @@ export default function Home() {
   const handleExactSearch = () => {
     handlePlayerSearch();
   };
+
+  useEffect(() => {
+    if (!searchResults.length) return;
+
+    const idsToFetch = searchResults
+      .map(result => {
+        const rawId = result?.profileId ?? result?.profile_id ?? result?.profileID;
+        if (rawId === undefined || rawId === null) return null;
+        const id = String(rawId).trim();
+        if (!id) return null;
+        if (steamProfiles[id] !== undefined) return null;
+        if (steamProfileFetchesInFlight.current.has(id)) return null;
+        return id;
+      })
+      .filter((id): id is string => Boolean(id));
+
+    if (idsToFetch.length === 0) return;
+
+    idsToFetch.forEach(id => steamProfileFetchesInFlight.current.add(id));
+
+    let cancelled = false;
+
+    supabase
+      .from('players')
+      .select('profile_id, steam_id64')
+      .in('profile_id', idsToFetch)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          throw error;
+        }
+
+        setSteamProfiles(prev => {
+          const next = { ...prev };
+          idsToFetch.forEach(id => {
+            if (next[id] === undefined) {
+              next[id] = null;
+            }
+          });
+          for (const row of data || []) {
+            const id = String(row?.profile_id ?? '').trim();
+            if (!id) continue;
+            const value = typeof row?.steam_id64 === 'string' ? row.steam_id64.trim() : '';
+            next[id] = value ? value : null;
+          }
+          return next;
+        });
+      })
+      .catch(error => {
+        if (cancelled) return;
+        console.warn('Failed to load Steam IDs from Supabase', error);
+        setSteamProfiles(prev => {
+          const next = { ...prev };
+          idsToFetch.forEach(id => {
+            if (next[id] === undefined) {
+              next[id] = null;
+            }
+          });
+          return next;
+        });
+      })
+      .finally(() => {
+        idsToFetch.forEach(id => steamProfileFetchesInFlight.current.delete(id));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchResults, steamProfiles]);
 
   const searchUpdatedAt: string | null = (() => {
     const firstWithTimestamp = searchResults.find(result => typeof (result as any)?.lastUpdated === 'string') as { lastUpdated?: string } | undefined;
@@ -2000,6 +2071,15 @@ export default function Home() {
                       const isFavorite = favoriteKey ? Boolean(favorites[favoriteKey]) : false;
                       const canFavorite = Boolean(favoriteKey && aliasFallback);
                       const favoriteCandidateAlias = aliasPrimary || aliasFallback;
+                      const hasSteamLookup = profileIdStr ? Object.prototype.hasOwnProperty.call(steamProfiles, profileIdStr) : false;
+                      const steamIdFromDbRaw = profileIdStr ? steamProfiles[profileIdStr] : undefined;
+                      const steamIdFromDb = typeof steamIdFromDbRaw === 'string' ? steamIdFromDbRaw.trim() : undefined;
+                      const fallbackSteamId = typeof result?.steamId === 'string' ? result.steamId.trim() : undefined;
+                      const resolvedSteamId = steamIdFromDb && steamIdFromDb.length > 0
+                        ? steamIdFromDb
+                        : (fallbackSteamId && fallbackSteamId.length > 0 ? fallbackSteamId : undefined);
+                      const steamProfileUrl = resolvedSteamId ? `https://steamcommunity.com/profiles/${resolvedSteamId}` : undefined;
+                      const steamLookupPending = profileIdStr ? steamProfileFetchesInFlight.current.has(profileIdStr) && !hasSteamLookup : false;
 
                       return (
                       <div key={index} className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-4 shadow-lg">
@@ -2057,6 +2137,23 @@ export default function Home() {
                                 {isFavorite ? 'Remove favourite' : 'Add to favourite'}
                               </span>
                             </button>
+                            {steamProfileUrl ? (
+                              <a
+                                href={steamProfileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-1.5 rounded-md border border-neutral-600/40 bg-[#171a21] text-[#c7d5e0] hover:bg-[#1b2838] transition-colors"
+                              >
+                                <img src="/assets/steam-logo.svg" alt="Steam" className="h-4 w-4 shrink-0" />
+                                <span className="text-xs font-semibold">Steam profile</span>
+                              </a>
+                            ) : profileIdStr ? (
+                              steamLookupPending ? (
+                                <span className="text-xs text-neutral-400">Fetching Steam profile…</span>
+                              ) : hasSteamLookup ? (
+                                <span className="text-xs text-neutral-500">Steam profile unavailable</span>
+                              ) : null
+                            ) : null}
                             {(result.lastUpdated || searchUpdatedAt) && (
                               <span className="text-xs text-neutral-400 text-left sm:text-right">
                                 Last updated: {formatTimestamp(result.lastUpdated || searchUpdatedAt) ?? 'Unknown'}
