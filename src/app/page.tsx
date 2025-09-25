@@ -1061,12 +1061,15 @@ export default function Home() {
 
     let cancelled = false;
 
-    supabase
-      .from('players')
-      .select('profile_id, steam_id64')
-      .in('profile_id', idsToFetch)
-      .then(({ data, error }) => {
+    const fetchSteamIds = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('players')
+          .select('profile_id, steam_id64')
+          .in('profile_id', idsToFetch);
+
         if (cancelled) return;
+
         if (error) {
           throw error;
         }
@@ -1086,8 +1089,7 @@ export default function Home() {
           }
           return next;
         });
-      })
-      .catch(error => {
+      } catch (error) {
         if (cancelled) return;
         console.warn('Failed to load Steam IDs from Supabase', error);
         setSteamProfiles(prev => {
@@ -1099,10 +1101,12 @@ export default function Home() {
           });
           return next;
         });
-      })
-      .finally(() => {
+      } finally {
         idsToFetch.forEach(id => steamProfileFetchesInFlight.current.delete(id));
-      });
+      }
+    };
+
+    fetchSteamIds();
 
     return () => {
       cancelled = true;
@@ -2079,6 +2083,41 @@ export default function Home() {
                         ? steamIdFromDb
                         : (fallbackSteamId && fallbackSteamId.length > 0 ? fallbackSteamId : undefined);
                       const steamProfileUrl = resolvedSteamId ? `https://steamcommunity.com/profiles/${resolvedSteamId}` : undefined;
+                      const renderFavoriteButton = (extraClasses: string = '') => (
+                        <button
+                          type="button"
+                          onClick={() => canFavorite && toggleFavorite({
+                            profileId: profileIdStr,
+                            alias: favoriteCandidateAlias,
+                            playerName: result.playerName,
+                            country: result.personalStats?.profile?.country,
+                          }, result)}
+                          className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${
+                            isFavorite
+                              ? 'text-yellow-400 bg-neutral-800/70'
+                              : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
+                          } ${extraClasses}`.trim()}
+                          aria-pressed={isFavorite}
+                          disabled={!canFavorite}
+                          title={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            viewBox="0 0 24 24"
+                            fill={isFavorite ? 'currentColor' : 'none'}
+                            stroke="currentColor"
+                            strokeWidth={isFavorite ? 1 : 1.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.317 4.043a1 1 0 00.95.69h4.268c.969 0 1.371 1.24.588 1.81l-3.453 2.507a1 1 0 00-.364 1.118l1.317 4.043c.3.921-.755 1.688-1.54 1.118L12 15.347l-3.534 2.609c-.784.57-1.838-.197-1.539-1.118l1.317-4.043a1 1 0 00-.364-1.118L4.427 9.47c-.783-.57-.38-1.81.588-1.81h4.268a1 1 0 00.95-.69l1.317-4.043z" />
+                          </svg>
+                          <span className="ml-2 hidden text-xs font-semibold sm:inline">
+                            {isFavorite ? 'Remove favourite' : 'Add to favourite'}
+                          </span>
+                        </button>
+                      );
+
                       const steamLookupPending = profileIdStr ? steamProfileFetchesInFlight.current.has(profileIdStr) && !hasSteamLookup : false;
 
                       return (
@@ -2101,48 +2140,19 @@ export default function Home() {
                               <div className="flex items-center gap-1 text-xs">
                                 <span className="text-neutral-400">XP</span>
                                 <span className="text-white">{result.personalStats.profile.xp.toLocaleString?.() || result.personalStats.profile.xp}</span>
+                                {canFavorite && renderFavoriteButton('sm:hidden ml-1')}
                               </div>
                             )}
+                            {!result.personalStats?.profile?.xp && canFavorite && renderFavoriteButton('sm:hidden')}
                           </div>
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end items-start gap-2 sm:gap-3 sm:text-right">
-                            <button
-                              type="button"
-                              onClick={() => canFavorite && toggleFavorite({
-                                profileId: profileIdStr,
-                                alias: favoriteCandidateAlias,
-                                playerName: result.playerName,
-                                country: result.personalStats?.profile?.country,
-                              }, result)}
-                              className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${
-                                isFavorite
-                                  ? 'text-yellow-400 bg-neutral-800/70'
-                                  : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
-                              }`}
-                              aria-pressed={isFavorite}
-                              disabled={!canFavorite}
-                              title={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                viewBox="0 0 24 24"
-                                fill={isFavorite ? 'currentColor' : 'none'}
-                                stroke="currentColor"
-                                strokeWidth={isFavorite ? 1 : 1.5}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.317 4.043a1 1 0 00.95.69h4.268c.969 0 1.371 1.24.588 1.81l-3.453 2.507a1 1 0 00-.364 1.118l1.317 4.043c.3.921-.755 1.688-1.54 1.118L12 15.347l-3.534 2.609c-.784.57-1.838-.197-1.539-1.118l1.317-4.043a1 1 0 00-.364-1.118L4.427 9.47c-.783-.57-.38-1.81.588-1.81h4.268a1 1 0 00.95-.69l1.317-4.043z" />
-                              </svg>
-                              <span className="ml-2 hidden text-xs font-semibold sm:inline">
-                                {isFavorite ? 'Remove favourite' : 'Add to favourite'}
-                              </span>
-                            </button>
+                          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:gap-3 sm:items-center sm:justify-end sm:text-right">
+                            {canFavorite && renderFavoriteButton('hidden sm:inline-flex')}
                             {steamProfileUrl ? (
                               <a
                                 href={steamProfileUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-1.5 rounded-md border border-neutral-600/40 bg-[#171a21] text-[#c7d5e0] hover:bg-[#1b2838] transition-colors"
+                                className="inline-flex items-center justify-center gap-2 flex-1 min-w-[140px] order-1 sm:order-none sm:flex-initial sm:min-w-0 px-3 py-1.5 rounded-md border border-neutral-600/40 bg-[#171a21] text-[#c7d5e0] hover:bg-[#1b2838] transition-colors"
                               >
                                 <img src="/assets/steam-logo.svg" alt="Steam" className="h-4 w-4 shrink-0" />
                                 <span className="text-xs font-semibold">Steam profile</span>
@@ -2155,7 +2165,7 @@ export default function Home() {
                               ) : null
                             ) : null}
                             {(result.lastUpdated || searchUpdatedAt) && (
-                              <span className="text-xs text-neutral-400 text-left sm:text-right">
+                              <span className="order-3 w-full text-xs text-neutral-400 text-left sm:order-none sm:w-auto sm:text-right">
                                 Last updated: {formatTimestamp(result.lastUpdated || searchUpdatedAt) ?? 'Unknown'}
                               </span>
                             )}
@@ -2174,7 +2184,7 @@ export default function Home() {
                                   setTimeout(() => setSearchCardCopied(null), 1200);
                                 } catch {}
                               }}
-                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                              className="inline-flex items-center justify-center gap-2 flex-1 min-w-[140px] order-2 sm:order-none sm:flex-initial sm:min-w-0 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
                               title="Copy link to this player search"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
