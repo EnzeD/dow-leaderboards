@@ -1815,7 +1815,7 @@ export default function Home() {
                     ].map(({ key, label }) => (
                       <th
                         key={key}
-                        className={`py-3 ${key === "rank" || key === "rankDelta" ? "px-3" : "px-4"} ${key === "rankDelta" ? "text-center" : "text-left"} cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 whitespace-nowrap ${key === "rank" || key === "rankDelta" ? "w-16" : ""}`}
+                        className={`py-3 ${key === "rank" || key === "rankDelta" ? "px-3" : "px-4"} ${key === "rank" || key === "rankDelta" ? "text-center" : "text-left"} cursor-pointer hover:bg-neutral-700/30 text-white font-bold border-r border-neutral-600/30 last:border-r-0 transition-all duration-300 whitespace-nowrap ${key === "rank" || key === "rankDelta" ? "w-14" : ""}`}
                         onClick={() => handleSort(key as keyof LadderRow)}
                       >
                         {label}
@@ -1829,15 +1829,15 @@ export default function Home() {
                 <tbody>
                   {sortedRows.map((row, i) => (
                     <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
-                      <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20 w-16`}> 
-                        <div className="flex items-center gap-1">
+                      <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20 w-14 text-center`}>
+                        <div className="flex items-center justify-center gap-1">
                           <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
                           <span className="font-bold">
                             {row.rank}
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 border-r border-neutral-600/20 text-center align-middle w-16">
+                      <td className="px-3 py-3 border-r border-neutral-600/20 text-center align-middle w-14">
                         <RankDeltaBadge delta={row.rankDelta} hasHistory={hasRankDeltaData} />
                       </td>
                       <td className={`px-4 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20 min-w-0`}>
