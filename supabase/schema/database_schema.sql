@@ -32,18 +32,38 @@ CREATE TABLE public.crawl_runs (
   request_count integer,
   error_message text,
   notes text,
-  CONSTRAINT crawl_runs_pkey PRIMARY KEY (started_at, job_id),
+  CONSTRAINT crawl_runs_pkey PRIMARY KEY (job_id, started_at),
   CONSTRAINT crawl_runs_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.crawl_jobs(id)
+);
+CREATE TABLE public.leaderboard_history (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  captured_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  mode text NOT NULL,
+  payload jsonb NOT NULL,
+  player_count integer,
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT leaderboard_history_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.leaderboard_mappings (
   leaderboard_id integer NOT NULL,
   match_type_id integer NOT NULL,
   statgroup_type smallint NOT NULL,
   race_id smallint NOT NULL,
-  CONSTRAINT leaderboard_mappings_pkey PRIMARY KEY (statgroup_type, leaderboard_id, match_type_id, race_id),
+  CONSTRAINT leaderboard_mappings_pkey PRIMARY KEY (statgroup_type, match_type_id, race_id, leaderboard_id),
   CONSTRAINT leaderboard_mappings_leaderboard_id_fkey FOREIGN KEY (leaderboard_id) REFERENCES public.leaderboards(id),
   CONSTRAINT leaderboard_mappings_match_type_id_fkey FOREIGN KEY (match_type_id) REFERENCES public.match_types(id),
   CONSTRAINT leaderboard_mappings_race_id_fkey FOREIGN KEY (race_id) REFERENCES public.races(id)
+);
+CREATE TABLE public.leaderboard_rank_history (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  snapshot_id bigint NOT NULL,
+  leaderboard_id integer NOT NULL,
+  profile_id text NOT NULL,
+  rank integer NOT NULL,
+  rating integer,
+  captured_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  CONSTRAINT leaderboard_rank_history_pkey PRIMARY KEY (id),
+  CONSTRAINT leaderboard_rank_history_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.leaderboard_history(id)
 );
 CREATE TABLE public.leaderboard_snapshot_entries (
   snapshot_id uuid NOT NULL,
@@ -65,7 +85,7 @@ CREATE TABLE public.leaderboard_snapshot_entries (
   highest_rating integer,
   winrate numeric,
   last_match_at timestamp with time zone,
-  CONSTRAINT leaderboard_snapshot_entries_pkey PRIMARY KEY (snapshot_id, rank),
+  CONSTRAINT leaderboard_snapshot_entries_pkey PRIMARY KEY (rank, snapshot_id),
   CONSTRAINT leaderboard_snapshot_entries_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.leaderboard_snapshots(id),
   CONSTRAINT leaderboard_snapshot_entries_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.players(profile_id)
 );
@@ -136,7 +156,7 @@ CREATE TABLE public.match_team_results (
   outcome USER-DEFINED NOT NULL DEFAULT 'unknown'::match_outcome,
   team_rating_avg numeric,
   team_rating_sigma numeric,
-  CONSTRAINT match_team_results_pkey PRIMARY KEY (match_id, team_id),
+  CONSTRAINT match_team_results_pkey PRIMARY KEY (team_id, match_id),
   CONSTRAINT match_team_results_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.matches(match_id)
 );
 CREATE TABLE public.match_types (
@@ -214,4 +234,19 @@ CREATE TABLE public.races (
   label text NOT NULL,
   faction_id smallint,
   CONSTRAINT races_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.search_index_refresh_log (
+  id integer NOT NULL DEFAULT nextval('search_index_refresh_log_id_seq'::regclass),
+  refreshed_at timestamp with time zone DEFAULT now(),
+  duration_ms integer,
+  row_count integer,
+  CONSTRAINT search_index_refresh_log_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.steam_player_count (
+  id integer NOT NULL DEFAULT 1 CHECK (id = 1),
+  app_id text NOT NULL DEFAULT '3556750'::text,
+  player_count integer,
+  updated_at timestamp with time zone DEFAULT now(),
+  success boolean DEFAULT false,
+  CONSTRAINT steam_player_count_pkey PRIMARY KEY (id)
 );
