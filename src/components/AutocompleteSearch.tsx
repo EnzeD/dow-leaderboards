@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { PlayerSearchResult } from '@/lib/supabase';
+import { PlayerSearchResult, supabase } from '@/lib/supabase';
 import { getLevelFromXP } from '@/lib/xp-levels';
 
 type AutocompleteSearchProps = {
@@ -59,15 +59,29 @@ export default function AutocompleteSearch({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/players/search?q=${encodeURIComponent(query)}&limit=10`);
-      if (response.ok) {
-        const data = await response.json();
-        setSuggestions(data.results || []);
-        setShowSuggestions(fromTyping && (data.results || []).length > 0);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
+      const { data, error } = await supabase
+        .from('players')
+        .select('profile_id, current_alias, country, steam_id64, xp')
+        .not('current_alias', 'is', null)
+        .ilike('current_alias', `%${query}%`)
+        .order('current_alias')
+        .limit(10);
+
+      if (error) {
+        throw error;
       }
+
+      const results: PlayerSearchResult[] = (data || []).map(player => ({
+        profile_id: player.profile_id,
+        current_alias: player.current_alias || '',
+        country: player.country,
+        steam_id64: player.steam_id64,
+        level: getLevelFromXP(player.xp ?? undefined),
+        xp: player.xp,
+      }));
+
+      setSuggestions(results);
+      setShowSuggestions(fromTyping && results.length > 0);
     } catch (error) {
       console.error('Autocomplete search failed:', error);
       setSuggestions([]);
