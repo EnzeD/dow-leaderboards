@@ -23,11 +23,28 @@ export async function getLatestRankMap(leaderboardId: number): Promise<Map<strin
     return new Map();
   }
 
+  const { data: previous, error: previousError } = await supabaseAdmin
+    .from("leaderboard_rank_history")
+    .select("captured_at")
+    .eq("leaderboard_id", leaderboardId)
+    .lt("captured_at", latest.captured_at)
+    .order("captured_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (previousError || !previous?.captured_at) {
+    if (previousError) console.warn("Previous rank history lookup failed", previousError);
+    return new Map();
+  }
+
+  // Use the snapshot immediately preceding the latest one as our comparison baseline.
+  const baselineCapturedAt = previous.captured_at;
+
   const { data, error } = await supabaseAdmin
     .from("leaderboard_rank_history")
     .select("profile_id, rank")
     .eq("leaderboard_id", leaderboardId)
-    .eq("captured_at", latest.captured_at)
+    .eq("captured_at", baselineCapturedAt)
     .limit(2000);
 
   if (error || !data) {
