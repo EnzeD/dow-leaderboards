@@ -1,74 +1,25 @@
-import { supabase } from '@/lib/supabase';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const revalidate = 60;
+export const runtime = 'nodejs';
 
-const CACHE_HEADERS = {
-  'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=900',
-};
-
-const STEAM_APP_ID = process.env.STEAM_APP_ID || '4570';
-
-export async function GET() {
-  try {
-    const { data, error } = await supabase
-      .from('steam_player_count')
-      .select('player_count, updated_at, success, app_id')
-      .eq('id', 1)
-      .single();
-
-    if (error) {
-      console.error('Supabase fetch error:', error);
-      return Response.json(
-        {
-          appId: STEAM_APP_ID,
-          playerCount: null,
-          success: false,
-          cached: false,
-          error: 'Failed to read cached player count',
-        },
-        { status: 502, headers: CACHE_HEADERS }
-      );
-    }
-
-    if (!data) {
-      return Response.json(
-        {
-          appId: STEAM_APP_ID,
-          playerCount: null,
-          success: false,
-          cached: false,
-          error: 'No cached player count available',
-        },
-        { status: 503, headers: CACHE_HEADERS }
-      );
-    }
-
-    const playerCount =
-      typeof data.player_count === 'number' ? data.player_count : null;
-
-    return Response.json(
+export function GET(_request: NextRequest): Response {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    return NextResponse.json(
       {
-        appId: data.app_id || STEAM_APP_ID,
-        playerCount,
-        success: Boolean(data.success && playerCount !== null),
-        lastUpdated: data.updated_at,
-        cached: true,
-        stale: !data.success && playerCount !== null,
-        source: 'supabase',
+        error: 'supabase_unavailable',
+        message:
+          'Install the latest site build and read steam player count from Supabase directly.',
       },
-      { headers: CACHE_HEADERS }
-    );
-  } catch (error) {
-    console.error('Player count route error:', error);
-    return Response.json(
-      {
-        appId: STEAM_APP_ID,
-        playerCount: null,
-        success: false,
-        cached: false,
-        error: 'Unexpected failure loading player count',
-      },
-      { status: 500, headers: CACHE_HEADERS }
+      { status: 410 }
     );
   }
+
+  const query = new URLSearchParams();
+  query.set('select', 'player_count,updated_at,success,app_id');
+  query.set('id', 'eq.1');
+
+  const url = `${supabaseUrl}/rest/v1/steam_player_count?${query.toString()}`;
+
+  return NextResponse.redirect(url, 308);
 }
