@@ -3124,8 +3124,8 @@ export default function Home() {
           </div>
           <div className="space-y-3 text-sm text-neutral-200">
             <p>Advanced statistics is not available yet.</p>
-            <p>Today it&apos;s not possible to display them with the Relic API alone—we need to set up bots, background jobs, and functions that cost real money.</p>
-            <p>This website stays free for everyone, so any premium tier would also help keep the hosting running.</p>
+            <p>Today it&apos;s not possible to display them with the Relic API alone, we need to set up bots, background jobs, and functions that cost some money.</p>
+            <p>This website stays free for everyone, so any participation would also help keep the hosting running, which is greatly appreciated!</p>
             <p>Would you be interested in unlocking the advanced stats against a small price?</p>
           </div>
           <div className="flex flex-col gap-2">
