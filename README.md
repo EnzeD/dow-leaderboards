@@ -237,6 +237,7 @@ We welcome contributions! Here are some ways you can help:
 - `/api/cache/leaderboard/[id]` — Cached leaderboard rows (default 200)
 - `/api/cache/leaderboard/[id]/[limit]` — Extended rows (e.g., 1000)
 - `/api/cache/combined-1v1` and `/api/cache/combined-1v1/[limit]` — Combined 1v1 across factions
+- `/api/cache/combined-1v1-multi` and `/api/cache/combined-1v1-multi/[limit]` — Combined 1v1 with every faction placement (players may appear more than once)
 - `/api/cache/player/by-alias/[alias]` — Player profile + stats + recent matches
 
 ## 📝 License

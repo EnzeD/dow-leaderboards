@@ -51,7 +51,7 @@ export type LadderRow = {
   rank: number; profileId: string; playerName: string;
   rating: number; wins: number; losses: number; winrate: number; streak: number;
   country?: string; lastMatchDate?: Date; faction?: string; level?: number;
-  rankDelta?: number | null;
+  rankDelta?: number | null; originalRank?: number; leaderboardId?: number;
 };
 
 export type Leaderboard = {
@@ -320,6 +320,66 @@ export async function fetchCombined1v1Max(maxPerFaction: number = 500) {
   }
 
   return Array.from(playerMap.values())
+    .sort((a, b) => b.rating - a.rating)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+export async function fetchCombined1v1AllEntries() {
+  const { items: leaderboards } = await fetchLeaderboards();
+  const oneVsOneLeaderboards = leaderboards.filter(lb =>
+    lb.matchType === '1v1' && lb.faction && lb.faction !== 'Unknown'
+  );
+
+  const allResults = await Promise.allSettled(
+    oneVsOneLeaderboards.map(async (lb) => {
+      const rows = await fetchTop100(lb.id);
+      return rows.map(row => ({
+        ...row,
+        faction: lb.faction,
+        originalRank: row.rank,
+        leaderboardId: lb.id
+      }));
+    })
+  );
+
+  const allRows: (LadderRow & { originalRank: number; leaderboardId: number })[] = [];
+  allResults.forEach(result => {
+    if (result.status === 'fulfilled') {
+      allRows.push(...result.value);
+    }
+  });
+
+  return allRows
+    .sort((a, b) => b.rating - a.rating)
+    .map((row, index) => ({ ...row, rank: index + 1 }));
+}
+
+export async function fetchCombined1v1AllEntriesMax(maxPerFaction: number = 500) {
+  const { items: leaderboards } = await fetchLeaderboards();
+  const oneVsOneLeaderboards = leaderboards.filter(lb =>
+    lb.matchType === '1v1' && lb.faction && lb.faction !== 'Unknown'
+  );
+
+  const allResults = await Promise.allSettled(
+    oneVsOneLeaderboards.map(async (lb) => {
+      const rows = await fetchAllRows(lb.id, maxPerFaction);
+      return rows.map(row => ({
+        ...row,
+        faction: lb.faction,
+        originalRank: row.rank,
+        leaderboardId: lb.id
+      }));
+    })
+  );
+
+  const allRows: (LadderRow & { originalRank: number; leaderboardId: number })[] = [];
+  allResults.forEach(result => {
+    if (result.status === 'fulfilled') {
+      allRows.push(...result.value);
+    }
+  });
+
+  return allRows
     .sort((a, b) => b.rating - a.rating)
     .map((row, index) => ({ ...row, rank: index + 1 }));
 }

@@ -347,6 +347,7 @@ export default function Home() {
     selectedMatchType?: string;
     selectedCountry?: string;
     selectedId?: number;
+    combinedViewMode?: 'best' | 'all';
   };
   
   // Build a URL string that reflects the given state via query params
@@ -361,6 +362,7 @@ export default function Home() {
     p.delete('country');
     p.delete('q');
     p.delete('pid');
+    p.delete('combined');
 
     if (state.view === 'leaderboards') {
       // leaderboards is the default tab; keep root clean by omitting defaults
@@ -372,6 +374,10 @@ export default function Home() {
       }
       if (state.selectedCountry && state.selectedCountry !== 'Global') {
         p.set('country', state.selectedCountry);
+      }
+      const isCombined = state.selectedFaction === 'All factions' && state.selectedMatchType === '1v1';
+      if (isCombined && state.combinedViewMode === 'all') {
+        p.set('combined', 'all');
       }
       // no 'tab' param for default view
     } else if (state.view === 'search') {
@@ -431,11 +437,13 @@ export default function Home() {
     const match = p.get('match') || '1v1';
     const faction = p.get('faction') || 'All factions';
     const country = p.get('country') || 'Global';
+    const combined = p.get('combined');
     return {
       view: 'leaderboards',
       selectedMatchType: match,
       selectedFaction: faction,
       selectedCountry: country,
+      combinedViewMode: combined === 'all' ? 'all' : 'best',
     };
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
@@ -458,6 +466,7 @@ export default function Home() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [_selectedPlayer, _setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
+  const [combinedViewMode, setCombinedViewMode] = useState<'best' | 'all'>('best');
   const [lbExpanded, setLbExpanded] = useState(false);
   const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
   const [favorites, setFavorites] = useState<Record<string, FavoriteEntry>>({});
@@ -549,6 +558,12 @@ export default function Home() {
     }
   }, [matchTypes, selectedMatchType]);
 
+  useEffect(() => {
+    if (!isCombinedMode) return;
+    setLbExpanded(false);
+    setCombinedLimit(200);
+  }, [combinedViewMode, isCombinedMode]);
+
   // Load leaderboards on mount
   useEffect(() => {
     fetch("/api/leaderboards")
@@ -621,6 +636,9 @@ export default function Home() {
       if (typeof initialFromUrl.selectedMatchType === 'string') setSelectedMatchType(initialFromUrl.selectedMatchType);
       if (typeof initialFromUrl.selectedFaction === 'string') setSelectedFaction(initialFromUrl.selectedFaction);
       if (typeof initialFromUrl.selectedCountry === 'string') setSelectedCountry(initialFromUrl.selectedCountry);
+      if (initialFromUrl.combinedViewMode) {
+        setCombinedViewMode(initialFromUrl.combinedViewMode);
+      }
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -633,6 +651,7 @@ export default function Home() {
       selectedMatchType: initialFromUrl.selectedMatchType ?? selectedMatchType,
       selectedCountry: initialFromUrl.selectedCountry ?? selectedCountry,
       selectedId,
+      combinedViewMode: initialFromUrl.combinedViewMode ?? combinedViewMode,
     };
     syncUrl(initialState);
 
@@ -652,6 +671,7 @@ export default function Home() {
         if (typeof fromUrl.selectedFaction === 'string') setSelectedFaction(fromUrl.selectedFaction);
         if (typeof fromUrl.selectedMatchType === 'string') setSelectedMatchType(fromUrl.selectedMatchType);
         if (typeof fromUrl.selectedCountry === 'string') setSelectedCountry(fromUrl.selectedCountry);
+        if (fromUrl.combinedViewMode) setCombinedViewMode(fromUrl.combinedViewMode);
       }
     };
     window.addEventListener('popstate', onPopState);
@@ -702,7 +722,10 @@ export default function Home() {
     if (isCombinedMode) {
       // Fetch combined 1v1 data (CDN cached)
       setLoading(true);
-      fetch(`/api/cache/combined-1v1/${combinedLimit}`)
+      const base = combinedViewMode === 'all'
+        ? '/api/cache/combined-1v1-multi'
+        : '/api/cache/combined-1v1';
+      fetch(`${base}/${combinedLimit}`)
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -721,7 +744,7 @@ export default function Home() {
         })
         .catch(() => setLoading(false));
     }
-  }, [selectedId, isCombinedMode, combinedLimit]);
+  }, [selectedId, isCombinedMode, combinedLimit, combinedViewMode]);
 
   const handleSort = (field: keyof LadderRow) => {
     if (sortField === field) {
@@ -798,12 +821,12 @@ export default function Home() {
         })
         .catch(() => {});
     }
-  }, [search, ladderData, isCombinedMode, combinedLimit, selectedId, lbExpanded]);
+  }, [search, ladderData, isCombinedMode, combinedLimit, selectedId, lbExpanded, combinedViewMode]);
 
   // Reset expansion flag when filters change or user clears search
   useEffect(() => {
     setLbExpanded(false);
-  }, [selectedMatchType, selectedFaction, selectedCountry, selectedId, activeTab]);
+  }, [selectedMatchType, selectedFaction, selectedCountry, selectedId, activeTab, combinedViewMode]);
 
   // When search is cleared, revert to default dataset size (top 200)
   useEffect(() => {
@@ -824,7 +847,7 @@ export default function Home() {
         setLbExpanded(false);
       }
     }
-  }, [search, isCombinedMode, combinedLimit, selectedId, lbExpanded]);
+  }, [search, isCombinedMode, combinedLimit, selectedId, lbExpanded, combinedViewMode]);
 
   // Search functionality
   const handlePlayerSearch = async (qOverride?: string, opts?: { pushHistory?: boolean }) => {
@@ -840,6 +863,7 @@ export default function Home() {
         selectedMatchType,
         selectedCountry,
         selectedId,
+        combinedViewMode,
       };
       if (typeof window !== 'undefined') {
         const currentUrl = buildUrl(currentState);
@@ -891,10 +915,11 @@ export default function Home() {
       selectedMatchType,
       selectedCountry,
       selectedId,
+      combinedViewMode,
     };
     syncUrl(state);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId]);
+  }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId, combinedViewMode]);
 
   // Collapse mobile navigation when switching tabs
   useEffect(() => {
@@ -960,6 +985,7 @@ export default function Home() {
             selectedMatchType,
             selectedCountry,
             selectedId,
+            combinedViewMode,
           };
           syncUrl(currentState);
         } else {
@@ -1837,29 +1863,65 @@ export default function Home() {
         {/* Current Selection Info */}
         {(selectedLeaderboard || isCombinedMode || selectedFaction === "All factions") && (
           <div className="mb-4 text-sm text-neutral-300 font-medium p-3 bg-neutral-900/40 rounded-md border border-neutral-700/30" style={{backdropFilter: 'blur(5px)'}}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                Showing: {isCombinedMode ? "Combined 1v1 Rankings - All factions" : (selectedFaction === "All factions" ? `All factions • ${selectedMatchType}` : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`)}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <div>
+                  Showing: {isCombinedMode
+                    ? `Combined 1v1 Rankings • ${combinedViewMode === 'all' ? 'All faction placements' : 'Best per player'}`
+                    : (selectedFaction === "All factions" ? `All factions • ${selectedMatchType}` : `${selectedLeaderboard?.faction} • ${selectedLeaderboard?.matchType}`)}
+                </div>
                 {ladderData && (
-                  <>
-                    {" • "}Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
+                  <div className="text-xs text-neutral-400">
+                    Last updated: {new Date(ladderData.lastUpdated).toLocaleString()}
                     {ladderData.stale && (
                       <span className="ml-2 px-2 py-1 bg-yellow-600 text-yellow-100 rounded">Stale Data</span>
                     )}
-                  </>
+                  </div>
+                )}
+                {isCombinedMode && (
+                  <div className="text-xs text-neutral-400">
+                    {combinedViewMode === 'all'
+                      ? 'Players appear once for every faction they rank in. Expect duplicate names when someone excels with multiple armies.'
+                      : 'Shows each player once, using the faction where they currently have the highest rating.'}
+                  </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={handleShare}
-                className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
-                title="Share this view"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
-                </svg>
-                <span className={`text-xs font-semibold ${shareCopied ? 'text-green-400' : ''}`}>{shareCopied ? 'Link copied' : 'Copy link'}</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {isCombinedMode && (
+                  <div className="flex items-center gap-1 bg-neutral-800/70 border border-neutral-600/40 rounded-md px-2 py-1 text-xs text-neutral-200">
+                    <span className="uppercase tracking-wide text-neutral-400 font-semibold">View</span>
+                    <button
+                      type="button"
+                      onClick={() => setCombinedViewMode('best')}
+                      disabled={combinedViewMode === 'best' || loading}
+                      aria-pressed={combinedViewMode === 'best'}
+                      className={`px-2 py-0.5 rounded font-semibold transition-colors ${combinedViewMode === 'best' ? 'bg-neutral-500 text-white' : 'text-neutral-300 hover:text-white'}`}
+                    >
+                      Best per player
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCombinedViewMode('all')}
+                      disabled={combinedViewMode === 'all' || loading}
+                      aria-pressed={combinedViewMode === 'all'}
+                      className={`px-2 py-0.5 rounded font-semibold transition-colors ${combinedViewMode === 'all' ? 'bg-neutral-500 text-white' : 'text-neutral-300 hover:text-white'}`}
+                    >
+                      All faction placements
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors"
+                  title="Share this view"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+                  </svg>
+                  <span className={`text-xs font-semibold ${shareCopied ? 'text-green-400' : ''}`}>{shareCopied ? 'Link copied' : 'Copy link'}</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1880,7 +1942,9 @@ export default function Home() {
                       { key: "rank", label: "Rank" },
                       { key: "rankDelta", label: "↑↓" },
                       { key: "playerName", label: "Alias" },
-                      ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
+                      ...(isCombinedMode ? [
+                        { key: "faction", label: "Faction" }
+                      ] : []),
                       { key: "rating", label: "ELO" },
                       { key: "streak", label: "Streak" },
                       { key: "wins", label: "Wins" },
@@ -1902,8 +1966,10 @@ export default function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedRows.map((row, i) => (
-                    <tr key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
+                  {sortedRows.map((row, i) => {
+                    const entryKey = `${row.profileId}-${row.leaderboardId ?? row.faction ?? 'combined'}-${row.originalRank ?? row.rank}`;
+                    return (
+                      <tr key={entryKey} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} hover:bg-neutral-700/30 border-b border-neutral-600/20 transition-all duration-300 backdrop-blur-sm`}>
                       <td className={`px-3 py-3 ${getRankColor(row.rank)} font-bold text-sm border-r border-neutral-600/20 w-14 text-center`}>
                         <div className="flex items-center justify-center gap-1">
                           <span className="text-lg drop-shadow-lg">{getTierIndicator(row.rank)}</span>
@@ -1951,16 +2017,19 @@ export default function Home() {
                       <td className="px-4 py-3 text-neutral-300 text-xs font-medium">
                         <span className="truncate">{formatLastMatch(row.lastMatchDate)}</span>
                       </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Card View - Ultra Compact Single Line */}
             <div className="md:hidden space-y-1">
-              {sortedRows.map((row, i) => (
-                <div key={row.profileId} className={`${i % 2 === 0 ? "bg-neutral-900/70" : "bg-neutral-800/70"} border border-neutral-600/30 rounded p-2 backdrop-blur-sm`}>
+              {sortedRows.map((row, i) => {
+                const entryKey = `${row.profileId}-${row.leaderboardId ?? row.faction ?? 'combined'}-${row.originalRank ?? row.rank}`;
+                return (
+                  <div key={entryKey} className={`${i % 2 === 0 ? "bg-neutral-900/70" : "bg-neutral-800/70"} border border-neutral-600/30 rounded p-2 backdrop-blur-sm`}>
                   {/* Everything in one line */}
                   <div className="flex items-center gap-2 text-xs">
                     {/* Rank */}
@@ -1987,12 +2056,12 @@ export default function Home() {
                           {row.level}
                         </span>
                       )}
-                      {isCombinedMode && (
-                        <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
-                          <FactionLogo faction={row.faction || undefined} size={14} />
-                          {row.faction ? row.faction.slice(0, 3) : 'Unk'}
-                        </span>
-                      )}
+                    {isCombinedMode && (
+                      <span className={`text-xs font-semibold ml-1 ${getFactionColor(row.faction || '')} inline-flex items-center gap-1`}>
+                        <FactionLogo faction={row.faction || undefined} size={14} />
+                        {row.faction ? row.faction.slice(0, 3) : 'Unk'}
+                      </span>
+                    )}
                     </div>
 
                     {/* Stats - Ultra compact */}
@@ -2006,8 +2075,9 @@ export default function Home() {
                       </span>
                     </div>
                   </div>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
