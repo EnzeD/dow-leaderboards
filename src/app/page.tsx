@@ -551,6 +551,19 @@ export default function Home() {
     (selectedFaction === "All factions" || lb.faction === selectedFaction)
   );
 
+  const handleFactionChange = (value: string) => {
+    setSelectedFaction(value);
+    if (value === "All factions") return;
+
+    const matching = leaderboards.find(lb =>
+      lb.matchType === selectedMatchType && lb.faction === value
+    );
+
+    if (matching) {
+      setSelectedId(matching.id);
+    }
+  };
+
   useEffect(() => {
     if (matchTypes.length === 0) return;
     if (!matchTypes.includes(selectedMatchType)) {
@@ -710,12 +723,13 @@ export default function Home() {
 
   // Update selected ID when filters change OR when leaderboards first load
   useEffect(() => {
+    if (isCombinedMode) return;
     if (filteredLeaderboards.length === 0) return;
     const newId = filteredLeaderboards[0].id;
     if (newId !== selectedId) {
       setSelectedId(newId);
     }
-  }, [filteredLeaderboards, selectedId]);
+  }, [filteredLeaderboards, selectedId, isCombinedMode]);
 
   // Load ladder when selection changes
   useEffect(() => {
@@ -1792,7 +1806,7 @@ export default function Home() {
                   id="faction-select"
                   name="faction"
                   value={selectedFaction}
-                  onChange={(e) => setSelectedFaction(e.target.value)}
+                  onChange={(e) => handleFactionChange(e.target.value)}
                   className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
                   disabled={loading}
                 >
