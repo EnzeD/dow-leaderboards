@@ -250,3 +250,23 @@ CREATE TABLE public.steam_player_count (
   success boolean DEFAULT false,
   CONSTRAINT steam_player_count_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.premium_interest_leads (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  alias_submitted text NOT NULL,
+  profile_id text,
+  player_name text,
+  survey_choice text,
+  email text,
+  source text NOT NULL DEFAULT 'search_teaser'::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT premium_interest_leads_pkey PRIMARY KEY (id),
+  CONSTRAINT premium_interest_leads_survey_choice_check CHECK (
+    survey_choice IS NULL
+    OR survey_choice = 'No'::text
+    OR survey_choice ~ '^(Yes|Maybe)'
+    OR survey_choice ~ '^\$?\d+(\.\d{1,2})?/month$'
+  )
+);
+CREATE UNIQUE INDEX premium_interest_leads_email_key ON public.premium_interest_leads USING btree (lower(email)) WHERE (email IS NOT NULL);
+CREATE UNIQUE INDEX premium_interest_leads_profile_key ON public.premium_interest_leads USING btree (COALESCE(profile_id, lower(alias_submitted)));
