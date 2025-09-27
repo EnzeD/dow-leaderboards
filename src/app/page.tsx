@@ -54,6 +54,9 @@ type FavoriteDataEntry = {
 const DEFAULT_RECENT_MATCH_LIMIT = 10;
 const FAVORITES_COOKIE = 'dow_favorites';
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
+const premiumTeaserEnabled = ['1', 'true', 'on', 'yes'].includes(
+  (process.env.NEXT_PUBLIC_ENABLE_PREMIUM_TEASER ?? '').toLowerCase()
+);
 
 const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
 
@@ -2280,6 +2283,97 @@ export default function Home() {
                         </div>
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
+
+                        {premiumTeaserEnabled && (
+                          <div className="mt-4 rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="flex flex-1 items-start gap-3">
+                                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
+                                  <svg
+                                    className="h-5 w-5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M4 20h16" />
+                                    <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
+                                    <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
+                                    <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
+                                  </svg>
+                                </span>
+                                <div className="space-y-1">
+                                  <p className="text-sm font-semibold text-white">Advanced statistics</p>
+                                  <p className="text-xs text-neutral-300">
+                                    Get access to maximum stats while supporting the website.
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
+                                <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
+                                <span>Everything you need to climb.</span>
+                              </div>
+                            </div>
+                            <div className="mt-3 rounded-lg border border-yellow-500/20 bg-neutral-950/70 p-4">
+                              <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-yellow-300">
+                                <span>Matchup intelligence</span>
+                                <span className="text-neutral-500">Advanced view</span>
+                              </div>
+                              <div className="mt-3 grid h-14 w-full grid-cols-6 gap-1" aria-hidden="true">
+                                {['a', 'b', 'c', 'd', 'e', 'f'].map((token) => (
+                                  <div
+                                    key={token}
+                                    className="rounded-md bg-gradient-to-b from-yellow-500/25 via-yellow-500/10 to-yellow-500/5 blur-sm"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <ul className="mt-4 space-y-1.5 text-xs text-neutral-200">
+                              {[ 
+                                'A dedicated bot that will build your data every day',
+                                'ELO ratings over time',
+                                'Win rate per match-up',
+                                'Win rate per maps',
+                                'Win rate against frequent opponents',
+                                'Unlimited match history (starting after activation)'
+                              ].map((benefit) => (
+                                <li key={benefit} className="flex items-start gap-2">
+                                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
+                                    <svg
+                                      className="h-3 w-3"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M3.5 8.5l2.5 2.5 6-6" />
+                                    </svg>
+                                  </span>
+                                  <span>{benefit}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <p className="text-xs text-neutral-300 sm:max-w-md">
+                                Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
+                              </p>
+                              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                                <Link
+                                  href="/premium?source=search_teaser&cta=primary"
+                                  className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
+                                >
+                                  Activate advanced statistics
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Recent Match History */}
                         {result.recentMatches && result.recentMatches.length > 0 && (
