@@ -1,5 +1,5 @@
 import { fetchCombined1v1AllEntriesMax, resolveNames } from "@/lib/relic";
-import { getLatestRankMap } from "@/lib/rank-history";
+import { buildCombinedMultiKey, getLatestCombinedMultiRankMap } from "@/lib/rank-history";
 import { supabase } from "@/lib/supabase";
 import { getLevelFromXP } from "@/lib/xp-levels";
 
@@ -50,14 +50,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
       console.warn('Database unavailable, continuing without level data:', dbError);
     }
 
-    const previousRanks = await getLatestRankMap(-1);
+    const previousRanks = await getLatestCombinedMultiRankMap();
 
     for (const r of limitedRows) {
       const key = String(r.profileId);
       if (levelMap.has(key)) {
         (r as any).level = levelMap.get(key);
       }
-      const prevRank = previousRanks.get(key);
+      const deltaKey = buildCombinedMultiKey(r);
+      const prevRank = deltaKey ? previousRanks.get(deltaKey) : undefined;
       (r as any).rankDelta = typeof prevRank === "number" ? prevRank - r.rank : null;
     }
 

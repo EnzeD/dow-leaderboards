@@ -54,3 +54,49 @@ export async function getLatestRankMap(leaderboardId: number): Promise<Map<strin
 
   return new Map(data.map(row => [row.profile_id, row.rank]));
 }
+
+export function buildCombinedMultiKey(row: any): string | null {
+  if (!row) return null;
+  const profileId = row.profileId ?? row.profile_id ?? row.profileID;
+  if (!profileId) return null;
+  const leaderboardId = row.leaderboardId ?? row.leaderboard_id;
+  const faction = row.faction ?? row.Faction ?? row.race;
+  const discriminator = leaderboardId ?? faction;
+  return `${String(profileId)}:${discriminator ?? 'unknown'}`;
+}
+
+export async function getLatestCombinedMultiRankMap(): Promise<Map<string, number>> {
+  if (!supabaseAdmin) return new Map();
+
+  const { data, error } = await supabaseAdmin
+    .from("leaderboard_history")
+    .select("payload, captured_at")
+    .eq("mode", "combined-1v1-multi")
+    .order("captured_at", { ascending: false })
+    .limit(2);
+
+  if (error) {
+    console.warn("Combined multi history lookup failed", error);
+    return new Map();
+  }
+
+  if (!data || data.length < 2) {
+    return new Map();
+  }
+
+  const baseline = data[1];
+  const rows = Array.isArray((baseline as any)?.payload?.rows)
+    ? (baseline as any).payload.rows
+    : [];
+
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const key = buildCombinedMultiKey(row);
+    if (!key) continue;
+    const rank = typeof row?.rank === "number" ? row.rank : null;
+    if (rank === null) continue;
+    map.set(key, rank);
+  }
+
+  return map;
+}
