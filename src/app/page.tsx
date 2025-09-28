@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
+import ReplaysTab from "@/app/_components/ReplaysTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -1745,9 +1746,6 @@ export default function Home() {
                   >
                     <span className="flex items-center gap-2">
                       Replays
-                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                        Soon
-                      </span>
                     </span>
                   </button>
                   <button
@@ -1880,9 +1878,6 @@ export default function Home() {
             >
               <span className="inline-flex items-center gap-2 whitespace-nowrap">
                 Replays
-                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                  Soon
-                </span>
               </span>
             </button>
             <a
@@ -2927,10 +2922,7 @@ export default function Home() {
           'We will have maps, matchup stats, and other insights so you can study every battlefield at a glance.'
         )}
 
-        {activeTab === 'replays' && renderComingSoonSection(
-          'Replays',
-          'Players will be able to upload, download, and vote for the best replays to spotlight epic battles.'
-        )}
+        {activeTab === 'replays' && <ReplaysTab />}
 
 
         {/* Support Tab Content */}
