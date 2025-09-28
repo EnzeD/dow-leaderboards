@@ -400,46 +400,102 @@ const ReplaysTab = () => {
             No replays have been uploaded yet. Be the first to share a battle!
           </div>
         ) : (
-          <div className="space-y-3">
-            {replays.map((replay, index) => (
-              <div
-                key={replay.path}
-                className="flex flex-col gap-3 rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="space-y-1 sm:space-y-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-neutral-800 text-sm text-neutral-200">
+                <thead className="bg-neutral-900/80 text-xs uppercase tracking-wide text-neutral-400">
+                  <tr>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Rank</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Replay</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Downloads</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Size</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Uploaded</th>
+                    <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-800">
+                  {replays.map((replay, index) => (
+                    <tr key={replay.path} className="bg-neutral-900/60 hover:bg-neutral-800/60 transition-colors">
+                      <td className="px-4 py-3 font-semibold text-neutral-100">#{index + 1}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-white" title={replay.originalName}>
+                          {replay.originalName}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-right text-neutral-200">
+                        {formatDownloads(replay.downloads)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-neutral-200">
+                        {formatBytes(replay.size)}
+                      </td>
+                      <td className="px-4 py-3 text-neutral-300">
+                        {formatDate(replay.uploadedAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleDownload(replay.path)}
+                            disabled={downloadingPath === replay.path}
+                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleCopyLink(replay.path)}
+                            disabled={copyingPath === replay.path}
+                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-3 md:hidden">
+              {replays.map((replay, index) => (
+                <div
+                  key={replay.path}
+                  className="flex flex-col gap-3 rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-4"
+                >
+                  <div className="flex items-center justify-between">
                     <p className="text-base font-medium text-white" title={replay.originalName}>
                       {replay.originalName}
                     </p>
                     <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-200">
-                      #{index + 1} · {formatDownloads(replay.downloads)}
+                      #{index + 1}
                     </span>
                   </div>
                   <p className="text-sm text-neutral-400">
-                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)}
+                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)} · {formatDownloads(replay.downloads)}
                   </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleDownload(replay.path)}
+                      disabled={downloadingPath === replay.path}
+                      className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyLink(replay.path)}
+                      disabled={copyingPath === replay.path}
+                      className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleDownload(replay.path)}
-                    disabled={downloadingPath === replay.path}
-                    className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleCopyLink(replay.path)}
-                    disabled={copyingPath === replay.path}
-                    className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
