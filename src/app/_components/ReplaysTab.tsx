@@ -401,17 +401,22 @@ const ReplaysTab = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {replays.map(replay => (
+            {replays.map((replay, index) => (
               <div
                 key={replay.path}
                 className="flex flex-col gap-3 rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="space-y-1 sm:space-y-0">
-                  <p className="text-base font-medium text-white" title={replay.originalName}>
-                    {replay.originalName}
-                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
+                    <p className="text-base font-medium text-white" title={replay.originalName}>
+                      {replay.originalName}
+                    </p>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-200">
+                      #{index + 1} · {formatDownloads(replay.downloads)}
+                    </span>
+                  </div>
                   <p className="text-sm text-neutral-400">
-                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)} · {formatDownloads(replay.downloads)}
+                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
