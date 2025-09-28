@@ -50,7 +50,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'signed_url_failed' }, { status: 500 });
     }
 
-    return NextResponse.json({ url: data.signedUrl }, {
+    let downloadCount: number | null = null;
+    const { data: incremented, error: incrementError } = await supabaseAdmin
+      .rpc('increment_replay_download', { path_input: path });
+
+    if (incrementError) {
+      console.error('Failed to increment replay download count', incrementError);
+    } else if (typeof incremented === 'number') {
+      downloadCount = Number(incremented);
+    }
+
+    return NextResponse.json({ url: data.signedUrl, downloadCount }, {
       headers: { 'Cache-Control': 'no-store' }
     });
   }
@@ -68,21 +78,23 @@ export async function GET(req: NextRequest) {
   const fileItems = items?.filter(item => item.name && !item.name.endsWith('/')) ?? [];
   const paths = fileItems.map(item => item.name);
 
-  const { data: signedUrls, error: signedError } = paths.length
-    ? await supabaseAdmin.storage.from(REPLAYS_BUCKET).createSignedUrls(paths, SIGNED_URL_TTL_SECONDS)
+  const { data: statsRows, error: statsError } = paths.length
+    ? await supabaseAdmin
+        .from('replay_download_stats')
+        .select('path, download_count')
+        .in('path', paths)
     : { data: [], error: null };
 
-  if (signedError) {
-    console.error('Failed to create signed URLs for replay list', signedError);
-    return NextResponse.json({ error: 'signed_url_failed' }, { status: 500 });
+  if (statsError) {
+    console.error('Failed to fetch replay download stats', statsError);
   }
 
-  const signedMap = new Map<string, string>();
-  signedUrls?.forEach(entry => {
-    const path = typeof entry.path === 'string' ? entry.path : null;
-    const signedUrl = typeof entry.signedUrl === 'string' ? entry.signedUrl : null;
-    if (path && signedUrl) {
-      signedMap.set(path, signedUrl);
+  const downloadMap = new Map<string, number>();
+  statsRows?.forEach(row => {
+    const key = typeof row.path === 'string' ? row.path : null;
+    const count = typeof row.download_count === 'number' ? row.download_count : Number(row.download_count ?? 0);
+    if (key) {
+      downloadMap.set(key, Number.isFinite(count) ? count : 0);
     }
   });
 
@@ -97,8 +109,16 @@ export async function GET(req: NextRequest) {
       originalName,
       size: item.metadata?.size ?? null,
       uploadedAt: item.created_at ?? item.updated_at ?? null,
-      downloadUrl: signedMap.get(item.name) ?? null,
+      downloads: downloadMap.get(item.name) ?? 0,
     };
+  });
+
+  replays.sort((a, b) => {
+    const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
+    if (downloadDelta !== 0) return downloadDelta;
+    const timeA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+    const timeB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+    return timeB - timeA;
   });
 
   return NextResponse.json({ replays }, {

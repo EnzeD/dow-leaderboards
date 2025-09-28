@@ -7,7 +7,7 @@ type ReplayListEntry = {
   originalName: string;
   size: number | null;
   uploadedAt: string | null;
-  downloadUrl: string | null;
+  downloads: number;
 };
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -31,6 +31,14 @@ const resolveErrorMessage = (code: string) => {
       return 'Supabase is not configured. Add your project keys to the environment.';
     case 'upload_failed':
       return 'We could not save the replay. Please try again shortly.';
+    case 'download_failed':
+      return 'We could not generate a download link. Please try again.';
+    case 'missing_signed_url':
+      return 'Download link was empty. Refresh the list and try again.';
+    case 'increment_failed':
+      return 'Download link is ready, but we could not record the download count.';
+    case 'clipboard_unavailable':
+      return 'Clipboard access is blocked by your browser. Try downloading instead.';
     default:
       return 'Something went wrong. Please try again shortly.';
   }
@@ -68,10 +76,19 @@ const formatDate = (value: string | null) => {
 
 const sortReplays = (entries: ReplayListEntry[]) => {
   return [...entries].sort((a, b) => {
+    const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
+    if (downloadDelta !== 0) {
+      return downloadDelta;
+    }
     const timeA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
     const timeB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
     return timeB - timeA;
   });
+};
+
+const formatDownloads = (value: number | null | undefined) => {
+  const count = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return `${count} download${count === 1 ? '' : 's'}`;
 };
 
 const ReplaysTab = () => {
@@ -81,6 +98,9 @@ const ReplaysTab = () => {
   const [uploadErrorCode, setUploadErrorCode] = useState<string | null>(null);
   const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [actionErrorCode, setActionErrorCode] = useState<string | null>(null);
+  const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
+  const [copyingPath, setCopyingPath] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -94,15 +114,40 @@ const ReplaysTab = () => {
         cache: 'no-store',
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
         const code = payload?.error ?? 'list_failed';
         throw new Error(code);
       }
 
-      const payload = await response.json();
-      const entries = Array.isArray(payload.replays) ? payload.replays : [];
-      setReplays(sortReplays(entries));
+      const entries = Array.isArray(payload?.replays) ? payload.replays : [];
+      const normalized = entries
+        .map((entry: any) => {
+          const path = typeof entry?.path === 'string' ? entry.path : '';
+          const sizeRaw = typeof entry?.size === 'number'
+            ? entry.size
+            : entry?.size === null || entry?.size === undefined
+              ? null
+              : Number(entry?.size);
+          const downloadsRaw = typeof entry?.downloads === 'number'
+            ? entry.downloads
+            : entry?.downloads === null || entry?.downloads === undefined
+              ? 0
+              : Number(entry?.downloads);
+
+          return {
+            path,
+            originalName: typeof entry?.originalName === 'string' ? entry.originalName : path || 'Unknown replay',
+            size: typeof sizeRaw === 'number' && Number.isFinite(sizeRaw) ? sizeRaw : null,
+            uploadedAt: typeof entry?.uploadedAt === 'string' ? entry.uploadedAt : null,
+            downloads: Number.isFinite(downloadsRaw) ? downloadsRaw : 0,
+          } satisfies ReplayListEntry;
+        })
+        .filter((entry: ReplayListEntry) => Boolean(entry.path));
+
+      setReplays(sortReplays(normalized));
+      setActionErrorCode(null);
     } catch (error) {
       const code = error instanceof Error ? error.message : 'list_failed';
       setListErrorCode(code || 'list_failed');
@@ -168,25 +213,108 @@ const ReplaysTab = () => {
     }
   }, [loadReplays]);
 
+  const requestSignedUrl = useCallback(async (path: string) => {
+    const response = await fetch(`/api/replays?path=${encodeURIComponent(path)}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const code = payload?.error ?? 'download_failed';
+      throw new Error(code);
+    }
+
+    const url = typeof payload?.url === 'string' ? payload.url : null;
+    if (!url) {
+      throw new Error('missing_signed_url');
+    }
+
+    const downloadCount = typeof payload?.downloadCount === 'number'
+      ? Number(payload.downloadCount)
+      : null;
+
+    return { url, downloadCount } as const;
+  }, []);
+
   const handleRefresh = useCallback(() => {
+    setActionErrorCode(null);
     void loadReplays();
   }, [loadReplays]);
 
-  const handleDownload = useCallback((url: string | null) => {
-    if (!url) return;
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }, []);
+  const handleDownload = useCallback(async (path: string) => {
+    if (!path) return;
 
-  const handleCopyLink = useCallback((url: string | null) => {
-    if (!url) return;
+    setActionErrorCode(null);
+    setDownloadingPath(path);
+
+    try {
+      const { url, downloadCount } = await requestSignedUrl(path);
+
+      if (typeof downloadCount === 'number') {
+        setReplays(prev =>
+          sortReplays(
+            prev.map(entry =>
+              entry.path === path ? { ...entry, downloads: downloadCount } : entry
+            )
+          )
+        );
+      } else {
+        void loadReplays();
+      }
+
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'download_failed';
+      setActionErrorCode(code || 'download_failed');
+    } finally {
+      setDownloadingPath(null);
+    }
+  }, [loadReplays, requestSignedUrl]);
+
+  const handleCopyLink = useCallback(async (path: string) => {
+    if (!path) return;
     if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+      setActionErrorCode('clipboard_unavailable');
       return;
     }
-    void navigator.clipboard.writeText(url).catch(() => undefined);
-  }, []);
+
+    setActionErrorCode(null);
+    setCopyingPath(path);
+
+    try {
+      const { url, downloadCount } = await requestSignedUrl(path);
+
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch (copyError) {
+        console.error('Failed to copy replay download URL', copyError);
+        throw new Error('clipboard_unavailable');
+      }
+
+      if (typeof downloadCount === 'number') {
+        setReplays(prev =>
+          sortReplays(
+            prev.map(entry =>
+              entry.path === path ? { ...entry, downloads: downloadCount } : entry
+            )
+          )
+        );
+      } else {
+        void loadReplays();
+      }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'download_failed';
+      setActionErrorCode(code || 'download_failed');
+    } finally {
+      setCopyingPath(null);
+    }
+  }, [loadReplays, requestSignedUrl]);
 
   const uploadErrorMessage = uploadErrorCode ? resolveErrorMessage(uploadErrorCode) : null;
   const listErrorMessage = listErrorCode ? resolveErrorMessage(listErrorCode) : null;
+  const actionErrorMessage = actionErrorCode ? resolveErrorMessage(actionErrorCode) : null;
 
   return (
     <div className="space-y-6">
@@ -255,6 +383,11 @@ const ReplaysTab = () => {
             {listErrorMessage}
           </div>
         )}
+        {actionErrorMessage && (
+          <div className="rounded-md border border-amber-700/40 bg-amber-900/20 px-4 py-3 text-sm text-amber-100">
+            {actionErrorMessage}
+          </div>
+        )}
 
         {loadingList ? (
           <div className="space-y-3">
@@ -278,25 +411,25 @@ const ReplaysTab = () => {
                     {replay.originalName}
                   </p>
                   <p className="text-sm text-neutral-400">
-                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)}
+                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)} · {formatDownloads(replay.downloads)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    onClick={() => handleDownload(replay.downloadUrl)}
-                    disabled={!replay.downloadUrl}
+                    onClick={() => void handleDownload(replay.path)}
+                    disabled={downloadingPath === replay.path}
                     className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Download
+                    {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleCopyLink(replay.downloadUrl)}
-                    disabled={!replay.downloadUrl}
+                    onClick={() => void handleCopyLink(replay.path)}
+                    disabled={copyingPath === replay.path}
                     className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Copy link
+                    {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
                   </button>
                 </div>
               </div>
