@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
