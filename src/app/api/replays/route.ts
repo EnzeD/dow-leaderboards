@@ -79,8 +79,10 @@ export async function GET(req: NextRequest) {
 
   const signedMap = new Map<string, string>();
   signedUrls?.forEach(entry => {
-    if (entry.signedUrl) {
-      signedMap.set(entry.path, entry.signedUrl);
+    const path = typeof entry.path === 'string' ? entry.path : null;
+    const signedUrl = typeof entry.signedUrl === 'string' ? entry.signedUrl : null;
+    if (path && signedUrl) {
+      signedMap.set(path, signedUrl);
     }
   });
 
