@@ -572,10 +572,75 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               }
 
               return (
-                <div key={replay.path} className="bg-neutral-900 border border-neutral-600/30 rounded-lg shadow-lg overflow-hidden">
-                  <div className="flex">
-                    {/* Map image section - vertically centered */}
-                    <div className="shrink-0 bg-neutral-800/50 p-3 border-r border-neutral-700/30 flex flex-col items-center justify-center">
+                <div key={replay.path} className="bg-neutral-900 border border-neutral-600/30 rounded-lg shadow-lg overflow-hidden p-4">
+                  {/* Header with title and actions - title left, buttons right */}
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-semibold text-white truncate" title={replay.originalName}>
+                        {replay.submittedName || replay.replayName || replay.originalName}
+                      </h4>
+                      <div className="flex items-center gap-3 text-xs text-neutral-400 mt-1">
+                        <span className="text-neutral-200 font-medium">
+                          {formatDownloadsCount(replay.downloads)} {formatDownloadsCount(replay.downloads) === 1 ? 'download' : 'downloads'}
+                        </span>
+                        <span>•</span>
+                        <span>{formatDate(replay.uploadedAt)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleDownload(replay.path)}
+                        disabled={downloadingPath === replay.path}
+                        className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {downloadingPath === replay.path ? 'Downloading...' : 'Download'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyLink(replay.path)}
+                        disabled={copyingPath === replay.path}
+                        className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {copyingPath === replay.path ? 'Copying...' : 'Copy Link'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Teams display with map in the middle */}
+                  <div className="flex flex-col sm:flex-row gap-3 items-start">
+                    {/* Team 1 */}
+                    <div className="flex-1">
+                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 1</div>
+                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
+                        {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
+                          const enrichedProfile = profile as EnrichedReplayProfile;
+                          return (
+                            <div key={`t1-${idx}`} className="flex items-center justify-between gap-2 py-1">
+                              <PlayerTeam
+                                profiles={[enrichedProfile]}
+                                team={1}
+                                onPlayerClick={onPlayerClick}
+                                showDetails={true}
+                                compact={false}
+                                className="text-neutral-200 text-xs flex-1"
+                              />
+                              {enrichedProfile.faction_rating && (
+                                <span className="text-xs font-semibold text-yellow-400">
+                                  {enrichedProfile.faction_rating} ELO
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {(!replay.profiles || !replay.profiles.filter(p => p.team === 1).length) && (
+                          <span className="text-xs text-neutral-500">No players</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Map in the middle */}
+                    <div className="shrink-0 flex flex-col items-center justify-center px-3">
                       {mapImagePath ? (
                         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/30 bg-neutral-900">
                           <img
@@ -591,7 +656,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         </div>
                       )}
                       <div className="mt-2 text-center">
-                        <div className="text-xs text-neutral-200 font-medium truncate" title={mapDisplayName}>
+                        <div className="text-xs text-neutral-200 font-medium" title={mapDisplayName}>
                           {mapDisplayName}
                         </div>
                         {duration && (
@@ -602,115 +667,44 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       </div>
                     </div>
 
-                    {/* Main content section */}
-                    <div className="flex-1 p-4">
-                      {/* Header with title and actions */}
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-semibold text-white truncate" title={replay.originalName}>
-                            {replay.submittedName || replay.replayName || replay.originalName}
-                          </h4>
-                          <div className="flex items-center gap-3 text-xs text-neutral-400 mt-1">
-                            <span className="text-neutral-200 font-medium">
-                              {formatDownloadsCount(replay.downloads)} {formatDownloadsCount(replay.downloads) === 1 ? 'download' : 'downloads'}
-                            </span>
-                            <span>•</span>
-                            <span>{formatDate(replay.uploadedAt)}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleDownload(replay.path)}
-                            disabled={downloadingPath === replay.path}
-                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {downloadingPath === replay.path ? 'Downloading...' : 'Download'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleCopyLink(replay.path)}
-                            disabled={copyingPath === replay.path}
-                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {copyingPath === replay.path ? 'Copying...' : 'Copy Link'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Teams display - similar to match history */}
-                      <div className="space-y-2">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          {/* Team 1 */}
-                          <div className="flex-1">
-                            <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 1</div>
-                            <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
-                              {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
-                                const enrichedProfile = profile as EnrichedReplayProfile;
-                                return (
-                                  <div key={`t1-${idx}`} className="flex items-center justify-between gap-2 py-1">
-                                    <PlayerTeam
-                                      profiles={[enrichedProfile]}
-                                      team={1}
-                                      onPlayerClick={onPlayerClick}
-                                      showDetails={true}
-                                      compact={false}
-                                      className="text-neutral-200 text-xs flex-1"
-                                    />
-                                    {enrichedProfile.faction_rating && (
-                                      <span className="text-xs font-semibold text-yellow-400">
-                                        {enrichedProfile.faction_rating} ELO
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              {(!replay.profiles || !replay.profiles.filter(p => p.team === 1).length) && (
-                                <span className="text-xs text-neutral-500">No players</span>
+                    {/* Team 2 */}
+                    <div className="flex-1">
+                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 2</div>
+                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
+                        {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
+                          const enrichedProfile = profile as EnrichedReplayProfile;
+                          return (
+                            <div key={`t2-${idx}`} className="flex items-center justify-between gap-2 py-1">
+                              <PlayerTeam
+                                profiles={[enrichedProfile]}
+                                team={2}
+                                onPlayerClick={onPlayerClick}
+                                showDetails={true}
+                                compact={false}
+                                className="text-neutral-200 text-xs flex-1"
+                              />
+                              {enrichedProfile.faction_rating && (
+                                <span className="text-xs font-semibold text-yellow-400">
+                                  {enrichedProfile.faction_rating} ELO
+                                </span>
                               )}
                             </div>
-                          </div>
-                          {/* Team 2 */}
-                          <div className="flex-1">
-                            <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 2</div>
-                            <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
-                              {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
-                                const enrichedProfile = profile as EnrichedReplayProfile;
-                                return (
-                                  <div key={`t2-${idx}`} className="flex items-center justify-between gap-2 py-1">
-                                    <PlayerTeam
-                                      profiles={[enrichedProfile]}
-                                      team={2}
-                                      onPlayerClick={onPlayerClick}
-                                      showDetails={true}
-                                      compact={false}
-                                      className="text-neutral-200 text-xs flex-1"
-                                    />
-                                    {enrichedProfile.faction_rating && (
-                                      <span className="text-xs font-semibold text-yellow-400">
-                                        {enrichedProfile.faction_rating} ELO
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                              {(!replay.profiles || !replay.profiles.filter(p => p.team === 2).length) && (
-                                <span className="text-xs text-neutral-500">No players</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                          );
+                        })}
+                        {(!replay.profiles || !replay.profiles.filter(p => p.team === 2).length) && (
+                          <span className="text-xs text-neutral-500">No players</span>
+                        )}
                       </div>
-
-                      {/* Comment if available */}
-                      {replay.submittedComment && (
-                        <div className="mt-3 pt-3 border-t border-neutral-700/30">
-                          <div className="text-xs text-neutral-400 font-semibold mb-1">Comment</div>
-                          <p className="text-xs text-neutral-300">{replay.submittedComment}</p>
-                        </div>
-                      )}
                     </div>
                   </div>
+
+                  {/* Comment if available */}
+                  {replay.submittedComment && (
+                    <div className="mt-4 pt-3 border-t border-neutral-700/30">
+                      <div className="text-xs text-neutral-400 font-semibold mb-1">Comment</div>
+                      <p className="text-xs text-neutral-300">{replay.submittedComment}</p>
+                    </div>
+                  )}
                 </div>
               );
             })}
