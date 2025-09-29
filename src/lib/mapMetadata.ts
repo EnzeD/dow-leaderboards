@@ -23,7 +23,7 @@ const MAP_METADATA: Record<string, MapMetadata> = {
   "2P_EMPERORS_VALLEY": { id: "2P_EMPERORS_VALLEY", name: `Emperor's Valley (2)`, imagePath: `/assets/maps/2p_emperors_valley_mm.webp`, fallbackName: `Emperors Valley` },
   "2P_FACEOFF": { id: "2P_FACEOFF", name: `Faceoff (2)`, imagePath: `/assets/maps/2p_faceoff_mm.webp`, fallbackName: `Faceoff` },
   "2P_FALLEN_CITY": { id: "2P_FALLEN_CITY", name: `Fallen City (2)`, imagePath: `/assets/maps/2p_fallen_city_mm.webp`, fallbackName: `Fallen City` },
-  "2P_FATA_MORGANA": { id: "2P_FATA_MORGANA", name: `Fata Morga (2)`, imagePath: `/assets/maps/2p_fata_morgana_mm.webp`, fallbackName: `Fata Morgana` },
+  "2P_FATA_MORGANA": { id: "2P_FATA_MORGANA", name: `Fata Morgana (2)`, imagePath: `/assets/maps/2p_fata_morgana_mm.webp`, fallbackName: `Fata Morgana` },
   "2P_FEAR": { id: "2P_FEAR", name: `Fear (2)`, imagePath: `/assets/maps/2p_fear_mm.webp`, fallbackName: `Fear` },
   "2P_FRAZIERS_DEMISE": { id: "2P_FRAZIERS_DEMISE", name: `Frazier's Demise (2)`, imagePath: `/assets/maps/2p_fraziersdemise_mm.webp`, fallbackName: `Fraziers Demise` },
   "2P_FROSTBITE_RIVER": { id: "2P_FROSTBITE_RIVER", name: `Frostbite River (2)`, imagePath: `/assets/maps/2p_frostbite_river_mm.webp`, fallbackName: `Frostbite River` },
@@ -140,6 +140,7 @@ const MAP_METADATA: Record<string, MapMetadata> = {
 
 type MapsJsonEntry = {
   id?: string;
+  en?: string;
   aliases?: string[];
 };
 
@@ -148,12 +149,28 @@ const mapSourceEntries: MapsJsonEntry[] = Array.isArray(rawMapSource?.mapname)
   ? (rawMapSource?.mapname as MapsJsonEntry[])
   : [];
 
+// Create a map of English names to IDs for easier lookup
+const NAME_TO_ID_MAP: Record<string, string> = {};
+
 for (const entry of mapSourceEntries) {
   const canonicalId = entry?.id;
   if (!canonicalId) continue;
 
   const base = MAP_METADATA[canonicalId];
   if (!base) continue;
+
+  // Add English name mapping from the source JSON "en" field
+  if (entry.en) {
+    NAME_TO_ID_MAP[entry.en.toLowerCase()] = canonicalId;
+  }
+
+  // Also add mappings from the metadata names for completeness
+  if (base.name) {
+    NAME_TO_ID_MAP[base.name.toLowerCase()] = canonicalId;
+  }
+  if (base.fallbackName) {
+    NAME_TO_ID_MAP[base.fallbackName.toLowerCase()] = canonicalId;
+  }
 
   if (!Array.isArray(entry.aliases)) continue;
 
@@ -169,19 +186,58 @@ for (const entry of mapSourceEntries) {
 const normalizeId = (mapId?: string | null): string | null => {
   if (mapId === null || mapId === undefined) return null;
 
-  const trimmed = String(mapId).trim();
+  let trimmed = String(mapId).trim();
   if (!trimmed) return null;
 
-  const upper = trimmed.toUpperCase();
+  // Remove common path prefixes and file extensions
+  trimmed = trimmed
+    .replace(/^.*[\\\/]/, '') // Remove path
+    .replace(/\.(sga|sgb)$/i, '') // Remove file extensions
+    .replace(/^(mp\/)?/, ''); // Remove mp/ prefix if present
+
+  // Convert to uppercase and replace spaces with underscores
+  const upper = trimmed.toUpperCase().replace(/\s+/g, '_');
+
+  // Remove leading non-alphanumeric characters
   const sanitized = upper.replace(/^[^A-Z0-9]+/, '');
 
   return sanitized || upper;
 };
 
 export const getMapMetadata = (mapId?: string | null): MapMetadata | null => {
+  if (!mapId) return null;
+
+  // First try to match by English name (for replays)
+  const lowerName = mapId.toLowerCase().trim();
+  if (NAME_TO_ID_MAP[lowerName]) {
+    return MAP_METADATA[NAME_TO_ID_MAP[lowerName]] || null;
+  }
+
+  // Try normalized ID lookup
   const key = normalizeId(mapId);
   if (!key) return null;
-  return MAP_METADATA[key] || null;
+
+  // Try direct lookup first
+  if (MAP_METADATA[key]) return MAP_METADATA[key];
+
+  // Try without the player count prefix (2P_, 4P_, etc.)
+  const withoutPlayerCount = key.replace(/^\d+P_/, '');
+  for (const [metaKey, meta] of Object.entries(MAP_METADATA)) {
+    if (metaKey.endsWith('_' + withoutPlayerCount)) {
+      return meta;
+    }
+  }
+
+  // Try fuzzy matching on the base name
+  const baseKey = key.replace(/^\d+P_/, '').toLowerCase();
+  for (const [metaKey, meta] of Object.entries(MAP_METADATA)) {
+    const metaBase = metaKey.replace(/^\d+P_/, '').toLowerCase();
+    if (metaBase === baseKey) {
+      return meta;
+    }
+  }
+
+  return null;
 };
 
 export const getMapName = (mapId?: string | null): string => {
