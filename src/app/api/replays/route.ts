@@ -254,7 +254,27 @@ export async function POST(req: NextRequest) {
         profiles: Array.isArray(parsed?.profiles) ? parsed.profiles : null,
         raw_metadata: parsed ?? null,
       };
-    } catch (parseError) {
+    } catch (parseError: any) {
+      // Check if this is specifically a non-DoW:DE replay file
+      const errorMessage = parseError?.message || '';
+      if (errorMessage.includes('Not a valid replay file for Warhammer 40,000: Dawn of War - Definitive Edition')) {
+        console.log('Invalid DoW:DE replay file detected, removing from storage:', objectKey);
+
+        // Delete the invalid file from storage
+        const { error: deleteError } = await supabaseAdmin
+          .storage
+          .from(REPLAYS_BUCKET)
+          .remove([objectKey]);
+
+        if (deleteError) {
+          console.error('Failed to delete invalid replay file:', deleteError);
+        }
+
+        // Return specific error for non-DoW:DE files
+        return NextResponse.json({ error: 'invalid_dowde_replay' }, { status: 400 });
+      }
+
+      // For other parse errors, continue with null metadata
       console.error('Replay parse failed', parseError);
       meta = {
         replay_name: null,

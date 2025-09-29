@@ -38,6 +38,8 @@ const resolveErrorMessage = (code: string) => {
       return 'Select a replay file before uploading.';
     case 'invalid_form_data':
       return 'Could not read the upload request. Please try again.';
+    case 'invalid_dowde_replay':
+      return 'This replay file is not from Dawn of War: Definitive Edition. Please upload a valid DoW:DE replay file.';
     case 'list_failed':
       return 'Could not load community replays. Please refresh in a moment.';
     case 'signed_url_failed':
