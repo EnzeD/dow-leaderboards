@@ -6,6 +6,10 @@ export interface ReplayPlayerMatch {
   profile_id: string;
   confidence: number;
   method: 'exact' | 'fuzzy' | 'manual';
+  faction?: string;
+  rating?: number;
+  rank?: number;
+  leaderboard_id?: number;
 }
 
 export interface ReplayPlayerLink {
@@ -14,6 +18,9 @@ export interface ReplayPlayerLink {
   profile_id: string;
   match_confidence: number;
   match_method: string;
+  rating?: number;
+  rank?: number;
+  leaderboard_id?: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,22 +42,57 @@ export interface EnrichedReplayProfile {
 }
 
 /**
- * Maps faction names to 1v1 leaderboard IDs for rating lookups
+ * Gets game mode from map name (2P = 1v1, 4P = 2v2, 6P = 3v3, 8P = 4v4)
  */
-function getFactionLeaderboardId(factionName: string): number | null {
-  const factionToLeaderboardMap: Record<string, number> = {
-    'Chaos': 1,
-    'Dark Eldar': 2,
-    'Eldar': 3,
-    'Imperial Guard': 4,
-    'Necrons': 5,
-    'Orks': 6,
-    'Sisters of Battle': 7,
-    'Space Marines': 8,
-    'Tau': 9
+export function getGameModeFromMapName(mapName: string | null | undefined): string {
+  if (!mapName) return '1v1';
+  const upper = mapName.toUpperCase();
+  if (upper.includes('8P') || upper.includes('(8)')) return '4v4';
+  if (upper.includes('6P') || upper.includes('(6)')) return '3v3';
+  if (upper.includes('5P') || upper.includes('(5)')) return '3v3'; // 5P maps count as 3v3
+  if (upper.includes('4P') || upper.includes('(4)')) return '2v2';
+  if (upper.includes('3P') || upper.includes('(3)')) return '2v2'; // 3P maps count as 2v2
+  if (upper.includes('2P') || upper.includes('(2)')) return '1v1';
+  return '1v1'; // Default to 1v1
+}
+
+/**
+ * Maps faction names and game modes to leaderboard IDs for rating lookups
+ *
+ * Leaderboard ID structure:
+ * 1v1: 1-9 (Chaos to Tau)
+ * 2v2: 10-18 (Chaos to Tau)
+ * 3v3: 19-27 (Chaos to Tau)
+ * 4v4: 28-36 (Chaos to Tau)
+ */
+function getFactionLeaderboardId(factionName: string, gameMode: string = '1v1'): number | null {
+  const factionOffsets: Record<string, number> = {
+    'Chaos': 0,
+    'Dark Eldar': 1,
+    'Eldar': 2,
+    'Imperial Guard': 3,
+    'Necrons': 4,
+    'Orks': 5,
+    'Sisters of Battle': 6,
+    'Space Marines': 7,
+    'Tau': 8
   };
 
-  return factionToLeaderboardMap[factionName] || null;
+  const gameModeBase: Record<string, number> = {
+    '1v1': 1,
+    '2v2': 10,
+    '3v3': 19,
+    '4v4': 28
+  };
+
+  const offset = factionOffsets[factionName];
+  const base = gameModeBase[gameMode];
+
+  if (offset === undefined || base === undefined) {
+    return null;
+  }
+
+  return base + offset;
 }
 
 /**
@@ -97,7 +139,10 @@ export async function saveReplayPlayerLinks(replayPath: string, matches: ReplayP
         replay_player_alias: match.alias,
         profile_id: parseInt(match.profile_id),
         match_confidence: match.confidence,
-        match_method: match.method
+        match_method: match.method,
+        rating: match.rating || null,
+        rank: match.rank || null,
+        leaderboard_id: match.leaderboard_id || null
       }));
 
       const { error } = await supabase
@@ -144,7 +189,8 @@ export async function getReplayPlayerLinks(replayPath: string): Promise<ReplayPl
  */
 export async function enrichReplayProfiles(
   replayPath: string,
-  profiles: Array<{ alias: string; faction: string; team: number }>
+  profiles: Array<{ alias: string; faction: string; team: number }>,
+  mapName?: string | null
 ): Promise<EnrichedReplayProfile[]> {
   try {
     // Get existing links
@@ -174,7 +220,6 @@ export async function enrichReplayProfiles(
     // Get player details for linked profiles
     const profileIds = Array.from(linkMap.values()).map(link => parseInt(link.profile_id));
     let playerDetails = new Map();
-    let factionStats = new Map();
 
     if (profileIds.length > 0) {
       // Get basic player details
@@ -185,34 +230,6 @@ export async function enrichReplayProfiles(
 
       if (playerData) {
         playerDetails = new Map(playerData.map(player => [player.profile_id, player]));
-      }
-
-      // Get faction-specific stats for each player
-      const factionSet = new Set(profiles.map(p => p.faction));
-      const uniqueFactions = Array.from(factionSet);
-      const leaderboardIds = uniqueFactions
-        .map(faction => getFactionLeaderboardId(faction))
-        .filter(id => id !== null) as number[];
-
-      if (leaderboardIds.length > 0) {
-        const { data: statsData } = await supabase
-          .from('player_leaderboard_stats')
-          .select('profile_id, leaderboard_id, rating, rank, wins, losses')
-          .in('profile_id', profileIds)
-          .in('leaderboard_id', leaderboardIds)
-          .order('snapshot_at', { ascending: false });
-
-        if (statsData) {
-          // Group stats by profile_id and leaderboard_id (latest snapshot only)
-          const statsMap = new Map();
-          statsData.forEach(stat => {
-            const key = `${stat.profile_id}-${stat.leaderboard_id}`;
-            if (!statsMap.has(key)) {
-              statsMap.set(key, stat);
-            }
-          });
-          factionStats = statsMap;
-        }
       }
     }
 
@@ -235,16 +252,12 @@ export async function enrichReplayProfiles(
           enriched.max_rating = playerDetail.max_rating;
         }
 
-        // Add faction-specific stats
-        const leaderboardId = getFactionLeaderboardId(profile.faction);
-        if (leaderboardId) {
-          const factionStat = factionStats.get(`${link.profile_id}-${leaderboardId}`);
-          if (factionStat) {
-            enriched.faction_rating = factionStat.rating;
-            enriched.faction_rank = factionStat.rank;
-            enriched.faction_wins = factionStat.wins;
-            enriched.faction_losses = factionStat.losses;
-          }
+        // Use the saved ELO data from replay_player_links
+        if (link.rating !== undefined && link.rating !== null) {
+          enriched.faction_rating = link.rating;
+        }
+        if (link.rank !== undefined && link.rank !== null) {
+          enriched.faction_rank = link.rank;
         }
       }
 
@@ -254,6 +267,65 @@ export async function enrichReplayProfiles(
     console.error('Failed to enrich replay profiles:', error);
     // Return original profiles without enrichment
     return profiles.map(profile => ({ ...profile }));
+  }
+}
+
+/**
+ * Fetches player stats from Relic API for a given profile
+ */
+export async function fetchPlayerStatsFromRelic(
+  profileId: string,
+  factionName: string,
+  gameMode: string
+): Promise<{ rating?: number; rank?: number; leaderboardId?: number } | null> {
+  try {
+    // First get the player's steam ID from database
+    const { data: playerData, error: playerError } = await supabase
+      .from('players')
+      .select('steam_id64')
+      .eq('profile_id', parseInt(profileId))
+      .maybeSingle();
+
+    if (playerError || !playerData?.steam_id64) {
+      console.log(`No steam ID found for profile ${profileId}`);
+      return null;
+    }
+
+    // Fetch personal stats from Relic API
+    const profileName = encodeURIComponent(JSON.stringify([`/steam/${playerData.steam_id64}`]));
+    const url = `https://dow-api.reliclink.com/community/leaderboard/getPersonalStat?&title=dow1-de&profile_names=${profileName}`;
+    const res = await fetch(url, { cache: "no-store" });
+
+    if (!res.ok) {
+      console.error('Failed to fetch personal stats from Relic:', res.status);
+      return null;
+    }
+
+    const data: any = await res.json();
+    const lbStatsRaw: any[] = Array.isArray(data?.leaderboardStats) ? data.leaderboardStats : [];
+
+    // Get the correct leaderboard ID for this faction/mode combination
+    const leaderboardId = getFactionLeaderboardId(factionName, gameMode);
+    if (!leaderboardId) {
+      console.log(`Could not determine leaderboard ID for ${factionName} ${gameMode}`);
+      return null;
+    }
+
+    // Find the stats for this specific leaderboard
+    const stats = lbStatsRaw.find(s => Number(s.leaderboard_id) === leaderboardId);
+    if (!stats) {
+      console.log(`No stats found for leaderboard ${leaderboardId} (${factionName} ${gameMode})`);
+      return null;
+    }
+
+    return {
+      rating: Number(stats.rating ?? 0) || undefined,
+      rank: Number(stats.rank ?? -1) || undefined,
+      leaderboardId
+    };
+  } catch (error) {
+    console.error('Failed to fetch player stats from Relic:', error);
+    return null;
   }
 }
 

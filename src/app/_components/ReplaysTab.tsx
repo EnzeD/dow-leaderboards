@@ -541,11 +541,16 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               const mapImagePath = getMapImage(replay.mapName);
               const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
 
+              // Debug: Check if profiles have faction_rating
+              if (replay.profiles && replay.profiles.length > 0) {
+                console.log('Replay profiles for', replay.replayName || replay.originalName, ':', replay.profiles);
+              }
+
               return (
                 <div key={replay.path} className="bg-neutral-900 border border-neutral-600/30 rounded-lg shadow-lg overflow-hidden">
                   <div className="flex">
-                    {/* Map image section - similar to match history */}
-                    <div className="shrink-0 bg-neutral-800/50 p-3 border-r border-neutral-700/30">
+                    {/* Map image section - vertically centered */}
+                    <div className="shrink-0 bg-neutral-800/50 p-3 border-r border-neutral-700/30 flex flex-col items-center justify-center">
                       {mapImagePath ? (
                         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/30 bg-neutral-900">
                           <img
@@ -615,28 +620,58 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                           <div className="flex-1">
                             <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 1</div>
                             <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
-                              <PlayerTeam
-                                profiles={replay.profiles as EnrichedReplayProfile[]}
-                                team={1}
-                                onPlayerClick={onPlayerClick}
-                                showDetails={true}
-                                compact={false}
-                                className="text-neutral-200 text-xs"
-                              />
+                              {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
+                                const enrichedProfile = profile as EnrichedReplayProfile;
+                                return (
+                                  <div key={`t1-${idx}`} className="flex items-center justify-between gap-2 py-1">
+                                    <PlayerTeam
+                                      profiles={[enrichedProfile]}
+                                      team={1}
+                                      onPlayerClick={onPlayerClick}
+                                      showDetails={true}
+                                      compact={false}
+                                      className="text-neutral-200 text-xs flex-1"
+                                    />
+                                    {enrichedProfile.faction_rating && (
+                                      <span className="text-xs font-semibold text-yellow-400">
+                                        {enrichedProfile.faction_rating} ELO
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {(!replay.profiles || !replay.profiles.filter(p => p.team === 1).length) && (
+                                <span className="text-xs text-neutral-500">No players</span>
+                              )}
                             </div>
                           </div>
                           {/* Team 2 */}
                           <div className="flex-1">
                             <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 2</div>
                             <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
-                              <PlayerTeam
-                                profiles={replay.profiles as EnrichedReplayProfile[]}
-                                team={2}
-                                onPlayerClick={onPlayerClick}
-                                showDetails={true}
-                                compact={false}
-                                className="text-neutral-200 text-xs"
-                              />
+                              {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
+                                const enrichedProfile = profile as EnrichedReplayProfile;
+                                return (
+                                  <div key={`t2-${idx}`} className="flex items-center justify-between gap-2 py-1">
+                                    <PlayerTeam
+                                      profiles={[enrichedProfile]}
+                                      team={2}
+                                      onPlayerClick={onPlayerClick}
+                                      showDetails={true}
+                                      compact={false}
+                                      className="text-neutral-200 text-xs flex-1"
+                                    />
+                                    {enrichedProfile.faction_rating && (
+                                      <span className="text-xs font-semibold text-yellow-400">
+                                        {enrichedProfile.faction_rating} ELO
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {(!replay.profiles || !replay.profiles.filter(p => p.team === 2).length) && (
+                                <span className="text-xs text-neutral-500">No players</span>
+                              )}
                             </div>
                           </div>
                         </div>

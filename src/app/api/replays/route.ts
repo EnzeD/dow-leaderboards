@@ -6,7 +6,7 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { parseReplay } from 'dowde-replay-parser';
-import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks } from '@/lib/replay-player-matching';
+import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
         let enrichedProfiles = null;
         if (Array.isArray(meta?.profiles) && meta.profiles.length > 0) {
           try {
-            enrichedProfiles = await enrichReplayProfiles(item.name, meta.profiles);
+            enrichedProfiles = await enrichReplayProfiles(item.name, meta.profiles, meta?.map_name);
           } catch (error) {
             console.error('Failed to enrich profiles for replay', item.name, error);
             enrichedProfiles = meta.profiles; // Fallback to original profiles
@@ -291,8 +291,31 @@ export async function POST(req: NextRequest) {
       try {
         const matches = await matchReplayPlayersToDatabase(objectKey);
         if (matches.length > 0) {
-          await saveReplayPlayerLinks(objectKey, matches);
-          console.log(`Linked ${matches.length} players for replay ${objectKey}`);
+          // Determine game mode from map name
+          const gameMode = getGameModeFromMapName(meta.map_name);
+
+          // Fetch ELO data for each matched player
+          const enrichedMatches = await Promise.all(matches.map(async (match) => {
+            // Find the profile with this alias to get their faction
+            const profile = meta.profiles.find((p: any) => p.alias === match.alias);
+            if (!profile?.faction) {
+              return match;
+            }
+
+            // Fetch player stats from Relic API
+            const stats = await fetchPlayerStatsFromRelic(match.profile_id, profile.faction, gameMode);
+
+            return {
+              ...match,
+              faction: profile.faction,
+              rating: stats?.rating,
+              rank: stats?.rank,
+              leaderboard_id: stats?.leaderboardId
+            };
+          }));
+
+          await saveReplayPlayerLinks(objectKey, enrichedMatches);
+          console.log(`Linked ${enrichedMatches.length} players with ELO data for replay ${objectKey}`);
         }
       } catch (linkError) {
         console.error('Failed to auto-link players for replay', objectKey, linkError);
@@ -315,7 +338,7 @@ export async function POST(req: NextRequest) {
   let enrichedProfiles = null;
   if (metaRow && Array.isArray(metaRow.profiles) && metaRow.profiles.length > 0) {
     try {
-      enrichedProfiles = await enrichReplayProfiles(objectKey, metaRow.profiles);
+      enrichedProfiles = await enrichReplayProfiles(objectKey, metaRow.profiles, metaRow.map_name);
     } catch (error) {
       console.error('Failed to enrich profiles for upload response', error);
       enrichedProfiles = metaRow.profiles; // Fallback to original profiles
