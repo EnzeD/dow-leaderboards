@@ -524,7 +524,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         )}
       </div>
 
-      <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl space-y-4">
+      <div className="bg-neutral-800 border border-neutral-600/30 rounded-lg p-6 sm:p-8 shadow-lg space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h3 className="text-xl font-semibold text-white">Community Replays</h3>
@@ -574,7 +574,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               }
 
               return (
-                <div key={replay.path} className="bg-neutral-900 border border-neutral-600/30 rounded-lg shadow-lg overflow-hidden p-4">
+                <div key={replay.path} className="bg-neutral-900 border border-neutral-600/25 rounded-lg shadow-md overflow-hidden p-4">
                   {/* Header with title and actions - title left, buttons right */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="min-w-0">
@@ -614,7 +614,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     {/* Team 1 */}
                     <div className="flex-1">
                       <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 1</div>
-                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
+                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-600/25">
                         {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
                           const enrichedProfile = profile as EnrichedReplayProfile;
                           return (
@@ -644,7 +644,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     {/* Map in the middle */}
                     <div className="shrink-0 flex flex-col items-center justify-center px-3">
                       {mapImagePath ? (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/30 bg-neutral-900">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
                           <img
                             src={mapImagePath}
                             alt={`${mapDisplayName} mini-map`}
@@ -653,7 +653,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                           />
                         </div>
                       ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border border-neutral-600/30 bg-neutral-800/50 flex items-center justify-center">
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border border-neutral-600/25 bg-neutral-800/50 flex items-center justify-center">
                           <span className="text-2xl text-neutral-600">?</span>
                         </div>
                       )}
@@ -672,7 +672,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     {/* Team 2 */}
                     <div className="flex-1">
                       <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 2</div>
-                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-700/30">
+                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-600/25">
                         {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
                           const enrichedProfile = profile as EnrichedReplayProfile;
                           return (
@@ -702,7 +702,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
                   {/* Comment if available */}
                   {replay.submittedComment && (
-                    <div className="mt-4 pt-3 border-t border-neutral-700/30">
+                    <div className="mt-4 pt-3 border-t border-neutral-600/25">
                       <div className="text-xs text-neutral-400 font-semibold mb-1">Comment</div>
                       <p className="text-xs text-neutral-300">{replay.submittedComment}</p>
                     </div>
