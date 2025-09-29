@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'node:buffer';
+import { writeFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
+import { parseReplay } from 'dowde-replay-parser';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -89,6 +93,25 @@ export async function GET(req: NextRequest) {
     console.error('Failed to fetch replay download stats', statsError);
   }
 
+  // Load parsed metadata rows for these paths
+  const { data: metaRows, error: metaError } = paths.length
+    ? await supabaseAdmin
+        .from('replay_metadata')
+        .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status')
+        .in('path', paths)
+    : { data: [], error: null };
+
+  if (metaError) {
+    console.error('Failed to fetch replay metadata', metaError);
+  }
+
+  const metadataMap = new Map<string, any>();
+  metaRows?.forEach(row => {
+    if (typeof row?.path === 'string') {
+      metadataMap.set(row.path, row);
+    }
+  });
+
   const downloadMap = new Map<string, number>();
   statsRows?.forEach(row => {
     const key = typeof row.path === 'string' ? row.path : null;
@@ -98,20 +121,36 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  const replays = fileItems.map(item => {
-    const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
-    const originalName = typeof item.metadata?.originalName === 'string'
-      ? item.metadata.originalName
-      : fallbackName;
+  // Only show published replays in the public list
+  const replays = fileItems
+    .map(item => {
+      const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
+      const originalName = typeof item.metadata?.originalName === 'string'
+        ? item.metadata.originalName
+        : fallbackName;
+      const meta = metadataMap.get(item.name);
+      if (!meta || meta.status !== 'published') {
+        return null;
+      }
 
-    return {
-      path: item.name,
-      originalName,
-      size: item.metadata?.size ?? null,
-      uploadedAt: item.created_at ?? item.updated_at ?? null,
-      downloads: downloadMap.get(item.name) ?? 0,
-    };
-  });
+      return {
+        path: item.name,
+        originalName,
+        size: item.metadata?.size ?? null,
+        uploadedAt: item.created_at ?? item.updated_at ?? null,
+        downloads: downloadMap.get(item.name) ?? 0,
+        // Metadata (parsed + user submitted)
+        replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
+        mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
+        matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
+        matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
+        profiles: Array.isArray(meta?.profiles) ? meta.profiles : null,
+        submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
+        submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
+        status: typeof meta?.status === 'string' ? meta.status : 'pending',
+      };
+    })
+    .filter(Boolean) as any[];
 
   replays.sort((a, b) => {
     const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
@@ -176,13 +215,134 @@ export async function POST(req: NextRequest) {
       console.error('Failed to upload replay', error);
       return NextResponse.json({ error: 'upload_failed' }, { status: 500 });
     }
+
+    // Attempt to parse the replay for metadata
+    let meta: any = null;
+    let matchDurationSeconds: number | null = null;
+    let matchDurationLabel: string | null = null;
+    try {
+      const tmpPath = joinPath(tmpdir(), `${objectKey.replace(/\//g, '_')}`);
+      await writeFile(tmpPath, buffer);
+      const parsed = parseReplay(tmpPath) as any;
+      await unlink(tmpPath).catch(() => {});
+
+      // parsed.matchduration is like "MM:SS" string
+      const md = typeof parsed?.matchduration === 'string' ? parsed.matchduration : null;
+      if (md && /^\d{1,2}:\d{2}$/.test(md)) {
+        const [m, s] = md.split(':').map((v: string) => Number(v));
+        if (Number.isFinite(m) && Number.isFinite(s)) {
+          matchDurationSeconds = m * 60 + s;
+          matchDurationLabel = md;
+        }
+      }
+      meta = {
+        replay_name: typeof parsed?.replayname === 'string' ? parsed.replayname : null,
+        map_name: typeof parsed?.mapname === 'string' ? parsed.mapname : null,
+        profiles: Array.isArray(parsed?.profiles) ? parsed.profiles : null,
+        raw_metadata: parsed ?? null,
+      };
+    } catch (parseError) {
+      console.error('Replay parse failed', parseError);
+      meta = {
+        replay_name: null,
+        map_name: null,
+        profiles: null,
+        raw_metadata: { error: 'parse_failed' },
+      };
+      matchDurationSeconds = null;
+      matchDurationLabel = null;
+    }
+
+    // Persist metadata row (status pending until user submits name/comment)
+    const { error: metaError } = await supabaseAdmin
+      .from('replay_metadata')
+      .upsert({
+        path: objectKey,
+        original_name: fileName,
+        replay_name: meta.replay_name,
+        map_name: meta.map_name,
+        match_duration_seconds: matchDurationSeconds,
+        match_duration_label: matchDurationLabel,
+        profiles: meta.profiles,
+        raw_metadata: meta.raw_metadata,
+        status: 'pending',
+        updated_at: new Date().toISOString(),
+      });
+
+    if (metaError) {
+      console.error('Failed to upsert replay metadata', metaError);
+    }
   } catch (error) {
     console.error('Unexpected error while uploading replay', error);
     return NextResponse.json({ error: 'upload_failed' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true }, {
+  // Fetch the metadata row to return it in the response for immediate UI preview
+  const { data: metaRow } = await supabaseAdmin
+    .from('replay_metadata')
+    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status')
+    .eq('path', objectKey)
+    .maybeSingle();
+
+  return NextResponse.json({
+    success: true,
+    replay: metaRow ? {
+      path: metaRow.path,
+      originalName: metaRow.original_name,
+      replayName: metaRow.replay_name,
+      mapName: metaRow.map_name,
+      matchDurationSeconds: metaRow.match_duration_seconds,
+      matchDurationLabel: metaRow.match_duration_label,
+      profiles: metaRow.profiles ?? null,
+      submittedName: metaRow.submitted_name ?? null,
+      submittedComment: metaRow.submitted_comment ?? null,
+      status: metaRow.status ?? 'pending',
+    } : null
+  }, {
     status: 201,
     headers: { 'Cache-Control': 'no-store' }
   });
+}
+
+export async function PATCH(req: NextRequest) {
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: 'supabase_not_configured' }, { status: 500 });
+  }
+
+  let payload: any = null;
+  try {
+    payload = await req.json();
+  } catch (e) {
+    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+  }
+
+  const path = typeof payload?.path === 'string' ? payload.path : null;
+  if (!path) {
+    return NextResponse.json({ error: 'missing_path' }, { status: 400 });
+  }
+
+  const submittedNameRaw = payload?.submittedName;
+  const submittedCommentRaw = payload?.submittedComment;
+  const statusRaw = payload?.status;
+
+  const submittedName = typeof submittedNameRaw === 'string' ? submittedNameRaw.slice(0, 200) : null;
+  const submittedComment = typeof submittedCommentRaw === 'string' ? submittedCommentRaw.slice(0, 1000) : null;
+  const status = typeof statusRaw === 'string' ? statusRaw : 'published';
+
+  const update: Record<string, any> = { updated_at: new Date().toISOString() };
+  if (submittedName !== null) update.submitted_name = submittedName;
+  if (submittedComment !== null) update.submitted_comment = submittedComment;
+  if (status) update.status = status;
+
+  const { error } = await supabaseAdmin
+    .from('replay_metadata')
+    .update(update)
+    .eq('path', path);
+
+  if (error) {
+    console.error('Failed to update replay metadata', error);
+    return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store' } });
 }

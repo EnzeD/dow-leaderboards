@@ -2,12 +2,24 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+type Player = { alias: string; team: number; faction: string };
+
 type ReplayListEntry = {
   path: string;
   originalName: string;
   size: number | null;
   uploadedAt: string | null;
   downloads: number;
+  // Parsed metadata
+  replayName: string | null;
+  mapName: string | null;
+  matchDurationSeconds: number | null;
+  matchDurationLabel: string | null;
+  profiles: Player[] | null;
+  // User submitted
+  submittedName: string | null;
+  submittedComment: string | null;
+  status: 'pending' | 'published' | string;
 };
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -33,10 +45,14 @@ const resolveErrorMessage = (code: string) => {
       return 'We could not save the replay. Please try again shortly.';
     case 'download_failed':
       return 'We could not generate a download link. Please try again.';
+    case 'update_failed':
+      return 'We could not save your replay details. Please try again.';
     case 'missing_signed_url':
       return 'Download link was empty. Refresh the list and try again.';
     case 'increment_failed':
       return 'Download link is ready, but we could not record the download count.';
+    case 'missing_path':
+      return 'This replay could not be identified. Refresh and try again.';
     case 'clipboard_unavailable':
       return 'Clipboard access is blocked by your browser. Try downloading instead.';
     default:
@@ -91,6 +107,13 @@ const formatDownloads = (value: number | null | undefined) => {
   return `${count} download${count === 1 ? '' : 's'}`;
 };
 
+const formatTeam = (profiles: Player[] | null, team: number) => {
+  if (!Array.isArray(profiles) || profiles.length === 0) return 'Unknown';
+  const members = profiles.filter(p => Number(p?.team) === team);
+  if (members.length === 0) return '—';
+  return members.map(p => `${p.alias} (${p.faction})`).join(' · ');
+};
+
 const ReplaysTab = () => {
   const [replays, setReplays] = useState<ReplayListEntry[]>([]);
   const [loadingList, setLoadingList] = useState<boolean>(true);
@@ -103,6 +126,12 @@ const ReplaysTab = () => {
   const [copyingPath, setCopyingPath] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Preview of the last uploaded replay (not yet published)
+  const [preview, setPreview] = useState<ReplayListEntry | null>(null);
+  const [formName, setFormName] = useState<string>('');
+  const [formComment, setFormComment] = useState<string>('');
+  const [savingDetails, setSavingDetails] = useState<boolean>(false);
 
   const loadReplays = useCallback(async () => {
     setLoadingList(true);
@@ -142,6 +171,14 @@ const ReplaysTab = () => {
             size: typeof sizeRaw === 'number' && Number.isFinite(sizeRaw) ? sizeRaw : null,
             uploadedAt: typeof entry?.uploadedAt === 'string' ? entry.uploadedAt : null,
             downloads: Number.isFinite(downloadsRaw) ? downloadsRaw : 0,
+            replayName: typeof entry?.replayName === 'string' ? entry.replayName : null,
+            mapName: typeof entry?.mapName === 'string' ? entry.mapName : null,
+            matchDurationSeconds: typeof entry?.matchDurationSeconds === 'number' ? entry.matchDurationSeconds : null,
+            matchDurationLabel: typeof entry?.matchDurationLabel === 'string' ? entry.matchDurationLabel : null,
+            profiles: Array.isArray(entry?.profiles) ? entry.profiles : null,
+            submittedName: typeof entry?.submittedName === 'string' ? entry.submittedName : null,
+            submittedComment: typeof entry?.submittedComment === 'string' ? entry.submittedComment : null,
+            status: typeof entry?.status === 'string' ? entry.status : 'pending',
           } satisfies ReplayListEntry;
         })
         .filter((entry: ReplayListEntry) => Boolean(entry.path));
@@ -193,18 +230,42 @@ const ReplaysTab = () => {
         body,
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
         const code = payload?.error ?? 'upload_failed';
         throw new Error(code);
       }
 
-      setUploadSuccessMessage('Replay uploaded successfully.');
+      const replay = payload?.replay ?? null;
+      // Prepare preview UI using returned parsed data
+      if (replay) {
+        const normalized: ReplayListEntry = {
+          path: String(replay.path || ''),
+          originalName: String(replay.originalName || 'Unknown replay'),
+          size: null,
+          uploadedAt: null,
+          downloads: 0,
+          replayName: typeof replay.replayName === 'string' ? replay.replayName : null,
+          mapName: typeof replay.mapName === 'string' ? replay.mapName : null,
+          matchDurationSeconds: typeof replay.matchDurationSeconds === 'number' ? replay.matchDurationSeconds : null,
+          matchDurationLabel: typeof replay.matchDurationLabel === 'string' ? replay.matchDurationLabel : null,
+          profiles: Array.isArray(replay.profiles) ? replay.profiles : null,
+          submittedName: null,
+          submittedComment: null,
+          status: 'pending',
+        };
+        setPreview(normalized);
+        setFormName(normalized.replayName || normalized.originalName || '');
+        setFormComment('');
+        setUploadSuccessMessage('Replay parsed! Review details below and save.');
+      } else {
+        setUploadSuccessMessage('Replay uploaded successfully.');
+      }
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-
-      await loadReplays();
+      // Do not refresh list here; unpublished previews should not appear in the list
     } catch (error) {
       const code = error instanceof Error ? error.message : 'upload_failed';
       setUploadErrorCode(code || 'upload_failed');
@@ -312,6 +373,34 @@ const ReplaysTab = () => {
     }
   }, [loadReplays, requestSignedUrl]);
 
+  const handleSaveDetails = useCallback(async () => {
+    if (!preview?.path) return;
+    setSavingDetails(true);
+    setActionErrorCode(null);
+    try {
+      const res = await fetch('/api/replays', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: preview.path, submittedName: formName, submittedComment: formComment, status: 'published' }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const code = payload?.error || 'update_failed';
+        throw new Error(code);
+      }
+      // Clear preview and refresh list so it appears
+      setPreview(null);
+      setFormName('');
+      setFormComment('');
+      await loadReplays();
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'update_failed';
+      setActionErrorCode(code);
+    } finally {
+      setSavingDetails(false);
+    }
+  }, [preview, formName, formComment, loadReplays]);
+
   const uploadErrorMessage = uploadErrorCode ? resolveErrorMessage(uploadErrorCode) : null;
   const listErrorMessage = listErrorCode ? resolveErrorMessage(listErrorCode) : null;
   const actionErrorMessage = actionErrorCode ? resolveErrorMessage(actionErrorCode) : null;
@@ -336,6 +425,9 @@ const ReplaysTab = () => {
               onChange={() => {
                 setUploadErrorCode(null);
                 setUploadSuccessMessage(null);
+                setPreview(null);
+                setFormName('');
+                setFormComment('');
               }}
             />
             <button
@@ -358,6 +450,59 @@ const ReplaysTab = () => {
         {uploadSuccessMessage && (
           <div className="rounded-md border border-emerald-700/40 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-200">
             {uploadSuccessMessage}
+          </div>
+        )}
+
+        {preview && (
+          <div className="mt-4 space-y-3 rounded-lg border border-neutral-700/60 bg-neutral-900/80 p-4">
+            <h4 className="text-lg font-semibold text-white">Review replay details</h4>
+            <div className="text-sm text-neutral-300 space-y-1">
+              <p>
+                Name: <span className="text-neutral-200">{preview.replayName || preview.originalName}</span>
+              </p>
+              <p>
+                Map: <span className="text-neutral-200">{preview.mapName || 'Unknown'}</span>
+                {' '}· Duration: <span className="text-neutral-200">{preview.matchDurationLabel || (preview.matchDurationSeconds ? `${Math.floor((preview.matchDurationSeconds||0)/60)}:${String((preview.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span>
+              </p>
+              {Array.isArray(preview.profiles) && preview.profiles.length > 0 && (
+                <p>
+                  Players: {preview.profiles.map(p => `${p.alias} (${p.faction}) [Team ${p.team}]`).join(' · ')}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                placeholder="Replay name"
+                className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
+              />
+              <input
+                type="text"
+                value={formComment}
+                onChange={(e) => setFormComment(e.target.value)}
+                placeholder="Add a public comment (optional)"
+                className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSaveDetails()}
+                disabled={savingDetails || !formName.trim()}
+                className="inline-flex items-center justify-center rounded-md border border-emerald-700/60 bg-emerald-800/80 px-3 py-1.5 text-sm font-medium text-emerald-100 hover:bg-emerald-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingDetails ? 'Saving...' : 'Save & publish'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); }}
+                className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
+              >
+                Discard
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -406,31 +551,29 @@ const ReplaysTab = () => {
                 <thead className="bg-neutral-900/80 text-xs uppercase tracking-wide text-neutral-400">
                   <tr>
                     <th scope="col" className="px-4 py-3 text-left font-medium">Rank</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Replay</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Name</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Map</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Team 1</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Team 2</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Duration</th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">Downloads</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Size</th>
                     <th scope="col" className="px-4 py-3 text-left font-medium">Uploaded</th>
+                    <th scope="col" className="px-4 py-3 text-left font-medium">Comment</th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800">
                   {replays.map((replay, index) => (
-                    <tr key={replay.path} className="bg-neutral-900/60 hover:bg-neutral-800/60 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-neutral-100">#{index + 1}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-white" title={replay.originalName}>
-                          {replay.originalName}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3 text-right text-neutral-200">
-                        {formatDownloads(replay.downloads)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-neutral-200">
-                        {formatBytes(replay.size)}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-300">
-                        {formatDate(replay.uploadedAt)}
-                      </td>
+                    <tr key={replay.path} className="bg-neutral-900/60 hover:bg-neutral-800/60 transition-colors align-top">
+                      <td className="px-4 py-3 font-semibold text-neutral-100 whitespace-nowrap">#{index + 1}</td>
+                      <td className="px-4 py-3 text-neutral-100" title={replay.originalName}>{replay.submittedName || replay.replayName || replay.originalName}</td>
+                      <td className="px-4 py-3 text-neutral-100 whitespace-nowrap" title={replay.mapName || undefined}>{replay.mapName || 'Unknown'}</td>
+                      <td className="px-4 py-3 text-neutral-200">{formatTeam(replay.profiles, 1)}</td>
+                      <td className="px-4 py-3 text-neutral-200">{formatTeam(replay.profiles, 2)}</td>
+                      <td className="px-4 py-3 text-neutral-200 whitespace-nowrap">{replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</td>
+                      <td className="px-4 py-3 text-right text-neutral-200 whitespace-nowrap">{formatDownloads(replay.downloads)}</td>
+                      <td className="px-4 py-3 text-neutral-300 whitespace-nowrap">{formatDate(replay.uploadedAt)}</td>
+                      <td className="px-4 py-3 text-neutral-300 max-w-[24rem] truncate" title={replay.submittedComment || undefined}>{replay.submittedComment || '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
                           <button
@@ -464,16 +607,21 @@ const ReplaysTab = () => {
                   className="flex flex-col gap-3 rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-4"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-base font-medium text-white" title={replay.originalName}>
-                      {replay.originalName}
-                    </p>
+                    <p className="text-base font-medium text-white" title={replay.originalName}>{replay.submittedName || replay.replayName || replay.originalName}</p>
                     <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-200">
                       #{index + 1}
                     </span>
                   </div>
-                  <p className="text-sm text-neutral-400">
-                    {formatDate(replay.uploadedAt)} · {formatBytes(replay.size)} · {formatDownloads(replay.downloads)}
-                  </p>
+                  <p className="text-sm text-neutral-400">Map: <span className="text-neutral-200">{replay.mapName || 'Unknown'}</span> · Duration: <span className="text-neutral-200">{replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span></p>
+                  <div className="text-sm text-neutral-300 space-y-1">
+                    <p>Team 1: <span className="text-neutral-200">{formatTeam(replay.profiles, 1)}</span></p>
+                    <p>Team 2: <span className="text-neutral-200">{formatTeam(replay.profiles, 2)}</span></p>
+                    {replay.submittedComment && (
+                      <p className="text-neutral-400">Comment: <span className="text-neutral-300">{replay.submittedComment}</span></p>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-500">{formatDate(replay.uploadedAt)} · {formatDownloads(replay.downloads)}</p>
+                  {/* No inline editing in list on mobile either */}
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
