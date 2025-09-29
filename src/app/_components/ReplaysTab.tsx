@@ -309,14 +309,38 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         void loadReplays();
       }
 
-      window.open(url, '_blank', 'noopener,noreferrer');
+      // Find the replay to get its name
+      const replay = replays.find(r => r.path === path);
+      const replayName = replay?.submittedName || replay?.replayName || replay?.originalName || 'replay';
+
+      // Sanitize the replay name for use in filename
+      const sanitizedName = replayName
+        .replace(/\.rec$/i, '') // Remove .rec if already present
+        .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special characters
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+
+      // Create the filename with the structure "www.dow-de.com - Replay Name.rec"
+      const filename = `www.dow-de.com - ${sanitizedName}.rec`;
+
+      // Download the file with custom filename
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
       const code = error instanceof Error ? error.message : 'download_failed';
       setActionErrorCode(code || 'download_failed');
     } finally {
       setDownloadingPath(null);
     }
-  }, [loadReplays, requestSignedUrl]);
+  }, [loadReplays, requestSignedUrl, replays]);
 
   const handleCopyLink = useCallback(async (path: string) => {
     if (!path) return;
