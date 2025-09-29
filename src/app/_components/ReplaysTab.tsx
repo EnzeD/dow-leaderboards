@@ -555,9 +555,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
         {loadingList ? (
           <div className="space-y-3">
-            <div className="h-16 rounded-md bg-neutral-800/50 animate-pulse" />
-            <div className="h-16 rounded-md bg-neutral-800/50 animate-pulse" />
-            <div className="h-16 rounded-md bg-neutral-800/50 animate-pulse" />
+            <div className="h-32 rounded-lg bg-neutral-900 border border-neutral-600/25 animate-pulse" />
+            <div className="h-32 rounded-lg bg-neutral-900 border border-neutral-600/25 animate-pulse" />
+            <div className="h-32 rounded-lg bg-neutral-900 border border-neutral-600/25 animate-pulse" />
           </div>
         ) : replays.length === 0 ? (
           <div className="rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-6 text-center text-neutral-400">

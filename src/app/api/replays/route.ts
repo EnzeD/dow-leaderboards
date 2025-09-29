@@ -114,19 +114,22 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const { data: items, error } = await supabaseAdmin
-    .storage
-    .from(REPLAYS_BUCKET)
-    .list('', { limit: 100, sortBy: { column: 'created_at', order: 'desc' } });
+  // Query 1: Get metadata (contains all paths and data we need)
+  const { data: metaRows, error: metaError } = await supabaseAdmin
+    .from('replay_metadata')
+    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, updated_at, created_at')
+    .eq('status', 'published')
+    .order('updated_at', { ascending: false })
+    .limit(100);
 
-  if (error) {
-    console.error('Failed to list replays', error);
+  if (metaError) {
+    console.error('Failed to fetch replay metadata', metaError);
     return NextResponse.json({ error: 'list_failed' }, { status: 500 });
   }
 
-  const fileItems = items?.filter(item => item.name && !item.name.endsWith('/')) ?? [];
-  const paths = fileItems.map(item => item.name);
+  const paths = (metaRows || []).map(row => row.path);
 
+  // Query 2: Get download stats
   const { data: statsRows, error: statsError } = paths.length
     ? await supabaseAdmin
         .from('replay_download_stats')
@@ -138,25 +141,6 @@ export async function GET(req: NextRequest) {
     console.error('Failed to fetch replay download stats', statsError);
   }
 
-  // Load parsed metadata rows for these paths
-  const { data: metaRows, error: metaError } = paths.length
-    ? await supabaseAdmin
-        .from('replay_metadata')
-        .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status')
-        .in('path', paths)
-    : { data: [], error: null };
-
-  if (metaError) {
-    console.error('Failed to fetch replay metadata', metaError);
-  }
-
-  const metadataMap = new Map<string, any>();
-  metaRows?.forEach(row => {
-    if (typeof row?.path === 'string') {
-      metadataMap.set(row.path, row);
-    }
-  });
-
   const downloadMap = new Map<string, number>();
   statsRows?.forEach(row => {
     const key = typeof row.path === 'string' ? row.path : null;
@@ -166,18 +150,13 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  // Filter published replays first (no async needed here)
-  const publishedItems = fileItems
-    .map(item => {
-      const meta = metadataMap.get(item.name);
-      return meta && meta.status === 'published' ? { item, meta } : null;
-    })
-    .filter(Boolean) as Array<{ item: any; meta: any }>;
+  // Use metadata rows directly (already filtered by status='published')
+  const publishedItems = (metaRows || []).map(meta => ({ meta }));
 
   // Batch fetch all player links and details for ALL replays in 2 queries
-  const allPaths = publishedItems.map(({ item }) => item.name);
+  const allPaths = publishedItems.map(({ meta }) => meta.path);
 
-  // Single query to get all player links
+  // Query 3: Get all player links
   const { data: allLinks } = allPaths.length > 0
     ? await supabaseAdmin
         .from('replay_player_links')
@@ -197,7 +176,7 @@ export async function GET(req: NextRequest) {
   // Get all unique profile IDs
   const allProfileIds = Array.from(new Set((allLinks || []).map(link => parseInt(link.profile_id))));
 
-  // Single query to get all player details
+  // Query 4: Get all player details
   const { data: allPlayerDetails } = allProfileIds.length > 0
     ? await supabaseAdmin
         .from('player_search_index')
@@ -210,16 +189,14 @@ export async function GET(req: NextRequest) {
   );
 
   // Now build replays synchronously with all data pre-fetched
-  const replays = publishedItems.map(({ item, meta }) => {
-    const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
-    const originalName = typeof item.metadata?.originalName === 'string'
-      ? item.metadata.originalName
-      : fallbackName;
+  const replays = publishedItems.map(({ meta }) => {
+    const fallbackName = meta.path.includes('__') ? meta.path.split('__').pop() ?? meta.path : meta.path;
+    const originalName = meta.original_name || fallbackName;
 
     // Enrich profiles using pre-fetched data
     let enrichedProfiles = null;
     if (Array.isArray(meta?.profiles) && meta.profiles.length > 0) {
-      const links = linksByPath.get(item.name) || [];
+      const links = linksByPath.get(meta.path) || [];
       const linkMap = new Map(links.map(link => [link.replay_player_alias, link]));
 
       enrichedProfiles = meta.profiles.map((profile: any) => {
@@ -251,19 +228,19 @@ export async function GET(req: NextRequest) {
     }
 
     return {
-      path: item.name,
+      path: meta.path,
       originalName,
-      size: item.metadata?.size ?? null,
-      uploadedAt: item.created_at ?? item.updated_at ?? null,
-      downloads: downloadMap.get(item.name) ?? 0,
-      replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
-      mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
-      matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
-      matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
+      size: null, // Storage metadata removed for performance
+      uploadedAt: meta.created_at ?? meta.updated_at ?? null,
+      downloads: downloadMap.get(meta.path) ?? 0,
+      replayName: meta.replay_name,
+      mapName: meta.map_name,
+      matchDurationSeconds: meta.match_duration_seconds,
+      matchDurationLabel: meta.match_duration_label,
       profiles: enrichedProfiles,
-      submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
-      submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
-      status: typeof meta?.status === 'string' ? meta.status : 'pending',
+      submittedName: meta.submitted_name,
+      submittedComment: meta.submitted_comment,
+      status: meta.status,
     };
   });
 
