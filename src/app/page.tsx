@@ -1731,6 +1731,18 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleMobileNavSelect('replays')}
+                    className={mobileNavButtonClass('replays')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Replays
+                      <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                        NEW
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleMobileNavSelect('stats')}
                     className={mobileNavButtonClass('stats')}
                   >
@@ -1739,15 +1751,6 @@ export default function Home() {
                       <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
                         Soon
                       </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMobileNavSelect('replays')}
-                    className={mobileNavButtonClass('replays')}
-                  >
-                    <span className="flex items-center gap-2">
-                      Replays
                     </span>
                   </button>
                   <button
@@ -1856,6 +1859,21 @@ export default function Home() {
               Favourites
             </button>
             <button
+              onClick={() => setActiveTab('replays')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'replays'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Replays
+                <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                  NEW
+                </span>
+              </span>
+            </button>
+            <button
               onClick={() => setActiveTab('stats')}
               className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'stats'
@@ -1868,18 +1886,6 @@ export default function Home() {
                 <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
                   Soon
                 </span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('replays')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'replays'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                Replays
               </span>
             </button>
             <a
