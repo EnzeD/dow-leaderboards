@@ -270,3 +270,37 @@ CREATE TABLE public.premium_interest_leads (
 );
 CREATE UNIQUE INDEX premium_interest_leads_email_key ON public.premium_interest_leads USING btree (lower(email)) WHERE (email IS NOT NULL);
 CREATE UNIQUE INDEX premium_interest_leads_profile_key ON public.premium_interest_leads USING btree (COALESCE(profile_id, lower(alias_submitted)));
+
+
+CREATE TABLE public.replay_metadata (
+  path text PRIMARY KEY,
+  original_name text NOT NULL,
+  replay_name text,
+  map_name text,
+  match_duration_seconds integer,
+  match_duration_label text,
+  profiles jsonb,
+  raw_metadata jsonb,
+  submitted_name text,
+  submitted_comment text,
+  status text NOT NULL DEFAULT 'pending',
+  created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE public.replay_player_links (
+  replay_path text NOT NULL,
+  replay_player_alias text NOT NULL,
+  profile_id bigint NOT NULL,
+  match_confidence real NOT NULL DEFAULT 1.0,
+  match_method text NOT NULL DEFAULT 'exact',
+  rating integer,
+  rank integer,
+  leaderboard_id integer,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT replay_player_links_pkey PRIMARY KEY (replay_path, replay_player_alias),
+  CONSTRAINT fk_replay_player_links_replay_path FOREIGN KEY (replay_path) REFERENCES public.replay_metadata(path) ON DELETE CASCADE,
+  CONSTRAINT fk_replay_player_links_profile_id FOREIGN KEY (profile_id) REFERENCES public.players(profile_id) ON DELETE CASCADE,
+  CONSTRAINT fk_replay_player_links_leaderboard_id FOREIGN KEY (leaderboard_id) REFERENCES public.leaderboards(id) ON DELETE SET NULL
+);

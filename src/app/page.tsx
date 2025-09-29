@@ -1,9 +1,12 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
+import ReplaysTab from "@/app/_components/ReplaysTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -1728,23 +1731,23 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleMobileNavSelect('stats')}
-                    className={mobileNavButtonClass('stats')}
-                  >
-                    <span className="flex items-center gap-2">
-                      Stats
-                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                        Soon
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleMobileNavSelect('replays')}
                     className={mobileNavButtonClass('replays')}
                   >
                     <span className="flex items-center gap-2">
                       Replays
+                      <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                        NEW
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMobileNavSelect('stats')}
+                    className={mobileNavButtonClass('stats')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Stats
                       <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
                         Soon
                       </span>
@@ -1856,21 +1859,6 @@ export default function Home() {
               Favourites
             </button>
             <button
-              onClick={() => setActiveTab('stats')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'stats'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                Stats
-                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                  Soon
-                </span>
-              </span>
-            </button>
-            <button
               onClick={() => setActiveTab('replays')}
               className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'replays'
@@ -1880,6 +1868,21 @@ export default function Home() {
             >
               <span className="inline-flex items-center gap-2 whitespace-nowrap">
                 Replays
+                <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                  NEW
+                </span>
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Stats
                 <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
                   Soon
                 </span>
@@ -2927,9 +2930,17 @@ export default function Home() {
           'We will have maps, matchup stats, and other insights so you can study every battlefield at a glance.'
         )}
 
-        {activeTab === 'replays' && renderComingSoonSection(
-          'Replays',
-          'Players will be able to upload, download, and vote for the best replays to spotlight epic battles.'
+        {activeTab === 'replays' && (
+          <ReplaysTab
+            onPlayerClick={async (playerName: string, profileId?: string) => {
+              // Switch to search tab and search for the player
+              setActiveTab('search');
+              setSearchQuery(playerName);
+
+              // Trigger the search
+              await handlePlayerSearch(playerName, { pushHistory: true });
+            }}
+          />
         )}
 
 

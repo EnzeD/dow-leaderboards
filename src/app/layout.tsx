@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { Exo_2 } from "next/font/google";
 import "./globals.css";
+
+const exo2 = Exo_2({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Dawn of War: Definitive Edition Leaderboards",
@@ -23,12 +29,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet" />
-      </head>
-      <body className="bg-neutral-900 min-h-screen font-exo-2" style={{
+      <body className={`${exo2.className} bg-neutral-900 min-h-screen`} style={{
         backgroundImage: 'linear-gradient(rgba(25, 25, 25, 0.85), rgba(15, 15, 15, 0.85)), url(/background.webp)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
