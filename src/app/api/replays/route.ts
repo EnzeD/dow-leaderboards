@@ -8,6 +8,7 @@ import { join as joinPath } from 'node:path';
 import { parseReplay } from 'dowde-replay-parser';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { createHash } from 'crypto';
+import { Filter } from 'bad-words';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -15,10 +16,13 @@ const REPLAYS_BUCKET = process.env.SUPABASE_REPLAYS_BUCKET ?? 'replays';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB prototype limit
 const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour access window
+const MAX_UPLOADS_PER_HOUR = 20; // Rate limit per IP
 
 const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
   : null;
+
+const profanityFilter = new Filter();
 
 const sanitizeBaseName = (input: string): string => {
   return input
@@ -44,6 +48,20 @@ const getClientIpHash = (req: NextRequest): string => {
 
   // Hash the IP for privacy (SHA256)
   return createHash('sha256').update(ip).digest('hex');
+};
+
+const sanitizeInput = (input: string, maxLength: number): string => {
+  return input
+    .slice(0, maxLength)
+    .trim()
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Remove potential XSS patterns
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 export const runtime = 'nodejs';
@@ -207,6 +225,24 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!supabaseAdmin) {
     return NextResponse.json({ error: 'supabase_not_configured' }, { status: 500 });
+  }
+
+  // Check rate limit before processing upload
+  const ipHash = getClientIpHash(req);
+  const { data: canUpload, error: rateLimitError } = await supabaseAdmin
+    .rpc('check_upload_rate_limit', {
+      ip_hash_input: ipHash,
+      max_uploads: MAX_UPLOADS_PER_HOUR,
+      window_hours: 1
+    });
+
+  if (rateLimitError) {
+    console.error('Rate limit check failed', rateLimitError);
+  } else if (canUpload === false) {
+    return NextResponse.json(
+      { error: 'rate_limit_exceeded' },
+      { status: 429 }
+    );
   }
 
   let formData: FormData;
@@ -432,8 +468,20 @@ export async function PATCH(req: NextRequest) {
   const submittedCommentRaw = payload?.submittedComment;
   const statusRaw = payload?.status;
 
-  const submittedName = typeof submittedNameRaw === 'string' ? submittedNameRaw.slice(0, 200) : null;
-  const submittedComment = typeof submittedCommentRaw === 'string' ? submittedCommentRaw.slice(0, 1000) : null;
+  // Sanitize and filter profanity
+  let submittedName: string | null = null;
+  let submittedComment: string | null = null;
+
+  if (typeof submittedNameRaw === 'string') {
+    const sanitized = sanitizeInput(submittedNameRaw, 200);
+    submittedName = sanitized ? profanityFilter.clean(sanitized) : null;
+  }
+
+  if (typeof submittedCommentRaw === 'string') {
+    const sanitized = sanitizeInput(submittedCommentRaw, 1000);
+    submittedComment = sanitized ? profanityFilter.clean(sanitized) : null;
+  }
+
   const status = typeof statusRaw === 'string' ? statusRaw : 'published';
 
   const update: Record<string, any> = { updated_at: new Date().toISOString() };

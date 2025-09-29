@@ -21,9 +21,10 @@
     "@supabase/supabase-js": "^2.57.4",
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
+    "bad-words": "^4.0.0",
     "dotenv": "^16.4.5",
-    "flag-icons": "^7.5.0",
     "dowde-replay-parser": "git+https://codeberg.org/ReubenUKGB/dowde-replay-parser.git",
+    "flag-icons": "^7.5.0",
     "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18"

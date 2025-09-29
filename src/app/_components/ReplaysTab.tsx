@@ -60,6 +60,8 @@ const resolveErrorMessage = (code: string) => {
       return 'This replay could not be identified. Refresh and try again.';
     case 'clipboard_unavailable':
       return 'Clipboard access is blocked by your browser. Try downloading instead.';
+    case 'rate_limit_exceeded':
+      return 'You have uploaded too many replays recently. Please wait an hour and try again.';
     default:
       return 'Something went wrong. Please try again shortly.';
   }
