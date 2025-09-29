@@ -166,48 +166,106 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  // Only show published replays in the public list, enriched with player links
-  const replays = await Promise.all(
-    fileItems
-      .map(async item => {
-        const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
-        const originalName = typeof item.metadata?.originalName === 'string'
-          ? item.metadata.originalName
-          : fallbackName;
-        const meta = metadataMap.get(item.name);
-        if (!meta || meta.status !== 'published') {
-          return null;
-        }
+  // Filter published replays first (no async needed here)
+  const publishedItems = fileItems
+    .map(item => {
+      const meta = metadataMap.get(item.name);
+      return meta && meta.status === 'published' ? { item, meta } : null;
+    })
+    .filter(Boolean) as Array<{ item: any; meta: any }>;
 
-        // Enrich profiles with player database links
-        let enrichedProfiles = null;
-        if (Array.isArray(meta?.profiles) && meta.profiles.length > 0) {
-          try {
-            enrichedProfiles = await enrichReplayProfiles(item.name, meta.profiles, meta?.map_name);
-          } catch (error) {
-            console.error('Failed to enrich profiles for replay', item.name, error);
-            enrichedProfiles = meta.profiles; // Fallback to original profiles
+  // Batch fetch all player links and details for ALL replays in 2 queries
+  const allPaths = publishedItems.map(({ item }) => item.name);
+
+  // Single query to get all player links
+  const { data: allLinks } = allPaths.length > 0
+    ? await supabaseAdmin
+        .from('replay_player_links')
+        .select('replay_path, replay_player_alias, profile_id, match_confidence, match_method, rating, rank, leaderboard_id')
+        .in('replay_path', allPaths)
+    : { data: [] };
+
+  // Group links by replay path
+  const linksByPath = new Map<string, any[]>();
+  (allLinks || []).forEach(link => {
+    if (!linksByPath.has(link.replay_path)) {
+      linksByPath.set(link.replay_path, []);
+    }
+    linksByPath.get(link.replay_path)!.push(link);
+  });
+
+  // Get all unique profile IDs
+  const allProfileIds = Array.from(new Set((allLinks || []).map(link => parseInt(link.profile_id))));
+
+  // Single query to get all player details
+  const { data: allPlayerDetails } = allProfileIds.length > 0
+    ? await supabaseAdmin
+        .from('player_search_index')
+        .select('profile_id, current_alias, country, level, max_rating')
+        .in('profile_id', allProfileIds)
+    : { data: [] };
+
+  const playerDetailsMap = new Map(
+    (allPlayerDetails || []).map(player => [player.profile_id, player])
+  );
+
+  // Now build replays synchronously with all data pre-fetched
+  const replays = publishedItems.map(({ item, meta }) => {
+    const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
+    const originalName = typeof item.metadata?.originalName === 'string'
+      ? item.metadata.originalName
+      : fallbackName;
+
+    // Enrich profiles using pre-fetched data
+    let enrichedProfiles = null;
+    if (Array.isArray(meta?.profiles) && meta.profiles.length > 0) {
+      const links = linksByPath.get(item.name) || [];
+      const linkMap = new Map(links.map(link => [link.replay_player_alias, link]));
+
+      enrichedProfiles = meta.profiles.map((profile: any) => {
+        const link = linkMap.get(profile.alias);
+        const enriched: any = { ...profile };
+
+        if (link) {
+          const playerDetail = playerDetailsMap.get(parseInt(link.profile_id));
+          enriched.profile_id = link.profile_id;
+          enriched.match_confidence = link.match_confidence;
+
+          if (playerDetail) {
+            enriched.current_alias = playerDetail.current_alias;
+            enriched.country = playerDetail.country;
+            enriched.level = playerDetail.level;
+            enriched.max_rating = playerDetail.max_rating;
+          }
+
+          if (link.rating !== undefined && link.rating !== null) {
+            enriched.faction_rating = link.rating;
+          }
+          if (link.rank !== undefined && link.rank !== null) {
+            enriched.faction_rank = link.rank;
           }
         }
 
-        return {
-          path: item.name,
-          originalName,
-          size: item.metadata?.size ?? null,
-          uploadedAt: item.created_at ?? item.updated_at ?? null,
-          downloads: downloadMap.get(item.name) ?? 0,
-          // Metadata (parsed + user submitted)
-          replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
-          mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
-          matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
-          matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
-          profiles: enrichedProfiles,
-          submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
-          submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
-          status: typeof meta?.status === 'string' ? meta.status : 'pending',
-        };
-      })
-  ).then(results => results.filter(Boolean) as any[]);
+        return enriched;
+      });
+    }
+
+    return {
+      path: item.name,
+      originalName,
+      size: item.metadata?.size ?? null,
+      uploadedAt: item.created_at ?? item.updated_at ?? null,
+      downloads: downloadMap.get(item.name) ?? 0,
+      replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
+      mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
+      matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
+      matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
+      profiles: enrichedProfiles,
+      submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
+      submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
+      status: typeof meta?.status === 'string' ? meta.status : 'pending',
+    };
+  });
 
   replays.sort((a, b) => {
     const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
