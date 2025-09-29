@@ -242,7 +242,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         setPreview(normalized);
         setFormName(normalized.replayName || normalized.originalName || '');
         setFormComment('');
-        setUploadSuccessMessage('Replay parsed! Review details below and save.');
+        setUploadSuccessMessage('Replay uploaded! Review details below, edit the title, add a comment and save.');
       } else {
         setUploadSuccessMessage('Replay uploaded successfully.');
       }
@@ -400,6 +400,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setPreview(null);
       setFormName('');
       setFormComment('');
+      setUploadSuccessMessage(null); // Clear the success message
       await loadReplays();
     } catch (err) {
       const code = err instanceof Error ? err.message : 'update_failed';
@@ -511,7 +512,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               </button>
               <button
                 type="button"
-                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); }}
+                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); setUploadSuccessMessage(null); }}
                 className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
               >
                 Discard
