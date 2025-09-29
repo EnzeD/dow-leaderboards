@@ -39,6 +39,7 @@ let totalSkippedNoSteam = 0;
 let totalFailed = 0;
 let totalPlayers = 0;
 let newPlayersDiscovered = 0;
+let totalMatchesInserted = 0;
 let startTimeMs = Date.now();
 
 function sleep(ms) {
@@ -354,6 +355,36 @@ async function chunkedUpsert(table, rows, options = {}) {
   }
 }
 
+async function countNewMatches(rows) {
+  if (!rows.length) return 0;
+  const uniqueIds = Array.from(
+    new Set(
+      rows
+        .map(row => parseBigIntish(row?.match_id))
+        .filter(Boolean)
+    )
+  );
+
+  if (!uniqueIds.length) return 0;
+
+  const { data, error } = await supabase
+    .from("matches")
+    .select("match_id")
+    .in("match_id", uniqueIds);
+
+  if (error) {
+    console.warn(`Failed to check existing match IDs: ${error.message}`);
+    return 0;
+  }
+
+  const existingIds = new Set((data ?? []).map(row => parseBigIntish(row?.match_id)).filter(Boolean));
+  let newCount = 0;
+  for (const id of uniqueIds) {
+    if (!existingIds.has(id)) newCount += 1;
+  }
+  return newCount;
+}
+
 async function ensureAliasHistory(rows) {
   if (!rows.length) return;
   for (const row of rows) {
@@ -503,7 +534,11 @@ async function processPlayer(player) {
     .filter(Boolean);
   const newIds = candidateIds.filter(id => !knownProfileIds.has(id));
 
+  let newMatchesCount = 0;
   try {
+    if (parsed.matches.length) {
+      newMatchesCount = await countNewMatches(parsed.matches);
+    }
     if (parsed.players.length) {
       await chunkedUpsert("players", parsed.players, { onConflict: "profile_id" });
     }
@@ -518,6 +553,7 @@ async function processPlayer(player) {
   }
 
   totalMatchesFetched += parsed.matches.length;
+  totalMatchesInserted += newMatchesCount;
   if (newIds.length) {
     newPlayersDiscovered += newIds.length;
     totalPlayers += newIds.length;
@@ -570,7 +606,7 @@ async function main() {
       const etaSeconds = speed > 0 ? remaining / speed : Infinity;
       console.log(
         `Processed ${totalProcessed} players | updated ${totalUpdated} | XP increased ${totalXpIncreased} | matches fetched ${totalMatchesFetched} | skipped (no steam) ${totalSkippedNoSteam} | ` +
-        `new players discovered ${newPlayersDiscovered} | remaining ${remaining} | ETA ${formatDuration(etaSeconds)}`
+        `matches inserted ${totalMatchesInserted} | new players discovered ${newPlayersDiscovered} | remaining ${remaining} | ETA ${formatDuration(etaSeconds)}`
       );
     }
   }
@@ -579,6 +615,7 @@ async function main() {
   console.log(`Processed ${totalProcessed} players.`);
   console.log(`Updated ${totalUpdated} players (XP increased for ${totalXpIncreased}).`);
   console.log(`Fetched ${totalMatchesFetched} matches.`);
+  console.log(`Inserted ${totalMatchesInserted} matches.`);
   console.log(`Skipped ${totalSkippedNoSteam} players with no steam_id64.`);
   console.log(`Failed operations: ${totalFailed}.`);
   console.log(`Relic requests used: ${relicRequestCount}/${RELIC_REQUEST_CAP}.`);
