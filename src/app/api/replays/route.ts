@@ -6,6 +6,7 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { parseReplay } from 'dowde-replay-parser';
+import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks } from '@/lib/replay-player-matching';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -121,36 +122,48 @@ export async function GET(req: NextRequest) {
     }
   });
 
-  // Only show published replays in the public list
-  const replays = fileItems
-    .map(item => {
-      const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
-      const originalName = typeof item.metadata?.originalName === 'string'
-        ? item.metadata.originalName
-        : fallbackName;
-      const meta = metadataMap.get(item.name);
-      if (!meta || meta.status !== 'published') {
-        return null;
-      }
+  // Only show published replays in the public list, enriched with player links
+  const replays = await Promise.all(
+    fileItems
+      .map(async item => {
+        const fallbackName = item.name.includes('__') ? item.name.split('__').pop() ?? item.name : item.name;
+        const originalName = typeof item.metadata?.originalName === 'string'
+          ? item.metadata.originalName
+          : fallbackName;
+        const meta = metadataMap.get(item.name);
+        if (!meta || meta.status !== 'published') {
+          return null;
+        }
 
-      return {
-        path: item.name,
-        originalName,
-        size: item.metadata?.size ?? null,
-        uploadedAt: item.created_at ?? item.updated_at ?? null,
-        downloads: downloadMap.get(item.name) ?? 0,
-        // Metadata (parsed + user submitted)
-        replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
-        mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
-        matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
-        matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
-        profiles: Array.isArray(meta?.profiles) ? meta.profiles : null,
-        submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
-        submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
-        status: typeof meta?.status === 'string' ? meta.status : 'pending',
-      };
-    })
-    .filter(Boolean) as any[];
+        // Enrich profiles with player database links
+        let enrichedProfiles = null;
+        if (Array.isArray(meta?.profiles) && meta.profiles.length > 0) {
+          try {
+            enrichedProfiles = await enrichReplayProfiles(item.name, meta.profiles);
+          } catch (error) {
+            console.error('Failed to enrich profiles for replay', item.name, error);
+            enrichedProfiles = meta.profiles; // Fallback to original profiles
+          }
+        }
+
+        return {
+          path: item.name,
+          originalName,
+          size: item.metadata?.size ?? null,
+          uploadedAt: item.created_at ?? item.updated_at ?? null,
+          downloads: downloadMap.get(item.name) ?? 0,
+          // Metadata (parsed + user submitted)
+          replayName: typeof meta?.replay_name === 'string' ? meta.replay_name : null,
+          mapName: typeof meta?.map_name === 'string' ? meta.map_name : null,
+          matchDurationSeconds: typeof meta?.match_duration_seconds === 'number' ? meta.match_duration_seconds : null,
+          matchDurationLabel: typeof meta?.match_duration_label === 'string' ? meta.match_duration_label : null,
+          profiles: enrichedProfiles,
+          submittedName: typeof meta?.submitted_name === 'string' ? meta.submitted_name : null,
+          submittedComment: typeof meta?.submitted_comment === 'string' ? meta.submitted_comment : null,
+          status: typeof meta?.status === 'string' ? meta.status : 'pending',
+        };
+      })
+  ).then(results => results.filter(Boolean) as any[]);
 
   replays.sort((a, b) => {
     const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
@@ -272,6 +285,20 @@ export async function POST(req: NextRequest) {
     if (metaError) {
       console.error('Failed to upsert replay metadata', metaError);
     }
+
+    // Automatically attempt to link players to database if profiles were parsed
+    if (Array.isArray(meta.profiles) && meta.profiles.length > 0) {
+      try {
+        const matches = await matchReplayPlayersToDatabase(objectKey);
+        if (matches.length > 0) {
+          await saveReplayPlayerLinks(objectKey, matches);
+          console.log(`Linked ${matches.length} players for replay ${objectKey}`);
+        }
+      } catch (linkError) {
+        console.error('Failed to auto-link players for replay', objectKey, linkError);
+        // Don't fail the upload for this
+      }
+    }
   } catch (error) {
     console.error('Unexpected error while uploading replay', error);
     return NextResponse.json({ error: 'upload_failed' }, { status: 500 });
@@ -284,6 +311,17 @@ export async function POST(req: NextRequest) {
     .eq('path', objectKey)
     .maybeSingle();
 
+  // Enrich profiles with player links for immediate preview
+  let enrichedProfiles = null;
+  if (metaRow && Array.isArray(metaRow.profiles) && metaRow.profiles.length > 0) {
+    try {
+      enrichedProfiles = await enrichReplayProfiles(objectKey, metaRow.profiles);
+    } catch (error) {
+      console.error('Failed to enrich profiles for upload response', error);
+      enrichedProfiles = metaRow.profiles; // Fallback to original profiles
+    }
+  }
+
   return NextResponse.json({
     success: true,
     replay: metaRow ? {
@@ -293,7 +331,7 @@ export async function POST(req: NextRequest) {
       mapName: metaRow.map_name,
       matchDurationSeconds: metaRow.match_duration_seconds,
       matchDurationLabel: metaRow.match_duration_label,
-      profiles: metaRow.profiles ?? null,
+      profiles: enrichedProfiles,
       submittedName: metaRow.submitted_name ?? null,
       submittedComment: metaRow.submitted_comment ?? null,
       status: metaRow.status ?? 'pending',

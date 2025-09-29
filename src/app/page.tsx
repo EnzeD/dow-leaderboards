@@ -2924,7 +2924,18 @@ export default function Home() {
           'We will have maps, matchup stats, and other insights so you can study every battlefield at a glance.'
         )}
 
-        {activeTab === 'replays' && <ReplaysTab />}
+        {activeTab === 'replays' && (
+          <ReplaysTab
+            onPlayerClick={async (playerName: string, profileId?: string) => {
+              // Switch to search tab and search for the player
+              setActiveTab('search');
+              setSearchQuery(playerName);
+
+              // Trigger the search
+              await handlePlayerSearch(playerName, { pushHistory: true });
+            }}
+          />
+        )}
 
 
         {/* Support Tab Content */}

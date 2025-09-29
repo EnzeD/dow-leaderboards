@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { EnrichedReplayProfile } from '@/lib/replay-player-matching';
+import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
 
 type Player = { alias: string; team: number; faction: string };
 
@@ -15,7 +17,7 @@ type ReplayListEntry = {
   mapName: string | null;
   matchDurationSeconds: number | null;
   matchDurationLabel: string | null;
-  profiles: Player[] | null;
+  profiles: EnrichedReplayProfile[] | Player[] | null;
   // User submitted
   submittedName: string | null;
   submittedComment: string | null;
@@ -107,6 +109,12 @@ const formatDownloads = (value: number | null | undefined) => {
   return `${count} download${count === 1 ? '' : 's'}`;
 };
 
+const formatDownloadsCount = (value: number | null | undefined) => {
+  const count = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return count;
+};
+
+// Legacy formatTeam function for backward compatibility
 const formatTeam = (profiles: Player[] | null, team: number) => {
   if (!Array.isArray(profiles) || profiles.length === 0) return 'Unknown';
   const members = profiles.filter(p => Number(p?.team) === team);
@@ -114,7 +122,11 @@ const formatTeam = (profiles: Player[] | null, team: number) => {
   return members.map(p => `${p.alias} (${p.faction})`).join(' · ');
 };
 
-const ReplaysTab = () => {
+interface ReplaysTabProps {
+  onPlayerClick?: (playerName: string, profileId?: string) => void;
+}
+
+const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [replays, setReplays] = useState<ReplayListEntry[]>([]);
   const [loadingList, setLoadingList] = useState<boolean>(true);
   const [listErrorCode, setListErrorCode] = useState<string | null>(null);
@@ -272,7 +284,7 @@ const ReplaysTab = () => {
     } finally {
       setUploading(false);
     }
-  }, [loadReplays]);
+  }, []);
 
   const requestSignedUrl = useCallback(async (path: string) => {
     const response = await fetch(`/api/replays?path=${encodeURIComponent(path)}`, {
@@ -466,7 +478,13 @@ const ReplaysTab = () => {
               </p>
               {Array.isArray(preview.profiles) && preview.profiles.length > 0 && (
                 <p>
-                  Players: {preview.profiles.map(p => `${p.alias} (${p.faction}) [Team ${p.team}]`).join(' · ')}
+                  Players: <PlayerList
+                    profiles={preview.profiles as EnrichedReplayProfile[]}
+                    onPlayerClick={onPlayerClick}
+                    showTeams={true}
+                    showDetails={true}
+                    compact={false}
+                  />
                 </p>
               )}
             </div>
@@ -511,7 +529,7 @@ const ReplaysTab = () => {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h3 className="text-xl font-semibold text-white">Community Replays</h3>
-            <p className="text-sm text-neutral-400">New uploads appear here instantly after a successful submit.</p>
+            <p className="text-sm text-neutral-400">Top most downloaded replays recently.</p>
           </div>
           <button
             type="button"
@@ -545,105 +563,85 @@ const ReplaysTab = () => {
             No replays have been uploaded yet. Be the first to share a battle!
           </div>
         ) : (
-          <>
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-full divide-y divide-neutral-800 text-sm text-neutral-200">
-                <thead className="bg-neutral-900/80 text-xs uppercase tracking-wide text-neutral-400">
-                  <tr>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Rank</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Name</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Map</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Team 1</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Team 2</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Duration</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Downloads</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Uploaded</th>
-                    <th scope="col" className="px-4 py-3 text-left font-medium">Comment</th>
-                    <th scope="col" className="px-4 py-3 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-800">
-                  {replays.map((replay, index) => (
-                    <tr key={replay.path} className="bg-neutral-900/60 hover:bg-neutral-800/60 transition-colors align-top">
-                      <td className="px-4 py-3 font-semibold text-neutral-100 whitespace-nowrap">#{index + 1}</td>
-                      <td className="px-4 py-3 text-neutral-100" title={replay.originalName}>{replay.submittedName || replay.replayName || replay.originalName}</td>
-                      <td className="px-4 py-3 text-neutral-100 whitespace-nowrap" title={replay.mapName || undefined}>{replay.mapName || 'Unknown'}</td>
-                      <td className="px-4 py-3 text-neutral-200">{formatTeam(replay.profiles, 1)}</td>
-                      <td className="px-4 py-3 text-neutral-200">{formatTeam(replay.profiles, 2)}</td>
-                      <td className="px-4 py-3 text-neutral-200 whitespace-nowrap">{replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</td>
-                      <td className="px-4 py-3 text-right text-neutral-200 whitespace-nowrap">{formatDownloads(replay.downloads)}</td>
-                      <td className="px-4 py-3 text-neutral-300 whitespace-nowrap">{formatDate(replay.uploadedAt)}</td>
-                      <td className="px-4 py-3 text-neutral-300 max-w-[24rem] truncate" title={replay.submittedComment || undefined}>{replay.submittedComment || '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleDownload(replay.path)}
-                            disabled={downloadingPath === replay.path}
-                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleCopyLink(replay.path)}
-                            disabled={copyingPath === replay.path}
-                            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
-                          </button>
+          <div className="space-y-3">
+            {replays.map((replay, index) => (
+              <div key={replay.path} className="text-xs bg-neutral-900 border border-neutral-600/25 p-3 rounded shadow-md">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 p-1 rounded hover:bg-neutral-800/30 transition-all duration-200">
+                    {/* Left side - Replay info */}
+                    <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-white font-medium truncate" title={replay.originalName}>
+                          {replay.submittedName || replay.replayName || replay.originalName}
+                        </span>
+                        <div className="flex items-center gap-2 text-neutral-400 text-xs">
+                          <span>{replay.mapName || 'Unknown'}</span>
+                          <span>•</span>
+                          <span>{replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </div>
 
-            <div className="space-y-3 md:hidden">
-              {replays.map((replay, index) => (
-                <div
-                  key={replay.path}
-                  className="flex flex-col gap-3 rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-base font-medium text-white" title={replay.originalName}>{replay.submittedName || replay.replayName || replay.originalName}</p>
-                    <span className="inline-flex items-center gap-1 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-200">
-                      #{index + 1}
-                    </span>
+                    {/* Right side - Downloads and actions */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 w-full sm:w-auto justify-start sm:justify-end">
+                      <span className="text-neutral-200">{formatDownloads(replay.downloads)}</span>
+                      <span className="text-neutral-400">{formatDate(replay.uploadedAt)}</span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleDownload(replay.path)}
+                          disabled={downloadingPath === replay.path}
+                          className="inline-flex items-center justify-center rounded border border-neutral-600/60 bg-neutral-800/80 px-2 py-1 text-xs font-medium text-neutral-100 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {downloadingPath === replay.path ? 'DL...' : 'Download'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyLink(replay.path)}
+                          disabled={copyingPath === replay.path}
+                          className="inline-flex items-center justify-center rounded border border-neutral-600/60 bg-neutral-800/80 px-2 py-1 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {copyingPath === replay.path ? 'Copying...' : 'Copy Replay Link'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-neutral-400">Map: <span className="text-neutral-200">{replay.mapName || 'Unknown'}</span> · Duration: <span className="text-neutral-200">{replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span></p>
-                  <div className="text-sm text-neutral-300 space-y-1">
-                    <p>Team 1: <span className="text-neutral-200">{formatTeam(replay.profiles, 1)}</span></p>
-                    <p>Team 2: <span className="text-neutral-200">{formatTeam(replay.profiles, 2)}</span></p>
-                    {replay.submittedComment && (
-                      <p className="text-neutral-400">Comment: <span className="text-neutral-300">{replay.submittedComment}</span></p>
-                    )}
+
+                  {/* Teams section */}
+                  <div className="flex flex-col sm:flex-row gap-2 mt-2 pt-2 border-t border-neutral-700/30">
+                    <div className="flex-1">
+                      <span className="text-neutral-400">Team 1:</span>{' '}
+                      <PlayerTeam
+                        profiles={replay.profiles as EnrichedReplayProfile[]}
+                        team={1}
+                        onPlayerClick={onPlayerClick}
+                        showDetails={false}
+                        compact={true}
+                        className="text-neutral-200"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-neutral-400">Team 2:</span>{' '}
+                      <PlayerTeam
+                        profiles={replay.profiles as EnrichedReplayProfile[]}
+                        team={2}
+                        onPlayerClick={onPlayerClick}
+                        showDetails={false}
+                        compact={true}
+                        className="text-neutral-200"
+                      />
+                    </div>
                   </div>
-                  <p className="text-xs text-neutral-500">{formatDate(replay.uploadedAt)} · {formatDownloads(replay.downloads)}</p>
-                  {/* No inline editing in list on mobile either */}
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleDownload(replay.path)}
-                      disabled={downloadingPath === replay.path}
-                      className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {downloadingPath === replay.path ? 'Preparing...' : 'Download'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyLink(replay.path)}
-                      disabled={copyingPath === replay.path}
-                      className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-2 text-sm font-medium text-neutral-200 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {copyingPath === replay.path ? 'Copying...' : 'Copy link'}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
+
+                  {/* Comment if available */}
+                  {replay.submittedComment && (
+                    <div className="mt-2 pt-2 border-t border-neutral-700/30">
+                      <span className="text-neutral-400">Comment:</span>{' '}
+                      <span className="text-neutral-300">{replay.submittedComment}</span>
+                    </div>
+                  )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -651,3 +649,4 @@ const ReplaysTab = () => {
 };
 
 export default ReplaysTab;
+export type { ReplaysTabProps };
