@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { parseReplay } from 'dowde-replay-parser';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
+import { createHash } from 'crypto';
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -33,6 +34,18 @@ const buildObjectKey = (originalName: string): string => {
   return `${randomUUID()}__${base}.rec`;
 };
 
+const getClientIpHash = (req: NextRequest): string => {
+  // Get IP from various headers (handling proxies/load balancers)
+  const forwarded = req.headers.get('x-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+
+  const ip = cfConnectingIp || forwarded?.split(',')[0]?.trim() || realIp || 'unknown';
+
+  // Hash the IP for privacy (SHA256)
+  return createHash('sha256').update(ip).digest('hex');
+};
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -56,16 +69,29 @@ export async function GET(req: NextRequest) {
     }
 
     let downloadCount: number | null = null;
+    let wasIncremented = false;
+
+    // Get client IP hash for duplicate prevention
+    const ipHash = getClientIpHash(req);
+
     const { data: incremented, error: incrementError } = await supabaseAdmin
-      .rpc('increment_replay_download', { path_input: path });
+      .rpc('increment_replay_download', {
+        path_input: path,
+        ip_hash_input: ipHash
+      });
 
     if (incrementError) {
       console.error('Failed to increment replay download count', incrementError);
-    } else if (typeof incremented === 'number') {
-      downloadCount = Number(incremented);
+    } else if (incremented && typeof incremented === 'object') {
+      downloadCount = Number(incremented.download_count ?? null);
+      wasIncremented = Boolean(incremented.incremented);
     }
 
-    return NextResponse.json({ url: data.signedUrl, downloadCount }, {
+    return NextResponse.json({
+      url: data.signedUrl,
+      downloadCount,
+      alreadyDownloaded: !wasIncremented
+    }, {
       headers: { 'Cache-Control': 'no-store' }
     });
   }
