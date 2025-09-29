@@ -322,8 +322,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         .replace(/\s+/g, ' ') // Normalize spaces
         .trim();
 
-      // Create the filename with the structure "www.dow-de.com - Replay Name.rec"
-      const filename = `www.dow-de.com - ${sanitizedName}.rec`;
+      // Create the filename
+      const filename = `${sanitizedName}.rec`;
 
       // Download the file with custom filename
       const response = await fetch(url);
