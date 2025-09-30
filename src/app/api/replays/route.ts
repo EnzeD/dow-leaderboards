@@ -345,10 +345,18 @@ export async function POST(req: NextRequest) {
           matchDurationLabel = md;
         }
       }
+      // Normalize faction names to match the rest of the codebase
+      const normalizedProfiles = Array.isArray(parsed?.profiles)
+        ? parsed.profiles.map((p: any) => ({
+            ...p,
+            faction: p.faction === 'Tau Empire' ? 'Tau' : p.faction
+          }))
+        : null;
+
       meta = {
         replay_name: typeof parsed?.replayname === 'string' ? parsed.replayname : null,
         map_name: typeof parsed?.mapname === 'string' ? parsed.mapname : null,
-        profiles: Array.isArray(parsed?.profiles) ? parsed.profiles : null,
+        profiles: normalizedProfiles,
         raw_metadata: parsed ?? null,
       };
     } catch (parseError: any) {
