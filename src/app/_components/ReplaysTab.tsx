@@ -97,6 +97,21 @@ const formatDownloadsCount = (value: number | null | undefined) => {
   return count;
 };
 
+// Faction color mapping
+const getFactionColor = (faction: string): string => {
+  const factionColors: Record<string, string> = {
+    'Chaos': 'bg-red-500/30 border-red-400/60 text-red-200',
+    'Dark Eldar': 'bg-purple-500/30 border-purple-400/60 text-purple-200',
+    'Eldar': 'bg-blue-500/30 border-blue-400/60 text-blue-200',
+    'Imperial Guard': 'bg-yellow-500/30 border-yellow-400/60 text-yellow-200',
+    'Necrons': 'bg-emerald-400/30 border-emerald-300/60 text-emerald-200',
+    'Orks': 'bg-green-500/30 border-green-400/60 text-green-200',
+    'Sisters of Battle': 'bg-pink-500/30 border-pink-400/60 text-pink-200',
+    'Space Marines': 'bg-blue-400/30 border-blue-300/60 text-blue-200',
+    'Tau': 'bg-cyan-500/30 border-cyan-400/60 text-cyan-200'
+  };
+  return factionColors[faction] || 'bg-blue-600/30 border-blue-500/60 text-blue-200';
+};
 
 interface ReplaysTabProps {
   onPlayerClick?: (playerName: string, profileId?: string) => void;
@@ -753,7 +768,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       step={50}
                       value={eloRange.min}
                       onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value), eloRange.max) })}
-                      className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                      className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
                     />
 
                     {/* Max slider */}
@@ -764,7 +779,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       step={50}
                       value={eloRange.max}
                       onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value), eloRange.min) })}
-                      className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                      className="absolute top-1/2 -translate-y-1/2 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
                     />
                   </div>
 
@@ -775,54 +790,57 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 </div>
               )}
 
-              {/* Clear Filters Button */}
-              {hasActiveFilters && (
-                <button
-                  onClick={clearAllFilters}
-                  className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600/20 border border-red-500/50 text-red-300 hover:bg-red-600/30 transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
             </div>
 
-            {/* Race/Faction Filter */}
+            {/* Race/Faction Filter - Inline with Clear All button */}
             {availableFactions.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-xs text-neutral-400 font-medium">Races:</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {availableFactions.map(faction => {
-                    const isSelected = selectedFactions.has(faction);
-                    // Normalize faction display name
-                    const displayName = faction
-                      .replace(/_/g, ' ')
-                      .split(' ')
-                      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                      .join(' ');
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-2 flex-1">
+                  <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">Races:</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableFactions.map(faction => {
+                      const isSelected = selectedFactions.has(faction);
+                      // Normalize faction display name
+                      const displayName = faction
+                        .replace(/_/g, ' ')
+                        .split(' ')
+                        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(' ');
 
-                    return (
-                      <button
-                        key={faction}
-                        onClick={() => {
-                          const newSet = new Set(selectedFactions);
-                          if (isSelected) {
-                            newSet.delete(faction);
-                          } else {
-                            newSet.add(faction);
-                          }
-                          setSelectedFactions(newSet);
-                        }}
-                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
-                          isSelected
-                            ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
-                            : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                        }`}
-                      >
-                        {displayName}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={faction}
+                          onClick={() => {
+                            const newSet = new Set(selectedFactions);
+                            if (isSelected) {
+                              newSet.delete(faction);
+                            } else {
+                              newSet.add(faction);
+                            }
+                            setSelectedFactions(newSet);
+                          }}
+                          className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                            isSelected
+                              ? getFactionColor(displayName)
+                              : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                          }`}
+                        >
+                          {displayName}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* Clear Filters Button - Bottom Right */}
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600/20 border border-red-500/50 text-red-300 hover:bg-red-600/30 transition-colors shrink-0"
+                  >
+                    Clear All
+                  </button>
+                )}
               </div>
             )}
 
