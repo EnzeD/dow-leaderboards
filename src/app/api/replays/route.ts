@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
   // Query 1: Get metadata (contains all paths and data we need)
   const { data: metaRows, error: metaError } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, updated_at, created_at')
+    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, winner_team, updated_at, created_at')
     .eq('status', 'published')
     .order('updated_at', { ascending: false })
     .limit(100);
@@ -247,6 +247,7 @@ export async function GET(req: NextRequest) {
       submittedName: meta.submitted_name,
       submittedComment: meta.submitted_comment,
       status: meta.status,
+      winnerTeam: meta.winner_team ?? null,
       canEdit,
     };
   });
@@ -463,7 +464,7 @@ export async function POST(req: NextRequest) {
   // Fetch the metadata row to return it in the response for immediate UI preview
   const { data: metaRow } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status')
+    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
     .eq('path', objectKey)
     .maybeSingle();
 
@@ -491,6 +492,7 @@ export async function POST(req: NextRequest) {
       submittedName: metaRow.submitted_name ?? null,
       submittedComment: metaRow.submitted_comment ?? null,
       status: metaRow.status ?? 'pending',
+      winnerTeam: metaRow.winner_team ?? null,
     } : null
   }, {
     status: 201,
@@ -519,6 +521,7 @@ export async function PATCH(req: NextRequest) {
   const statusRaw = payload?.status;
   const submittedNameRaw = payload?.submittedName;
   const submittedCommentRaw = payload?.submittedComment;
+  const winnerTeamRaw = payload?.winnerTeam;
 
   // Get current status to determine if this is initial publish
   const { data: currentMeta } = await supabaseAdmin
@@ -557,10 +560,22 @@ export async function PATCH(req: NextRequest) {
 
   const status = typeof statusRaw === 'string' ? statusRaw : 'published';
 
+  // Validate winnerTeam if provided
+  let winnerTeam: number | null = null;
+  if (winnerTeamRaw !== undefined && winnerTeamRaw !== null) {
+    const parsed = Number(winnerTeamRaw);
+    if (parsed === 1 || parsed === 2) {
+      winnerTeam = parsed;
+    } else if (winnerTeamRaw === null || winnerTeamRaw === '') {
+      winnerTeam = null;
+    }
+  }
+
   const update: Record<string, any> = { updated_at: new Date().toISOString() };
   if (submittedName !== null) update.submitted_name = submittedName;
   if (submittedComment !== null) update.submitted_comment = submittedComment;
   if (status) update.status = status;
+  if (winnerTeamRaw !== undefined) update.winner_team = winnerTeam;
 
   const { error } = await supabaseAdmin
     .from('replay_metadata')

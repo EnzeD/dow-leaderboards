@@ -23,6 +23,7 @@ type ReplayListEntry = {
   submittedName: string | null;
   submittedComment: string | null;
   status: 'pending' | 'published' | string;
+  winnerTeam?: number | null;
   canEdit?: boolean;
 };
 
@@ -138,9 +139,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
   const [editComment, setEditComment] = useState<string>('');
+  const [editWinnerTeam, setEditWinnerTeam] = useState<number | null>(null);
   const [savingEdit, setSavingEdit] = useState<boolean>(false);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
   const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
+
+  // Winner reveal tracking
+  const [revealedWinners, setRevealedWinners] = useState<Set<string>>(new Set());
 
   // Filter states
   const [selectedFactions, setSelectedFactions] = useState<Set<string>>(new Set());
@@ -155,6 +160,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [preview, setPreview] = useState<ReplayListEntry | null>(null);
   const [formName, setFormName] = useState<string>('');
   const [formComment, setFormComment] = useState<string>('');
+  const [formWinnerTeam, setFormWinnerTeam] = useState<number | null>(null);
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
 
   // Extract unique values for filters
@@ -304,6 +310,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             submittedName: typeof entry?.submittedName === 'string' ? entry.submittedName : null,
             submittedComment: typeof entry?.submittedComment === 'string' ? entry.submittedComment : null,
             status: typeof entry?.status === 'string' ? entry.status : 'pending',
+            winnerTeam: typeof entry?.winnerTeam === 'number' ? entry.winnerTeam : null,
             canEdit: Boolean(entry?.canEdit),
           } satisfies ReplayListEntry;
         })
@@ -380,6 +387,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           submittedName: null,
           submittedComment: null,
           status: 'pending',
+          winnerTeam: null,
         };
         setPreview(normalized);
         setFormName(normalized.replayName || normalized.originalName || '');
@@ -535,7 +543,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       const res = await fetch('/api/replays', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: preview.path, submittedName: formName, submittedComment: formComment, status: 'published' }),
+        body: JSON.stringify({ path: preview.path, submittedName: formName, submittedComment: formComment, winnerTeam: formWinnerTeam, status: 'published' }),
       });
       const payload = await res.json().catch(() => null);
       if (!res.ok) {
@@ -546,6 +554,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setPreview(null);
       setFormName('');
       setFormComment('');
+      setFormWinnerTeam(null);
       setUploadSuccessMessage(null); // Clear the success message
       await loadReplays();
     } catch (err) {
@@ -554,12 +563,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     } finally {
       setSavingDetails(false);
     }
-  }, [preview, formName, formComment, loadReplays]);
+  }, [preview, formName, formComment, formWinnerTeam, loadReplays]);
 
   const handleStartEdit = useCallback((replay: ReplayListEntry) => {
     setEditingPath(replay.path);
     setEditName(replay.submittedName || replay.replayName || replay.originalName);
     setEditComment(replay.submittedComment || '');
+    setEditWinnerTeam(replay.winnerTeam ?? null);
     setActionErrorCode(null);
   }, []);
 
@@ -567,6 +577,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     setEditingPath(null);
     setEditName('');
     setEditComment('');
+    setEditWinnerTeam(null);
     setActionErrorCode(null);
   }, []);
 
@@ -577,7 +588,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       const res = await fetch('/api/replays', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, submittedName: editName, submittedComment: editComment }),
+        body: JSON.stringify({ path, submittedName: editName, submittedComment: editComment, winnerTeam: editWinnerTeam }),
       });
       const payload = await res.json().catch(() => null);
       if (!res.ok) {
@@ -587,6 +598,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setEditingPath(null);
       setEditName('');
       setEditComment('');
+      setEditWinnerTeam(null);
       await loadReplays();
     } catch (err) {
       const code = err instanceof Error ? err.message : 'update_failed';
@@ -594,7 +606,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     } finally {
       setSavingEdit(false);
     }
-  }, [editName, editComment, loadReplays]);
+  }, [editName, editComment, editWinnerTeam, loadReplays]);
 
   const handleDelete = useCallback(async (path: string) => {
     setDeletingPath(path);
@@ -617,6 +629,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setDeletingPath(null);
     }
   }, [loadReplays]);
+
+  const handleRevealWinner = useCallback((path: string) => {
+    setRevealedWinners(prev => new Set(prev).add(path));
+  }, []);
 
   const uploadErrorMessage = uploadErrorCode ? resolveErrorMessage(uploadErrorCode) : null;
   const listErrorMessage = listErrorCode ? resolveErrorMessage(listErrorCode) : null;
@@ -645,6 +661,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 setPreview(null);
                 setFormName('');
                 setFormComment('');
+                setFormWinnerTeam(null);
               }}
             />
             <button
@@ -712,6 +729,44 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
               />
             </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-neutral-400 font-medium">Winner (optional)</label>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormWinnerTeam(1)}
+                  className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                    formWinnerTeam === 1
+                      ? 'bg-emerald-600/30 border-emerald-500/60 text-emerald-200'
+                      : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                  }`}
+                >
+                  Team 1 won
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormWinnerTeam(2)}
+                  className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                    formWinnerTeam === 2
+                      ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
+                      : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                  }`}
+                >
+                  Team 2 won
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormWinnerTeam(null)}
+                  className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                    formWinnerTeam === null
+                      ? 'bg-neutral-700/50 border-neutral-500/60 text-neutral-200'
+                      : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                  }`}
+                >
+                  Unknown
+                </button>
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -723,7 +778,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               </button>
               <button
                 type="button"
-                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); setUploadSuccessMessage(null); }}
+                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); setFormWinnerTeam(null); setUploadSuccessMessage(null); }}
                 className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
               >
                 Discard
@@ -966,7 +1021,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 <div key={replay.path} className="bg-neutral-900 border border-neutral-600/25 rounded-lg shadow-md overflow-hidden p-4">
                   {/* Header with title and actions - title left, buttons right */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h4 className="text-sm font-semibold text-white truncate" title={replay.originalName}>
                         {replay.submittedName || replay.replayName || replay.originalName}
                       </h4>
@@ -978,7 +1033,36 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         <span>{formatDate(replay.uploadedAt)}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-2 flex-wrap items-center">
+                      {/* Winner reveal button */}
+                      {replay.winnerTeam && !revealedWinners.has(replay.path) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRevealWinner(replay.path)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-700/50 border border-neutral-600/40 text-neutral-300 hover:bg-neutral-600/50 transition-colors"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Click to reveal winner
+                        </button>
+                      ) : replay.winnerTeam && revealedWinners.has(replay.path) ? (
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md ${
+                          replay.winnerTeam === 1
+                            ? 'bg-emerald-600/30 border border-emerald-500/60 text-emerald-200'
+                            : 'bg-blue-600/30 border border-blue-500/60 text-blue-200'
+                        }`}>
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          Team {replay.winnerTeam} victory
+                        </div>
+                      ) : replay.winnerTeam === null ? (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-neutral-500 rounded-md bg-neutral-800/50 border border-neutral-700/40">
+                          Winner unknown
+                        </div>
+                      ) : null}
                       {replay.canEdit && (
                         <>
                           <button
@@ -1036,8 +1120,21 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   <div className="flex flex-col sm:flex-row gap-3 items-start">
                     {/* Team 1 */}
                     <div className="flex-1">
-                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 1</div>
-                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-600/25">
+                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide flex items-center gap-1">
+                        Team 1
+                        {replay.winnerTeam === 1 && revealedWinners.has(replay.path) && (
+                          <svg className="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className={`rounded-md p-2 transition-all ${
+                        replay.winnerTeam === 1 && revealedWinners.has(replay.path)
+                          ? 'bg-emerald-900/20 border-2 border-emerald-600/40 shadow-emerald-600/20 shadow-lg'
+                          : replay.winnerTeam === 2 && revealedWinners.has(replay.path)
+                          ? 'bg-neutral-800/20 border border-red-900/30 opacity-75'
+                          : 'bg-neutral-800/30 border border-neutral-600/25'
+                      }`}>
                         {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
                           const enrichedProfile = profile as EnrichedReplayProfile;
                           return (
@@ -1065,7 +1162,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     </div>
 
                     {/* Map in the middle */}
-                    <div className="shrink-0 flex flex-col items-center justify-center px-3">
+                    <div className="shrink-0 flex flex-col items-center justify-start px-3">
                       {mapImagePath ? (
                         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
                           <img
@@ -1094,8 +1191,21 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
                     {/* Team 2 */}
                     <div className="flex-1">
-                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide">Team 2</div>
-                      <div className="bg-neutral-800/30 rounded-md p-2 border border-neutral-600/25">
+                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide flex items-center gap-1">
+                        Team 2
+                        {replay.winnerTeam === 2 && revealedWinners.has(replay.path) && (
+                          <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className={`rounded-md p-2 transition-all ${
+                        replay.winnerTeam === 2 && revealedWinners.has(replay.path)
+                          ? 'bg-blue-900/20 border-2 border-blue-600/40 shadow-blue-600/20 shadow-lg'
+                          : replay.winnerTeam === 1 && revealedWinners.has(replay.path)
+                          ? 'bg-neutral-800/20 border border-red-900/30 opacity-75'
+                          : 'bg-neutral-800/30 border border-neutral-600/25'
+                      }`}>
                         {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
                           const enrichedProfile = profile as EnrichedReplayProfile;
                           return (
@@ -1142,6 +1252,44 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                           placeholder="Comment (optional)"
                           className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
                         />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-neutral-400 font-medium">Winner</label>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setEditWinnerTeam(1)}
+                            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                              editWinnerTeam === 1
+                                ? 'bg-emerald-600/30 border-emerald-500/60 text-emerald-200'
+                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                            }`}
+                          >
+                            Team 1 won
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditWinnerTeam(2)}
+                            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                              editWinnerTeam === 2
+                                ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
+                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                            }`}
+                          >
+                            Team 2 won
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditWinnerTeam(null)}
+                            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                              editWinnerTeam === null
+                                ? 'bg-neutral-700/50 border-neutral-500/60 text-neutral-200'
+                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                            }`}
+                          >
+                            Unknown
+                          </button>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
