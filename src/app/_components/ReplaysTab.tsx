@@ -23,6 +23,7 @@ type ReplayListEntry = {
   submittedName: string | null;
   submittedComment: string | null;
   status: 'pending' | 'published' | string;
+  canEdit?: boolean;
 };
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -62,6 +63,10 @@ const resolveErrorMessage = (code: string) => {
       return 'Clipboard access is blocked by your browser. Try downloading instead.';
     case 'rate_limit_exceeded':
       return 'You have uploaded too many replays recently. Please wait an hour and try again.';
+    case 'unauthorized':
+      return 'You do not have permission to edit or delete this replay.';
+    case 'delete_failed':
+      return 'Could not delete the replay. Please try again.';
     default:
       return 'Something went wrong. Please try again shortly.';
   }
@@ -128,6 +133,14 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
   const [copyingPath, setCopyingPath] = useState<string | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
+
+  // Edit/delete states
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editName, setEditName] = useState<string>('');
+  const [editComment, setEditComment] = useState<string>('');
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [deletingPath, setDeletingPath] = useState<string | null>(null);
+  const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
 
   // Filter states
   const [selectedFactions, setSelectedFactions] = useState<Set<string>>(new Set());
@@ -291,6 +304,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             submittedName: typeof entry?.submittedName === 'string' ? entry.submittedName : null,
             submittedComment: typeof entry?.submittedComment === 'string' ? entry.submittedComment : null,
             status: typeof entry?.status === 'string' ? entry.status : 'pending',
+            canEdit: Boolean(entry?.canEdit),
           } satisfies ReplayListEntry;
         })
         .filter((entry: ReplayListEntry) => Boolean(entry.path));
@@ -541,6 +555,68 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setSavingDetails(false);
     }
   }, [preview, formName, formComment, loadReplays]);
+
+  const handleStartEdit = useCallback((replay: ReplayListEntry) => {
+    setEditingPath(replay.path);
+    setEditName(replay.submittedName || replay.replayName || replay.originalName);
+    setEditComment(replay.submittedComment || '');
+    setActionErrorCode(null);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingPath(null);
+    setEditName('');
+    setEditComment('');
+    setActionErrorCode(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async (path: string) => {
+    setSavingEdit(true);
+    setActionErrorCode(null);
+    try {
+      const res = await fetch('/api/replays', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, submittedName: editName, submittedComment: editComment }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const code = payload?.error || 'update_failed';
+        throw new Error(code);
+      }
+      setEditingPath(null);
+      setEditName('');
+      setEditComment('');
+      await loadReplays();
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'update_failed';
+      setActionErrorCode(code);
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [editName, editComment, loadReplays]);
+
+  const handleDelete = useCallback(async (path: string) => {
+    setDeletingPath(path);
+    setActionErrorCode(null);
+    try {
+      const res = await fetch(`/api/replays?path=${encodeURIComponent(path)}`, {
+        method: 'DELETE',
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        const code = payload?.error || 'delete_failed';
+        throw new Error(code);
+      }
+      setConfirmDeletePath(null);
+      await loadReplays();
+    } catch (err) {
+      const code = err instanceof Error ? err.message : 'delete_failed';
+      setActionErrorCode(code);
+    } finally {
+      setDeletingPath(null);
+    }
+  }, [loadReplays]);
 
   const uploadErrorMessage = uploadErrorCode ? resolveErrorMessage(uploadErrorCode) : null;
   const listErrorMessage = listErrorCode ? resolveErrorMessage(listErrorCode) : null;
@@ -885,10 +961,6 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               const mapImagePath = getMapImage(replay.mapName);
               const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
 
-              // Debug: Check if profiles have faction_rating
-              if (replay.profiles && replay.profiles.length > 0) {
-                console.log('Replay profiles for', replay.replayName || replay.originalName, ':', replay.profiles);
-              }
 
               return (
                 <div key={replay.path} className="bg-neutral-900 border border-neutral-600/25 rounded-lg shadow-md overflow-hidden p-4">
@@ -906,7 +978,33 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         <span>{formatDate(replay.uploadedAt)}</span>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
+                      {replay.canEdit && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEdit(replay)}
+                            disabled={editingPath === replay.path}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-blue-600/60 bg-blue-800/80 px-3 py-1.5 text-xs font-medium text-blue-100 transition-colors hover:bg-blue-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeletePath(replay.path)}
+                            disabled={deletingPath === replay.path}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-red-600/60 bg-red-800/80 px-3 py-1.5 text-xs font-medium text-red-100 transition-colors hover:bg-red-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            {deletingPath === replay.path ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => void handleDownload(replay.path)}
@@ -1025,12 +1123,52 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     </div>
                   </div>
 
-                  {/* Comment if available */}
-                  {replay.submittedComment && (
-                    <div className="mt-4 pt-3 border-t border-neutral-600/25">
-                      <div className="text-xs text-neutral-400 font-semibold mb-1">Comment</div>
-                      <p className="text-xs text-neutral-300">{replay.submittedComment}</p>
+                  {/* Edit form (if editing this replay) */}
+                  {editingPath === replay.path ? (
+                    <div className="mt-4 pt-3 border-t border-neutral-600/25 space-y-3">
+                      <h5 className="text-sm font-semibold text-white">Edit replay details</h5>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Replay title"
+                          className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={editComment}
+                          onChange={(e) => setEditComment(e.target.value)}
+                          placeholder="Comment (optional)"
+                          className="w-full sm:w-1/2 rounded-md border border-neutral-700/60 bg-neutral-800/70 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-400 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveEdit(replay.path)}
+                          disabled={savingEdit || !editName.trim()}
+                          className="inline-flex items-center justify-center rounded-md border border-emerald-700/60 bg-emerald-800/80 px-3 py-1.5 text-sm font-medium text-emerald-100 hover:bg-emerald-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {savingEdit ? 'Saving...' : 'Save changes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    /* Comment if available */
+                    replay.submittedComment && (
+                      <div className="mt-4 pt-3 border-t border-neutral-600/25">
+                        <div className="text-xs text-neutral-400 font-semibold mb-1">Comment</div>
+                        <p className="text-xs text-neutral-300">{replay.submittedComment}</p>
+                      </div>
+                    )
                   )}
                 </div>
               );
@@ -1038,6 +1176,35 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {confirmDeletePath && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">Delete replay?</h3>
+            <p className="text-sm text-neutral-300">
+              This will permanently delete the replay file and all its data. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmDeletePath(null)}
+                className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(confirmDeletePath)}
+                disabled={deletingPath === confirmDeletePath}
+                className="inline-flex items-center justify-center rounded-md border border-red-700/60 bg-red-800/80 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingPath === confirmDeletePath ? 'Deleting...' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

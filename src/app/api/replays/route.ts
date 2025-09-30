@@ -114,10 +114,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  // Get client IP hash for ownership verification
+  const clientIpHash = getClientIpHash(req);
+
   // Query 1: Get metadata (contains all paths and data we need)
   const { data: metaRows, error: metaError } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, updated_at, created_at')
+    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, updated_at, created_at')
     .eq('status', 'published')
     .order('updated_at', { ascending: false })
     .limit(100);
@@ -227,6 +230,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Check if current user can edit this replay
+    const canEdit = Boolean(meta.uploader_ip_hash && meta.uploader_ip_hash === clientIpHash);
+
     return {
       path: meta.path,
       originalName,
@@ -241,6 +247,7 @@ export async function GET(req: NextRequest) {
       submittedName: meta.submitted_name,
       submittedComment: meta.submitted_comment,
       status: meta.status,
+      canEdit,
     };
   });
 
@@ -404,6 +411,7 @@ export async function POST(req: NextRequest) {
         profiles: meta.profiles,
         raw_metadata: meta.raw_metadata,
         status: 'pending',
+        uploader_ip_hash: ipHash,
         updated_at: new Date().toISOString(),
       });
 
@@ -507,9 +515,31 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'missing_path' }, { status: 400 });
   }
 
+  // Verify ownership if this is not the initial publish (status change from pending to published)
+  const statusRaw = payload?.status;
   const submittedNameRaw = payload?.submittedName;
   const submittedCommentRaw = payload?.submittedComment;
-  const statusRaw = payload?.status;
+
+  // Get current status to determine if this is initial publish
+  const { data: currentMeta } = await supabaseAdmin
+    .from('replay_metadata')
+    .select('status, uploader_ip_hash')
+    .eq('path', path)
+    .maybeSingle();
+
+  // If replay already published, verify IP ownership for edits
+  if (currentMeta?.status === 'published') {
+    const ipHash = getClientIpHash(req);
+    const { data: isOwner } = await supabaseAdmin
+      .rpc('verify_replay_ownership', {
+        path_input: path,
+        ip_hash_input: ipHash
+      });
+
+    if (!isOwner) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
+    }
+  }
 
   // Sanitize and filter profanity
   let submittedName: string | null = null;
@@ -540,6 +570,44 @@ export async function PATCH(req: NextRequest) {
   if (error) {
     console.error('Failed to update replay metadata', error);
     return NextResponse.json({ error: 'update_failed' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: 'supabase_not_configured' }, { status: 500 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const path = searchParams.get('path');
+
+  if (!path) {
+    return NextResponse.json({ error: 'missing_path' }, { status: 400 });
+  }
+
+  // Verify ownership
+  const ipHash = getClientIpHash(req);
+  const { data: result } = await supabaseAdmin
+    .rpc('delete_replay_with_verification', {
+      path_input: path,
+      ip_hash_input: ipHash
+    });
+
+  if (!result?.success) {
+    return NextResponse.json({ error: result?.error || 'delete_failed' }, { status: 403 });
+  }
+
+  // Delete from storage bucket
+  const { error: storageError } = await supabaseAdmin
+    .storage
+    .from(REPLAYS_BUCKET)
+    .remove([path]);
+
+  if (storageError) {
+    console.error('Failed to delete replay file from storage', storageError);
+    // Don't fail the request if storage deletion fails (metadata already deleted)
   }
 
   return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store' } });
