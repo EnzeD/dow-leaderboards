@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { EnrichedReplayProfile } from '@/lib/replay-player-matching';
+import { FormEvent, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { EnrichedReplayProfile, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
 import { getMapName, getMapImage } from '@/lib/mapMetadata';
 
@@ -114,6 +114,12 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [copyingPath, setCopyingPath] = useState<string | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
+  // Filter states
+  const [selectedFactions, setSelectedFactions] = useState<Set<string>>(new Set());
+  const [eloRange, setEloRange] = useState<{ min: number; max: number }>({ min: 0, max: 3000 });
+  const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
+  const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Preview of the last uploaded replay (not yet published)
@@ -121,6 +127,95 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [formName, setFormName] = useState<string>('');
   const [formComment, setFormComment] = useState<string>('');
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
+
+  // Extract unique values for filters
+  const availableFactions = useMemo(() => {
+    const factions = new Set<string>();
+    replays.forEach(replay => {
+      if (Array.isArray(replay.profiles)) {
+        replay.profiles.forEach(p => {
+          if (p.faction) factions.add(p.faction);
+        });
+      }
+    });
+    return Array.from(factions).sort();
+  }, [replays]);
+
+  const availableMaps = useMemo(() => {
+    const maps = new Set<string>();
+    replays.forEach(replay => {
+      if (replay.mapName) {
+        const mapDisplayName = getMapName(replay.mapName);
+        maps.add(mapDisplayName);
+      }
+    });
+    return Array.from(maps).sort();
+  }, [replays]);
+
+  const eloLimits = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    replays.forEach(replay => {
+      if (Array.isArray(replay.profiles)) {
+        replay.profiles.forEach(p => {
+          const enriched = p as EnrichedReplayProfile;
+          if (enriched.faction_rating) {
+            min = Math.min(min, enriched.faction_rating);
+            max = Math.max(max, enriched.faction_rating);
+          }
+        });
+      }
+    });
+    return { min: min === Infinity ? 0 : Math.floor(min / 100) * 100, max: max === -Infinity ? 3000 : Math.ceil(max / 100) * 100 };
+  }, [replays]);
+
+  // Filter replays based on active filters
+  const filteredReplays = useMemo(() => {
+    return replays.filter(replay => {
+      // Faction filter
+      if (selectedFactions.size > 0) {
+        const replayFactions = (replay.profiles || []).map(p => p.faction);
+        const hasFaction = replayFactions.some(f => selectedFactions.has(f));
+        if (!hasFaction) return false;
+      }
+
+      // Format filter
+      if (selectedFormats.size > 0) {
+        const format = getGameModeFromMapName(replay.mapName);
+        if (!selectedFormats.has(format)) return false;
+      }
+
+      // Map filter
+      if (selectedMaps.size > 0) {
+        const mapDisplayName = getMapName(replay.mapName);
+        if (!selectedMaps.has(mapDisplayName)) return false;
+      }
+
+      // ELO filter
+      if (Array.isArray(replay.profiles)) {
+        const hasEloInRange = replay.profiles.some(p => {
+          const enriched = p as EnrichedReplayProfile;
+          if (enriched.faction_rating) {
+            return enriched.faction_rating >= eloRange.min && enriched.faction_rating <= eloRange.max;
+          }
+          return eloRange.min === eloLimits.min && eloRange.max === eloLimits.max; // Include players without ELO if range is at default
+        });
+        if (!hasEloInRange) return false;
+      }
+
+      return true;
+    });
+  }, [replays, selectedFactions, selectedFormats, selectedMaps, eloRange, eloLimits]);
+
+  // Check if any filters are active
+  const hasActiveFilters = selectedFactions.size > 0 || selectedFormats.size > 0 || selectedMaps.size > 0 || eloRange.min !== eloLimits.min || eloRange.max !== eloLimits.max;
+
+  const clearAllFilters = () => {
+    setSelectedFactions(new Set());
+    setSelectedFormats(new Set());
+    setSelectedMaps(new Set());
+    setEloRange({ min: eloLimits.min, max: eloLimits.max });
+  };
 
   const loadReplays = useCallback(async () => {
     setLoadingList(true);
@@ -553,6 +648,143 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </button>
         </div>
 
+        {/* Filters */}
+        {replays.length > 0 && (
+          <div className="space-y-3 bg-neutral-900/50 p-4 rounded-lg border border-neutral-700/40">
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Format Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-neutral-400 font-medium">Format:</label>
+                <select
+                  value={selectedFormats.size === 0 ? 'any' : Array.from(selectedFormats)[0]}
+                  onChange={(e) => {
+                    if (e.target.value === 'any') {
+                      setSelectedFormats(new Set());
+                    } else {
+                      setSelectedFormats(new Set([e.target.value]));
+                    }
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+                >
+                  <option value="any">Any</option>
+                  <option value="1v1">1v1</option>
+                  <option value="2v2">2v2</option>
+                  <option value="3v3">3v3</option>
+                  <option value="4v4">4v4</option>
+                </select>
+              </div>
+
+              {/* ELO Range */}
+              {eloLimits.max > eloLimits.min && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-neutral-400 font-medium">ELO:</label>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-neutral-800 border border-neutral-600/40 rounded-md">
+                    <input
+                      type="number"
+                      min={eloLimits.min}
+                      max={eloLimits.max}
+                      step={50}
+                      value={eloRange.min}
+                      onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value) || eloLimits.min, eloRange.max) })}
+                      className="w-16 px-1 py-0.5 text-xs bg-neutral-900 border border-neutral-700 rounded text-neutral-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    />
+                    <span className="text-xs text-neutral-500">-</span>
+                    <input
+                      type="number"
+                      min={eloLimits.min}
+                      max={eloLimits.max}
+                      step={50}
+                      value={eloRange.max}
+                      onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value) || eloLimits.max, eloRange.min) })}
+                      className="w-16 px-1 py-0.5 text-xs bg-neutral-900 border border-neutral-700 rounded text-neutral-200 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Maps Dropdown */}
+              {availableMaps.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-neutral-400 font-medium">Map:</label>
+                  <select
+                    value={selectedMaps.size === 0 ? 'any' : Array.from(selectedMaps)[0]}
+                    onChange={(e) => {
+                      if (e.target.value === 'any') {
+                        setSelectedMaps(new Set());
+                      } else {
+                        setSelectedMaps(new Set([e.target.value]));
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors max-w-[200px]"
+                  >
+                    <option value="any">Any</option>
+                    {availableMaps.map(map => (
+                      <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Clear Filters Button */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600/20 border border-red-500/50 text-red-300 hover:bg-red-600/30 transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Race/Faction Filter */}
+            {availableFactions.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-xs text-neutral-400 font-medium">Races:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableFactions.map(faction => {
+                    const isSelected = selectedFactions.has(faction);
+                    // Normalize faction display name
+                    const displayName = faction
+                      .replace(/_/g, ' ')
+                      .split(' ')
+                      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(' ');
+
+                    return (
+                      <button
+                        key={faction}
+                        onClick={() => {
+                          const newSet = new Set(selectedFactions);
+                          if (isSelected) {
+                            newSet.delete(faction);
+                          } else {
+                            newSet.add(faction);
+                          }
+                          setSelectedFactions(newSet);
+                        }}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
+                            : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                        }`}
+                      >
+                        {displayName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Results Count */}
+            {hasActiveFilters && (
+              <div className="text-xs text-neutral-400 pt-1 border-t border-neutral-700/40">
+                Showing <span className="font-semibold text-neutral-200">{filteredReplays.length}</span> of <span className="font-semibold text-neutral-200">{replays.length}</span> replays
+              </div>
+            )}
+          </div>
+        )}
+
         {listErrorMessage && (
           <div className="rounded-md border border-red-700/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
             {listErrorMessage}
@@ -574,9 +806,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           <div className="rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-6 text-center text-neutral-400">
             No replays have been uploaded yet. Be the first to share a battle!
           </div>
+        ) : filteredReplays.length === 0 ? (
+          <div className="rounded-md border border-neutral-700/50 bg-neutral-900/70 px-4 py-6 text-center text-neutral-400">
+            No replays match the selected filters. Try adjusting your filters or clear them to see all replays.
+          </div>
         ) : (
           <div className="space-y-3">
-            {replays.map((replay) => {
+            {filteredReplays.map((replay) => {
               const mapDisplayName = getMapName(replay.mapName);
               const mapImagePath = getMapImage(replay.mapName);
               const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
