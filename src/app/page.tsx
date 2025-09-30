@@ -2004,6 +2004,13 @@ export default function Home() {
                 placeholder="Search players..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && search.trim() && filteredRows.length === 0 && lbExpanded) {
+                    setActiveTab('search');
+                    setSearchQuery(search.trim());
+                    setTriggerAutocomplete(true);
+                  }
+                }}
                 className="w-full px-4 py-3 bg-neutral-900 border border-neutral-600/50 rounded-md text-white placeholder-neutral-400 focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
               />
             </div>
