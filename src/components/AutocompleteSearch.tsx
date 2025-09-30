@@ -11,6 +11,8 @@ type AutocompleteSearchProps = {
   onExactSearch: () => void;
   loading?: boolean;
   placeholder?: string;
+  triggerSearch?: boolean;
+  onSearchTriggered?: () => void;
 };
 
 const FlagIcon = ({ countryCode }: { countryCode: string }) => {
@@ -39,7 +41,9 @@ export default function AutocompleteSearch({
   onSelect,
   onExactSearch,
   loading = false,
-  placeholder = "Type player name..."
+  placeholder = "Type player name...",
+  triggerSearch = false,
+  onSearchTriggered
 }: AutocompleteSearchProps) {
   const [suggestions, setSuggestions] = useState<PlayerSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -65,7 +69,7 @@ export default function AutocompleteSearch({
         .not('current_alias', 'is', null)
         .ilike('current_alias', `%${query}%`)
         .order('current_alias')
-        .limit(10);
+        .limit(20);
 
       if (error) {
         throw error;
@@ -80,8 +84,28 @@ export default function AutocompleteSearch({
         xp: player.xp,
       }));
 
-      setSuggestions(results);
-      setShowSuggestions(fromTyping && results.length > 0);
+      // Sort by relevance: exact matches first, then starts-with, then contains
+      const lowerQuery = query.toLowerCase();
+      const sortedResults = results.sort((a, b) => {
+        const aLower = a.current_alias.toLowerCase();
+        const bLower = b.current_alias.toLowerCase();
+
+        const aExact = aLower === lowerQuery;
+        const bExact = bLower === lowerQuery;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+
+        const aStarts = aLower.startsWith(lowerQuery);
+        const bStarts = bLower.startsWith(lowerQuery);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+
+        // Within same tier, sort alphabetically
+        return aLower.localeCompare(bLower);
+      });
+
+      setSuggestions(sortedResults);
+      setShowSuggestions(fromTyping && sortedResults.length > 0);
     } catch (error) {
       console.error('Autocomplete search failed:', error);
       setSuggestions([]);
@@ -107,6 +131,17 @@ export default function AutocompleteSearch({
       }
     };
   }, [value, fetchSuggestions, hasTyped]);
+
+  // Handle triggered search from external sources (e.g., leaderboard navigation)
+  useEffect(() => {
+    if (triggerSearch && value.length >= 2) {
+      setHasTyped(true);
+      fetchSuggestions(value, true);
+      if (onSearchTriggered) {
+        onSearchTriggered();
+      }
+    }
+  }, [triggerSearch, value, fetchSuggestions, onSearchTriggered]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;

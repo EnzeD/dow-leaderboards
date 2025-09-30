@@ -3,3 +3,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom scrollbar styling for dark theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #525252 #171717;
+}
+
+*::-webkit-scrollbar {
+  width: 16px;
+  height: 16px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #171717;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #525252;
+  border-radius: 6px;
+  border: 2px solid #171717;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #737373;
+}

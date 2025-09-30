@@ -488,6 +488,7 @@ export default function Home() {
   const [searchLastUpdated, setSearchLastUpdated] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [_selectedPlayer, _setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
+  const [triggerAutocomplete, setTriggerAutocomplete] = useState(false);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
   const [combinedViewMode, setCombinedViewMode] = useState<'best' | 'all'>('best');
   const [lbExpanded, setLbExpanded] = useState(false);
@@ -2018,14 +2019,14 @@ export default function Home() {
               <div className="text-xs sm:text-sm text-neutral-300 bg-neutral-900/40 border border-neutral-700/40 rounded-md p-3">
                 <span className="font-semibold text-white">No results on this leaderboard.</span>{' '}
                 <span>
-                  Try a profile search — use the exact multiplayer profile name (case-sensitive).
+                  Try a profile search.
                 </span>
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab('search');
                     setSearchQuery(search.trim());
-                    handlePlayerSearch(search.trim(), { pushHistory: true });
+                    setTriggerAutocomplete(true);
                   }}
                   className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded border border-neutral-600/40 bg-neutral-800/60 hover:bg-neutral-700/60 text-white transition-colors font-semibold"
                 >
@@ -2396,6 +2397,8 @@ export default function Home() {
                   onExactSearch={handleExactSearch}
                   loading={searchLoading}
                   placeholder="Type player name for instant results..."
+                  triggerSearch={triggerAutocomplete}
+                  onSearchTriggered={() => setTriggerAutocomplete(false)}
                 />
               </div>
 
