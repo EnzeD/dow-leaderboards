@@ -112,6 +112,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [actionErrorCode, setActionErrorCode] = useState<string | null>(null);
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
   const [copyingPath, setCopyingPath] = useState<string | null>(null);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -366,6 +367,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         throw new Error('clipboard_unavailable');
       }
 
+      // Show copied confirmation
+      setCopiedPath(path);
+      setTimeout(() => setCopiedPath(null), 1200);
+
       if (typeof downloadCount === 'number') {
         setReplays(prev =>
           sortReplays(
@@ -446,8 +451,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-5 py-2 text-sm font-medium text-white transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-5 py-2 text-sm font-medium text-white transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
             >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
               {uploading ? 'Uploading...' : 'Upload Replay'}
             </button>
           </div>
@@ -536,8 +544,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             type="button"
             onClick={handleRefresh}
             disabled={loadingList}
-            className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
           >
+            <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             {loadingList ? 'Refreshing...' : 'Refresh list'}
           </button>
         </div>
@@ -596,17 +607,25 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         type="button"
                         onClick={() => void handleDownload(replay.path)}
                         disabled={downloadingPath === replay.path}
-                        className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-100 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
                         {downloadingPath === replay.path ? 'Downloading...' : 'Download'}
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleCopyLink(replay.path)}
                         disabled={copyingPath === replay.path}
-                        className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {copyingPath === replay.path ? 'Copying...' : 'Copy Link'}
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        <span className={copiedPath === replay.path ? 'text-green-400' : ''}>
+                          {copiedPath === replay.path ? 'Link copied' : copyingPath === replay.path ? 'Copying...' : 'Copy link'}
+                        </span>
                       </button>
                     </div>
                   </div>
