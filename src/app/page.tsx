@@ -249,7 +249,7 @@ const RANK_DELTA_VARIANT_CLASS: Record<RankDeltaVariant, string> = {
   same: "text-neutral-200 bg-neutral-800/70 border border-neutral-600/40",
 };
 
-type RankDeltaMeta = { text: string; title: string; variant: RankDeltaVariant };
+type RankDeltaMeta = { text: string | React.ReactNode; title: string; variant: RankDeltaVariant };
 
 const resolveRankDeltaMeta = (delta?: number | null, allowNew = true): RankDeltaMeta | null => {
   if (delta === null || delta === undefined) {
@@ -270,14 +270,24 @@ const resolveRankDeltaMeta = (delta?: number | null, allowNew = true): RankDelta
 
   if (delta > 0) {
     return {
-      text: `↑${magnitude}`,
+      text: (
+        <>
+          <span className="inline-block -translate-y-0.5">↑</span>
+          {magnitude}
+        </>
+      ),
       title: `Up ${magnitude} place${magnitude === 1 ? '' : 's'}`,
       variant: "up",
     };
   }
 
   return {
-    text: `↓${magnitude}`,
+    text: (
+      <>
+        <span className="inline-block -translate-y-0.5">↓</span>
+        {magnitude}
+      </>
+    ),
     title: `Down ${magnitude} place${magnitude === 1 ? '' : 's'}`,
     variant: "down",
   };
@@ -2087,9 +2097,99 @@ export default function Home() {
 
         {/* Table - Desktop */}
         {loading ? (
-          <div className="text-center py-16 text-white font-medium">
-            Loading...
-          </div>
+          <>
+            {/* Desktop Skeleton */}
+            <div className="hidden md:block bg-neutral-900 border border-neutral-600/40 rounded-lg shadow-2xl overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-neutral-800 border-b-2 border-neutral-600/50" style={{background: 'linear-gradient(135deg, #262626, #171717)'}}>
+                  <tr>
+                    {[
+                      { key: "rank", label: "Rank" },
+                      { key: "rankDelta", label: "↑↓" },
+                      { key: "playerName", label: "Alias" },
+                      ...(isCombinedMode ? [{ key: "faction", label: "Faction" }] : []),
+                      { key: "rating", label: "ELO" },
+                      { key: "streak", label: "Streak" },
+                      { key: "wins", label: "Wins" },
+                      { key: "losses", label: "Losses" },
+                      { key: "winrate", label: "Ratio" },
+                      { key: "lastMatchDate", label: "Last Game" },
+                    ].map(({ key, label }) => (
+                      <th
+                        key={key}
+                        className={`py-3 ${key === "rank" || key === "rankDelta" ? "px-3" : "px-4"} ${key === "rank" || key === "rankDelta" ? "text-center" : "text-left"} text-white font-bold border-r border-neutral-600/30 last:border-r-0 whitespace-nowrap ${key === "rank" || key === "rankDelta" ? "w-14" : ""}`}
+                      >
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 30 }).map((_, i) => (
+                    <tr key={i} className={`${i % 2 === 0 ? "bg-neutral-900/80" : "bg-neutral-800/80"} border-b border-neutral-600/20`}>
+                      <td className="px-3 py-3 border-r border-neutral-600/20 w-14 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                          <div className="h-5 w-6 bg-neutral-700 rounded animate-pulse"></div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 border-r border-neutral-600/20 w-14">
+                        <div className="flex items-center justify-center">
+                          <div className="h-5 w-8 bg-neutral-700 rounded animate-pulse"></div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-neutral-600/20 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <div className="h-4 w-6 bg-neutral-700 rounded animate-pulse shrink-0"></div>
+                          <div className="h-5 bg-neutral-700 rounded animate-pulse" style={{ width: `${180 + (i * 17) % 100}px` }}></div>
+                        </div>
+                      </td>
+                      {isCombinedMode && (
+                        <td className="px-4 py-3 border-r border-neutral-600/20">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 w-4 bg-neutral-700 rounded animate-pulse"></div>
+                            <div className="h-5 w-28 bg-neutral-700 rounded animate-pulse"></div>
+                          </div>
+                        </td>
+                      )}
+                      <td className="px-4 py-3 border-r border-neutral-600/20">
+                        <div className="h-5 w-14 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-neutral-600/20">
+                        <div className="h-5 w-10 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-neutral-600/20">
+                        <div className="h-5 w-10 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-neutral-600/20">
+                        <div className="h-5 w-10 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-3 border-r border-neutral-600/20">
+                        <div className="h-5 w-14 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="h-5 w-24 bg-neutral-700 rounded animate-pulse"></div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Skeleton */}
+            <div className="md:hidden space-y-1">
+              {Array.from({ length: 30 }).map((_, i) => (
+                <div key={i} className={`${i % 2 === 0 ? "bg-neutral-900/70" : "bg-neutral-800/70"} border border-neutral-600/30 rounded p-2`}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-8 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 bg-neutral-700 rounded animate-pulse flex-1" style={{ maxWidth: '120px' }}></div>
+                    <div className="h-4 w-12 bg-neutral-700 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-neutral-700 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : (
           <>
             {/* Desktop Table View */}
@@ -2137,8 +2237,10 @@ export default function Home() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 border-r border-neutral-600/20 text-center align-middle w-14">
-                        <RankDeltaBadge delta={row.rankDelta} hasHistory={hasRankDeltaData} />
+                      <td className="px-3 py-3 border-r border-neutral-600/20 w-14">
+                        <div className="flex items-center justify-center">
+                          <RankDeltaBadge delta={row.rankDelta} hasHistory={hasRankDeltaData} />
+                        </div>
                       </td>
                       <td className={`px-4 py-3 ${row.playerName === "Unknown" ? "text-neutral-500" : "text-white font-medium"} border-r border-neutral-600/20 min-w-0`}>
                         <div className="flex items-center gap-2">
