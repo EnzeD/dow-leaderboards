@@ -722,6 +722,59 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 </div>
               )}
 
+              {/* ELO Range Slider */}
+              {eloLimits.max > eloLimits.min && (
+                <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                  <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">ELO:</label>
+                  {/* Min label */}
+                  <div className="flex items-center justify-center w-12 h-7 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
+                    {eloRange.min}
+                  </div>
+
+                  {/* Dual slider container */}
+                  <div className="relative flex-1 h-2">
+                    {/* Track background */}
+                    <div className="absolute inset-0 w-full h-2 bg-neutral-700 rounded-full" />
+
+                    {/* Active range highlight */}
+                    <div
+                      className="absolute inset-y-0 h-2 bg-blue-500 rounded-full"
+                      style={{
+                        left: `${((eloRange.min - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`,
+                        right: `${100 - ((eloRange.max - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`
+                      }}
+                    />
+
+                    {/* Min slider */}
+                    <input
+                      type="range"
+                      min={eloLimits.min}
+                      max={eloLimits.max}
+                      step={50}
+                      value={eloRange.min}
+                      onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value), eloRange.max) })}
+                      className="absolute inset-0 w-full h-2 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:appearance-none [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:appearance-none [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                    />
+
+                    {/* Max slider */}
+                    <input
+                      type="range"
+                      min={eloLimits.min}
+                      max={eloLimits.max}
+                      step={50}
+                      value={eloRange.max}
+                      onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value), eloRange.min) })}
+                      className="absolute inset-0 w-full h-2 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:appearance-none [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-track]:appearance-none [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                    />
+                  </div>
+
+                  {/* Max label */}
+                  <div className="flex items-center justify-center w-12 h-7 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
+                    {eloRange.max}
+                  </div>
+                </div>
+              )}
+
               {/* Clear Filters Button */}
               {hasActiveFilters && (
                 <button
@@ -732,66 +785,6 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 </button>
               )}
             </div>
-
-            {/* ELO Range Slider */}
-            {eloLimits.max > eloLimits.min && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-neutral-400 font-medium">ELO Range:</span>
-                  <span className="text-xs text-neutral-300 font-semibold">{eloRange.min} - {eloRange.max}</span>
-                </div>
-                <div className="relative px-2">
-                  <div className="flex items-center gap-4">
-                    {/* Min label */}
-                    <div className="flex items-center justify-center w-14 h-8 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
-                      {eloRange.min}
-                    </div>
-
-                    {/* Dual slider container */}
-                    <div className="relative flex-1 h-2 overflow-visible">
-                      {/* Track background */}
-                      <div className="absolute top-0 w-full h-2 bg-neutral-700 rounded-full" />
-
-                      {/* Active range highlight */}
-                      <div
-                        className="absolute top-0 h-2 bg-blue-500 rounded-full"
-                        style={{
-                          left: `${((eloRange.min - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`,
-                          right: `${100 - ((eloRange.max - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`
-                        }}
-                      />
-
-                      {/* Min slider */}
-                      <input
-                        type="range"
-                        min={eloLimits.min}
-                        max={eloLimits.max}
-                        step={50}
-                        value={eloRange.min}
-                        onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value), eloRange.max) })}
-                        className="absolute top-0 w-full h-2 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer"
-                      />
-
-                      {/* Max slider */}
-                      <input
-                        type="range"
-                        min={eloLimits.min}
-                        max={eloLimits.max}
-                        step={50}
-                        value={eloRange.max}
-                        onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value), eloRange.min) })}
-                        className="absolute top-0 w-full h-2 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer"
-                      />
-                    </div>
-
-                    {/* Max label */}
-                    <div className="flex items-center justify-center w-14 h-8 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
-                      {eloRange.max}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Race/Faction Filter */}
             {availableFactions.length > 0 && (
