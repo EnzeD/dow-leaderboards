@@ -48,7 +48,15 @@ A **production Next.js 14 + TypeScript application** that creates a public, mobi
    - Direct profile navigation
    - Country flag display
 
-5. **Data Collection Scripts**
+5. **Advanced Statistics Teaser** (Premium Feature Mockup)
+   - Modal UI showcasing upcoming premium features
+   - Price point survey ($2.99/month vs $4.99/month)
+   - Email collection for launch notification
+   - Lead capture in `premium_interest_leads` table
+   - Toggleable via `NEXT_PUBLIC_ENABLE_PREMIUM_TEASER` env var
+   - **Not yet implemented** - mockup only for market validation
+
+6. **Data Collection Scripts**
    - `seed:leaderboards` - Initial snapshot of all leaderboards
    - `enrich:players` - Steam ID/level/XP enrichment
    - `crawl:concurrent` - Match history collection
@@ -69,6 +77,7 @@ A **production Next.js 14 + TypeScript application** that creates a public, mobi
 - `matches` - Match history with player performance
 - `replays` - Uploaded replay metadata
 - `replay_player_links` - Match replays to profiles
+- `premium_interest_leads` - Market research for premium tier
 
 ### Core Data Structures
 
@@ -130,7 +139,7 @@ type Player = {
 **Other**
 - `/api/steam/players` - Current player count (cached from Supabase edge function)
 - `/api/log-favorite` - Analytics logging for favorite leaderboards
-- `/api/premium-interest` - Premium feature interest tracking
+- `/api/premium-interest` - Premium feature interest tracking (advanced stats teaser)
 
 ### Key Files
 
@@ -215,6 +224,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 
+# Feature flags
+NEXT_PUBLIC_ENABLE_PREMIUM_TEASER=false  # Enable advanced statistics teaser modal
+```
+
 ## Project Status
 
 ### Completed Features ✅
@@ -231,6 +244,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 - Responsive mobile design
 - Country flags
 - Faction logos
+- Advanced statistics teaser/mockup (market validation)
 
 ### Architecture Notes
 - Large UI file (`page.tsx` ~42k tokens) - use offset/limit when reading
