@@ -689,6 +689,12 @@ export default function Home() {
       if (initialFromUrl.combinedViewMode) {
         setCombinedViewMode(initialFromUrl.combinedViewMode);
       }
+    } else if (initialFromUrl.view === 'favorites') {
+      setActiveTab('favorites');
+    } else if (initialFromUrl.view === 'stats') {
+      setActiveTab('stats');
+    } else if (initialFromUrl.view === 'replays') {
+      setActiveTab('replays');
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -967,8 +973,17 @@ export default function Home() {
     }
   };
 
+  // Track if this is the first mount to avoid overwriting URL from initialization
+  const isFirstMount = useRef(true);
+
   // Keep URL in sync as state changes (without pushing)
   useEffect(() => {
+    // Skip sync on first mount - let the initialization useEffect handle it
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     const state: AppState = {
       view: activeTab,
       searchQuery,

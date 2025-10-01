@@ -807,17 +807,38 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             <h3 className="text-xl font-semibold text-white">Community Replays</h3>
             <p className="text-sm text-neutral-400">Top most downloaded replays recently.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loadingList}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {loadingList ? 'Refreshing...' : 'Refresh list'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window === 'undefined') return;
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', 'replays');
+                navigator.clipboard.writeText(url.toString());
+                setCopiedPath('share-button');
+                setTimeout(() => setCopiedPath(null), 1200);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+              </svg>
+              <span className={`text-xs font-semibold ${copiedPath === 'share-button' ? 'text-green-400' : ''}`}>
+                {copiedPath === 'share-button' ? 'Link copied' : 'Share'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loadingList}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loadingList ? 'Refreshing...' : 'Refresh list'}
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
