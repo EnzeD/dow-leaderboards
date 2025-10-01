@@ -817,8 +817,18 @@ export default function Home() {
     let comparison = 0;
 
     if (sortField === "lastMatchDate") {
-      const aTime = a.lastMatchDate instanceof Date ? a.lastMatchDate.getTime() : 0;
-      const bTime = b.lastMatchDate instanceof Date ? b.lastMatchDate.getTime() : 0;
+      // Parse dates from both Date objects and ISO strings (from JSON)
+      const getTime = (date: any) => {
+        if (!date) return 0;
+        if (date instanceof Date) return date.getTime();
+        if (typeof date === 'string') {
+          const parsed = new Date(date);
+          return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+        }
+        return 0;
+      };
+      const aTime = getTime(a.lastMatchDate);
+      const bTime = getTime(b.lastMatchDate);
       comparison = aTime - bTime;
     } else if (sortField === "rankDelta") {
       const normalize = (value: number | null | undefined) =>
