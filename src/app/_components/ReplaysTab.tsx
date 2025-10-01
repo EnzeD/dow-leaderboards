@@ -149,7 +149,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
   // Filter states
   const [selectedFactions, setSelectedFactions] = useState<Set<string>>(new Set());
-  const [eloRange, setEloRange] = useState<{ min: number; max: number } | null>(null);
+  // Store user's custom ELO selection (null means "use full range")
+  const [customEloRange, setCustomEloRange] = useState<{ min: number; max: number } | null>(null);
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
   const [aliasSearch, setAliasSearch] = useState<string>('');
@@ -204,12 +205,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     return { min: min === Infinity ? 0 : Math.floor(min / 100) * 100, max: max === -Infinity ? 3000 : Math.ceil(max / 100) * 100 };
   }, [replays]);
 
-  // Initialize ELO range to full range when limits are calculated
-  useEffect(() => {
-    if (eloLimits.min !== Infinity && eloLimits.max !== -Infinity) {
-      setEloRange({ min: eloLimits.min, max: eloLimits.max });
-    }
-  }, [eloLimits.min, eloLimits.max]);
+  // Derive effective ELO range: use custom range if set, otherwise use full limits (NO FLASH!)
+  const eloRange = useMemo(() => {
+    return customEloRange || eloLimits;
+  }, [customEloRange, eloLimits]);
 
   // Filter replays based on active filters
   const filteredReplays = useMemo(() => {
@@ -244,13 +243,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         if (!selectedMaps.has(mapDisplayName)) return false;
       }
 
-      // ELO filter (only apply if range has been modified from defaults)
-      if (eloRange && (eloRange.min !== eloLimits.min || eloRange.max !== eloLimits.max)) {
+      // ELO filter (only apply if custom range is set)
+      if (customEloRange) {
         if (Array.isArray(replay.profiles)) {
           const hasEloInRange = replay.profiles.some(p => {
             const enriched = p as EnrichedReplayProfile;
             if (enriched.faction_rating) {
-              return enriched.faction_rating >= eloRange.min && enriched.faction_rating <= eloRange.max;
+              return enriched.faction_rating >= customEloRange.min && enriched.faction_rating <= customEloRange.max;
             }
             return false; // Exclude players without ELO when filter is active
           });
@@ -260,20 +259,20 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
       return true;
     });
-  }, [replays, selectedFactions, selectedFormats, selectedMaps, eloRange, eloLimits, aliasSearch]);
+  }, [replays, selectedFactions, selectedFormats, selectedMaps, customEloRange, aliasSearch]);
 
   // Check if any filters are active
   const hasActiveFilters = selectedFactions.size > 0 ||
     selectedFormats.size > 0 ||
     selectedMaps.size > 0 ||
-    (eloRange && (eloRange.min !== eloLimits.min || eloRange.max !== eloLimits.max)) ||
+    customEloRange !== null ||
     aliasSearch.trim() !== '';
 
   const clearAllFilters = () => {
     setSelectedFactions(new Set());
     setSelectedFormats(new Set());
     setSelectedMaps(new Set());
-    setEloRange({ min: eloLimits.min, max: eloLimits.max });
+    setCustomEloRange(null);
     setAliasSearch('');
   };
 
@@ -905,7 +904,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             </div>
 
             {/* ELO Range Slider on separate row */}
-            {eloLimits.max > eloLimits.min && eloRange && (
+            {eloLimits.max > eloLimits.min && (
               <div className="flex items-center gap-3 w-full">
                 <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">ELO:</label>
 
@@ -915,7 +914,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   value={eloRange.min}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || eloLimits.min;
-                    setEloRange({ ...eloRange, min: Math.min(val, eloRange.max - 50) });
+                    setCustomEloRange({ min: Math.min(val, eloRange.max - 50), max: eloRange.max });
                   }}
                   min={eloLimits.min}
                   max={eloRange.max - 50}
@@ -928,10 +927,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   {/* Track background */}
                   <div className="absolute w-full h-2 bg-neutral-700 rounded-full" />
 
-                  {/* Active range highlight - show full range when no filter active */}
+                  {/* Active range highlight - gray when no custom filter, blue when filtered */}
                   <div
                     className={`absolute h-2 rounded-full pointer-events-none ${
-                      eloRange.min === eloLimits.min && eloRange.max === eloLimits.max
+                      customEloRange === null
                         ? 'bg-neutral-600'  // Gray when showing all (no filter)
                         : 'bg-blue-500'      // Blue when filter is active
                     }`}
@@ -948,7 +947,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     max={eloLimits.max}
                     step={50}
                     value={eloRange.min}
-                    onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value), eloRange.max - 50) })}
+                    onChange={(e) => setCustomEloRange({ min: Math.min(parseInt(e.target.value), eloRange.max - 50), max: eloRange.max })}
                     className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:hover:shadow-md [&::-webkit-slider-thumb]:transition-shadow [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:hover:shadow-md [&::-moz-range-thumb]:transition-shadow"
                     style={{ zIndex: eloRange.min === eloRange.max - 50 ? 2 : 1 }}
                   />
@@ -960,7 +959,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     max={eloLimits.max}
                     step={50}
                     value={eloRange.max}
-                    onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value), eloRange.min + 50) })}
+                    onChange={(e) => setCustomEloRange({ min: eloRange.min, max: Math.max(parseInt(e.target.value), eloRange.min + 50) })}
                     className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:hover:shadow-md [&::-webkit-slider-thumb]:transition-shadow [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:hover:shadow-md [&::-moz-range-thumb]:transition-shadow"
                     style={{ zIndex: eloRange.max === eloRange.min + 50 ? 2 : 1 }}
                   />
@@ -972,7 +971,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   value={eloRange.max}
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || eloLimits.max;
-                    setEloRange({ ...eloRange, max: Math.max(val, eloRange.min + 50) });
+                    setCustomEloRange({ min: eloRange.min, max: Math.max(val, eloRange.min + 50) });
                   }}
                   min={eloRange.min + 50}
                   max={eloLimits.max}
