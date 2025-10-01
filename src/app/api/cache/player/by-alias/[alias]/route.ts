@@ -202,7 +202,7 @@ export async function GET(_req: NextRequest, ctx: { params: { alias: string } })
     const ident = await findExactAlias(alias);
     if (!ident?.profileId) {
       const timestamp = new Date().toISOString();
-      return Response.json({ results: [], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=30' } });
+      return Response.json({ results: [], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } });
     }
 
     // personal stats via steam id (if available)
@@ -220,10 +220,10 @@ export async function GET(_req: NextRequest, ctx: { params: { alias: string } })
       lastUpdated: timestamp,
     };
 
-    return Response.json({ results: [payload], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=30' } });
+    return Response.json({ results: [payload], lastUpdated: timestamp }, { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } });
   } catch (e) {
     console.error('cache/player/by-alias failed:', e);
     const timestamp = new Date().toISOString();
-    return Response.json({ results: [], lastUpdated: timestamp }, { status: 502, headers: { 'Cache-Control': 'public, s-maxage=30' } });
+    return Response.json({ results: [], lastUpdated: timestamp }, { status: 502, headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' } });
   }
 }
