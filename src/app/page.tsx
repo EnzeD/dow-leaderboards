@@ -2662,7 +2662,27 @@ export default function Home() {
                         {/* Recent Match History */}
                         {result.recentMatches && result.recentMatches.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-neutral-600/40">
-                            <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h5 className="text-sm text-neutral-300">Recent Match History</h5>
+                              <div className="group relative">
+                                <svg
+                                  className="w-4 h-4 text-neutral-500 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                                <div className="absolute left-0 top-6 w-72 p-3 bg-neutral-800 border border-neutral-600 rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 text-xs text-neutral-300 leading-relaxed">
+                                  Missing a recent match? Matches are only recorded when the winner clicks &quot;NO&quot; to skip exploring the map at the end of the game. Always press &quot;NO&quot; to ensure your match appears in the history.
+                                </div>
+                              </div>
+                            </div>
                             {(() => {
                               const aliasForKey = result?.personalStats?.profile?.alias ?? result?.playerName ?? result?.alias;
                               const fallbackKey = `result-${index}`;
