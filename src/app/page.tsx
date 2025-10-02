@@ -2646,17 +2646,19 @@ export default function Home() {
                             Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
                           </p>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenAdvancedStats({
-                                alias: aliasPrimary || aliasFallback,
-                                profileId: profileIdStr,
-                                playerName: result.playerName,
-                              })}
-                              className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
-                            >
-                              View advanced statistics
-                            </button>
+                                {profileIdStr && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAdvancedStats({
+                                      alias: aliasPrimary || aliasFallback,
+                                      profileId: profileIdStr,
+                                      playerName: result.playerName,
+                                    })}
+                                    className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
+                                  >
+                                    View advanced statistics
+                                  </button>
+                                )}
                             {premiumTeaserEnabled && (
                               <button
                                 type="button"
@@ -3064,17 +3066,19 @@ export default function Home() {
                           >
                             View in Search
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenAdvancedStats({
-                              alias: entry.alias,
-                              profileId: entry.profileId,
-                              playerName: entry.playerName,
-                            })}
-                            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 rounded-md border border-yellow-500/40 transition-colors text-xs font-semibold"
-                          >
-                            Advanced stats
-                          </button>
+                          {entry.profileId && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAdvancedStats({
+                                alias: entry.alias,
+                                profileId: entry.profileId,
+                                playerName: entry.playerName,
+                              })}
+                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 rounded-md border border-yellow-500/40 transition-colors text-xs font-semibold"
+                            >
+                              View advanced statistics
+                            </button>
+                          )}
                           </div>
                         </div>
                       </div>

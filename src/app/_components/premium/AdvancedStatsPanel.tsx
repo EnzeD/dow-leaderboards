@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AdvancedStatsContext, useAdvancedStatsContext } from "./AdvancedStatsContext";
 import { useAdvancedStatsActivation } from "@/hooks/useAdvancedStatsActivation";
 import { Leaderboard } from "@/lib/relic";
@@ -16,9 +16,25 @@ export type AdvancedStatsPanelProps = {
   alias?: string | null;
   activatedOverride?: boolean;
   onRequestAccess?: () => void;
+  variant?: "standalone" | "embedded";
 };
 
-export default function AdvancedStatsPanel({ profileId, alias, activatedOverride, onRequestAccess }: AdvancedStatsPanelProps) {
+type AdvancedStatsSection = "elo" | "matchups" | "maps" | "opponents";
+
+const SECTIONS: Array<{ id: AdvancedStatsSection; label: string }> = [
+  { id: "elo", label: "Elo history" },
+  { id: "matchups", label: "Matchups" },
+  { id: "maps", label: "Maps" },
+  { id: "opponents", label: "Opponents" },
+];
+
+export default function AdvancedStatsPanel({
+  profileId,
+  alias,
+  activatedOverride,
+  onRequestAccess,
+  variant = "standalone",
+}: AdvancedStatsPanelProps) {
   const activation = useAdvancedStatsActivation(profileId);
   const leaderboards = useCombinedLeaderboards();
 
@@ -29,6 +45,11 @@ export default function AdvancedStatsPanel({ profileId, alias, activatedOverride
 
   const [selectedLeaderboardId, setSelectedLeaderboardId] = useState<number | "best" | "all" | null>(null);
   const [windowDays, setWindowDays] = useState<number>(90);
+  const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
+
+  useEffect(() => {
+    setActiveSection("elo");
+  }, [profileId]);
 
   if (!profileId) {
     return null;
@@ -63,54 +84,139 @@ export default function AdvancedStatsPanel({ profileId, alias, activatedOverride
     }
   };
 
+  const containerClass = variant === "embedded"
+    ? "rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg space-y-4"
+    : "space-y-6";
+
+  const titleClass = variant === "embedded" ? "text-lg font-semibold text-white" : "text-2xl font-semibold text-white";
+  const descriptionClass = variant === "embedded" ? "text-xs text-neutral-400" : "text-sm text-neutral-400 mt-1";
+
+  const intro = (
+    <div>
+      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Premium analytics</p>
+      <h3 className={titleClass}>Advanced statistics</h3>
+      <p className={descriptionClass}>
+        Detailed insights for {alias || `profile ${profileId}`} across ratings, matchups, maps, and opponents.
+      </p>
+    </div>
+  );
+
+  const controls = (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+      <label className="text-xs text-neutral-400" htmlFor="advanced-stats-window">Time window</label>
+      <select
+        id="advanced-stats-window"
+        value={windowDays}
+        onChange={(event) => setWindowDays(Number(event.target.value))}
+        className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+      >
+        <option value={30}>Last 30 days</option>
+        <option value={60}>Last 60 days</option>
+        <option value={90}>Last 90 days</option>
+        <option value={180}>Last 180 days</option>
+        <option value={365}>Last 365 days</option>
+      </select>
+      <label className="text-xs text-neutral-400" htmlFor="advanced-stats-leaderboard">Leaderboard</label>
+      <select
+        id="advanced-stats-leaderboard"
+        value={selectedLeaderboardId ?? ""}
+        onChange={handleLeaderboardChange}
+        className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
+      >
+        <option value="">All leaderboards</option>
+        <option value="best">Best leaderboard</option>
+        <option value="all">Show all placements</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
+  const sectionNav = (
+    <div className="flex flex-wrap gap-2">
+      {SECTIONS.map(({ id, label }) => {
+        const active = activeSection === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveSection(id)}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
+              active
+                ? 'bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow'
+                : 'bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const renderActiveSection = () => {
+    switch (activeSection) {
+      case "elo":
+        return (
+          <EloHistoryCard
+            profileId={profileId}
+            windowDays={windowDays}
+            leaderboardId={selectedLeaderboardId}
+          />
+        );
+      case "matchups":
+        return (
+          <MatchupMatrixCard
+            profileId={profileId}
+            windowDays={windowDays}
+            matchTypeId={null}
+          />
+        );
+      case "maps":
+        return (
+          <MapPerformanceCard
+            profileId={profileId}
+            windowDays={windowDays}
+            matchTypeId={null}
+          />
+        );
+      case "opponents":
+      default:
+        return (
+          <FrequentOpponentsCard
+            profileId={profileId}
+            windowDays={windowDays}
+            matchTypeId={null}
+          />
+        );
+    }
+  };
+
   return (
     <AdvancedStatsContext.Provider value={contextValue}>
-      <div className="space-y-6">
-        <header className="rounded-2xl border border-yellow-500/20 bg-neutral-950/90 p-4 shadow-xl">
+      <div className={containerClass}>
+        {variant === "embedded" ? (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Premium analytics</p>
-              <h3 className="text-2xl font-semibold text-white">Advanced statistics</h3>
-              <p className="text-sm text-neutral-400 mt-1">
-                Detailed insights for {alias || `profile ${profileId}`} across ratings, matchups, maps, and opponents.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <label className="text-xs text-neutral-400" htmlFor="advanced-stats-window">Time window</label>
-              <select
-                id="advanced-stats-window"
-                value={windowDays}
-                onChange={(event) => setWindowDays(Number(event.target.value))}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
-              >
-                <option value={30}>Last 30 days</option>
-                <option value={60}>Last 60 days</option>
-                <option value={90}>Last 90 days</option>
-                <option value={180}>Last 180 days</option>
-                <option value={365}>Last 365 days</option>
-              </select>
-              <label className="text-xs text-neutral-400" htmlFor="advanced-stats-leaderboard">Leaderboard</label>
-              <select
-                id="advanced-stats-leaderboard"
-                value={selectedLeaderboardId ?? ""}
-                onChange={handleLeaderboardChange}
-                className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
-              >
-                <option value="">All leaderboards</option>
-                <option value="best">Best leaderboard</option>
-                <option value="all">Show all placements</option>
-                {options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
+            {intro}
+            {controls}
           </div>
-        </header>
+        ) : (
+          <header className="rounded-2xl border border-yellow-500/20 bg-neutral-950/90 p-4 shadow-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              {intro}
+              {controls}
+            </div>
+          </header>
+        )}
 
-        <EloHistoryCard profileId={profileId} windowDays={windowDays} leaderboardId={selectedLeaderboardId} />
-        <MatchupMatrixCard profileId={profileId} windowDays={windowDays} matchTypeId={null} />
-        <MapPerformanceCard profileId={profileId} windowDays={windowDays} matchTypeId={null} />
-        <FrequentOpponentsCard profileId={profileId} windowDays={windowDays} matchTypeId={null} />
+        {variant === "embedded" ? sectionNav : (
+          <div className="px-1">{sectionNav}</div>
+        )}
+
+        <div className="space-y-4">
+          {renderActiveSection()}
+        </div>
       </div>
     </AdvancedStatsContext.Provider>
   );

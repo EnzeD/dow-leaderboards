@@ -140,12 +140,14 @@ export default function MatchupMatrixCard({ profileId, windowDays, matchTypeId }
 
       {!loading && !error && rows.length > 0 && (
         <div className="mt-6 overflow-x-auto">
-          <table className="min-w-full border-separate border-spacing-1 text-sm">
+          <table className="w-full table-fixed border-separate border-spacing-1 text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 z-20 bg-neutral-900/90 px-3 py-2 text-xs uppercase tracking-wide text-neutral-400">You ↘ Opponent</th>
+                <th className="sticky left-0 z-20 bg-neutral-900/90 px-3 py-2 text-left text-xs uppercase tracking-wide text-neutral-400 w-32">
+                  You ↘ Opponent
+                </th>
                 {factions.map((raceId) => (
-                  <th key={`opp-${raceId}`} className="px-2 py-2 text-xs uppercase tracking-wide text-neutral-400">
+                  <th key={`opp-${raceId}`} className="px-2 py-2 text-center text-xs uppercase tracking-wide text-neutral-400 w-24">
                     {raceIdToFaction(raceId)}
                   </th>
                 ))}
@@ -154,7 +156,7 @@ export default function MatchupMatrixCard({ profileId, windowDays, matchTypeId }
             <tbody>
               {factions.map((myRaceId) => (
                 <tr key={`my-${myRaceId}`}>
-                  <th className="sticky left-0 z-10 bg-neutral-900/90 px-3 py-2 text-xs uppercase tracking-wide text-neutral-400">
+                  <th className="sticky left-0 z-10 bg-neutral-900/90 px-3 py-2 text-left text-xs uppercase tracking-wide text-neutral-400 w-32">
                     {raceIdToFaction(myRaceId)}
                   </th>
                   {factions.map((opponentRaceId) => {
@@ -162,7 +164,7 @@ export default function MatchupMatrixCard({ profileId, windowDays, matchTypeId }
                     return (
                       <td
                         key={`cell-${myRaceId}-${opponentRaceId}`}
-                        className={`min-w-[4rem] rounded-md px-2 py-2 text-center text-xs font-semibold transition ${computeCellClass(cell?.winrate)}`}
+                        className={`w-24 rounded-md px-2 py-2 text-center text-xs font-semibold transition ${computeCellClass(cell?.winrate)}`}
                         title={cell
                           ? `${raceIdToFaction(myRaceId)} vs ${raceIdToFaction(opponentRaceId)}\nRecord: ${cell.wins}-${cell.losses} (${formatPercent(cell.winrate)})\nMatches: ${cell.matches}`
                           : `${raceIdToFaction(myRaceId)} vs ${raceIdToFaction(opponentRaceId)}\nNo data`}
