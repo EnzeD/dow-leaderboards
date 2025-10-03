@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
   // Query 1: Get metadata (contains all paths and data we need)
   const { data: metaRows, error: metaError } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, winner_team, updated_at, created_at')
+    .select('id, path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, winner_team, updated_at, created_at')
     .eq('status', 'published')
     .order('updated_at', { ascending: false })
     .limit(100);
@@ -234,6 +234,7 @@ export async function GET(req: NextRequest) {
     const canEdit = Boolean(meta.uploader_ip_hash && meta.uploader_ip_hash === clientIpHash);
 
     return {
+      id: meta.id,
       path: meta.path,
       originalName,
       size: null, // Storage metadata removed for performance
@@ -464,7 +465,7 @@ export async function POST(req: NextRequest) {
   // Fetch the metadata row to return it in the response for immediate UI preview
   const { data: metaRow } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
+    .select('id, path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
     .eq('path', objectKey)
     .maybeSingle();
 
@@ -482,6 +483,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     replay: metaRow ? {
+      id: metaRow.id,
       path: metaRow.path,
       originalName: metaRow.original_name,
       replayName: metaRow.replay_name,
