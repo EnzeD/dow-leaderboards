@@ -2,11 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
+import ReplayDetailInTab from "@/app/_components/ReplayDetailInTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -362,6 +364,9 @@ const getRankColor = (rank: number): string => {
 type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
 
 export default function Home() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   type AppState = {
     view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
     searchQuery?: string;
@@ -471,6 +476,10 @@ export default function Home() {
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Replay detail state
+  const [selectedReplaySlug, setSelectedReplaySlug] = useState<string | null>(null);
+  const [replayPrefetchCache, setReplayPrefetchCache] = useState<Record<number, any>>({});
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
   const [ladderData, setLadderData] = useState<LadderData | null>(null);
@@ -621,6 +630,45 @@ export default function Home() {
         setLeaderboards(data.items || []);
         // Don't set selectedId here - let the filter effect handle it
       });
+  }, []);
+
+  // URL sync for replay detail view
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const replayParam = searchParams.get('replay');
+
+    if (tab === 'replays' && replayParam) {
+      setActiveTab('replays');
+      setSelectedReplaySlug(replayParam);
+    } else if (tab === 'replays' && !replayParam) {
+      setActiveTab('replays');
+      setSelectedReplaySlug(null);
+    } else if (selectedReplaySlug && (!tab || tab !== 'replays')) {
+      // Clear replay selection if we navigate away from replays tab
+      setSelectedReplaySlug(null);
+    }
+  }, [searchParams, selectedReplaySlug]);
+
+  // Handle browser back/forward for replay navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      const replayParam = params.get('replay');
+
+      if (tab === 'replays' && replayParam) {
+        setActiveTab('replays');
+        setSelectedReplaySlug(replayParam);
+      } else if (tab === 'replays' && !replayParam) {
+        setActiveTab('replays');
+        setSelectedReplaySlug(null);
+      } else {
+        setSelectedReplaySlug(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -987,6 +1035,49 @@ export default function Home() {
       setTimeout(() => setShareCopied(false), 1200);
     } catch {}
   };
+
+  // Replay handlers
+  const handleReplayClick = useCallback((replaySlug: string) => {
+    setSelectedReplaySlug(replaySlug);
+    const newUrl = `/?tab=replays&replay=${replaySlug}`;
+    router.push(newUrl, { scroll: false });
+  }, [router]);
+
+  const handleBackToReplays = useCallback(() => {
+    setSelectedReplaySlug(null);
+    router.push('/?tab=replays', { scroll: false });
+  }, [router]);
+
+  const prefetchReplay = useCallback(async (replayId: number): Promise<any> => {
+    // Check if already cached
+    if (replayPrefetchCache[replayId]) {
+      return replayPrefetchCache[replayId];
+    }
+
+    try {
+      const response = await fetch(`/api/replays/by-id/${replayId}`, {
+        cache: 'no-store',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setReplayPrefetchCache(prev => ({ ...prev, [replayId]: data }));
+        return data;
+      }
+    } catch (error) {
+      console.error('Failed to prefetch replay:', error);
+    }
+
+    return null;
+  }, [replayPrefetchCache]);
+
+  const handleReplayProfileClick = useCallback((profileId: string) => {
+    // Navigate to search tab and search for the player
+    setActiveTab('search');
+    setSearchQuery('');
+    _setSearchProfileId(profileId);
+    router.push(`/?tab=search&profile=${profileId}`, { scroll: false });
+  }, [router]);
 
   // Ephemeral copied indicator for per-result share buttons
   const [searchCardCopied, setSearchCardCopied] = useState<number | null>(null);
@@ -3043,16 +3134,27 @@ export default function Home() {
         )}
 
         {activeTab === 'replays' && (
-          <ReplaysTab
-            onPlayerClick={async (playerName: string, profileId?: string) => {
-              // Switch to search tab and search for the player
-              setActiveTab('search');
-              setSearchQuery(playerName);
+          selectedReplaySlug ? (
+            <ReplayDetailInTab
+              replaySlug={selectedReplaySlug}
+              onBack={handleBackToReplays}
+              onProfileClick={handleReplayProfileClick}
+              prefetchedData={replayPrefetchCache[parseInt(selectedReplaySlug.split('-').pop() || '0', 10)]}
+            />
+          ) : (
+            <ReplaysTab
+              onPlayerClick={async (playerName: string, profileId?: string) => {
+                // Switch to search tab and search for the player
+                setActiveTab('search');
+                setSearchQuery(playerName);
 
-              // Trigger the search
-              await handlePlayerSearch(playerName, { pushHistory: true });
-            }}
-          />
+                // Trigger the search
+                await handlePlayerSearch(playerName, { pushHistory: true });
+              }}
+              onReplayClick={handleReplayClick}
+              prefetchReplay={prefetchReplay}
+            />
+          )
         )}
 
 

@@ -4,10 +4,12 @@ import { FormEvent, useCallback, useEffect, useRef, useState, useMemo } from 're
 import { EnrichedReplayProfile, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
 import { getMapName, getMapImage } from '@/lib/mapMetadata';
+import { generateReplaySlug } from '@/lib/slug';
 
 type Player = { alias: string; team: number; faction: string };
 
 type ReplayListEntry = {
+  id?: number; // Added for URL generation
   path: string;
   originalName: string;
   size: number | null;
@@ -68,6 +70,8 @@ const resolveErrorMessage = (code: string) => {
       return 'You do not have permission to edit or delete this replay.';
     case 'delete_failed':
       return 'Could not delete the replay. Please try again.';
+    case 'missing_replay_id':
+      return 'This replay does not have a shareable ID yet. Please try refreshing the list.';
     default:
       return 'Something went wrong. Please try again shortly.';
   }
@@ -121,9 +125,11 @@ const getFactionColor = (faction: string): string => {
 
 interface ReplaysTabProps {
   onPlayerClick?: (playerName: string, profileId?: string) => void;
+  onReplayClick?: (replaySlug: string) => void;
+  prefetchReplay?: (replayId: number) => Promise<any>;
 }
 
-const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
+const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTabProps) => {
   const [replays, setReplays] = useState<ReplayListEntry[]>([]);
   const [loadingList, setLoadingList] = useState<boolean>(true);
   const [listErrorCode, setListErrorCode] = useState<string | null>(null);
@@ -297,6 +303,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               : Number(entry?.downloads);
 
           return {
+            id: typeof entry?.id === 'number' ? entry.id : undefined,
             path,
             originalName: typeof entry?.originalName === 'string' ? entry.originalName : path || 'Unknown replay',
             size: typeof sizeRaw === 'number' && Number.isFinite(sizeRaw) ? sizeRaw : null,
@@ -492,48 +499,40 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     }
   }, [loadReplays, requestSignedUrl, replays]);
 
-  const handleCopyLink = useCallback(async (path: string) => {
-    if (!path) return;
+  const handleCopyLink = useCallback(async (replay: ReplayListEntry) => {
+    if (!replay.id) {
+      setActionErrorCode('missing_replay_id');
+      return;
+    }
+
     if (typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
       setActionErrorCode('clipboard_unavailable');
       return;
     }
 
     setActionErrorCode(null);
-    setCopyingPath(path);
+    setCopyingPath(replay.path);
 
     try {
-      const { url, downloadCount } = await requestSignedUrl(path);
+      const slug = generateReplaySlug({
+        submitted_name: replay.submittedName,
+        replay_name: replay.replayName,
+        original_name: replay.originalName,
+      });
+      const url = `${window.location.origin}/?tab=replays&replay=${slug}-${replay.id}`;
 
-      try {
-        await navigator.clipboard.writeText(url);
-      } catch (copyError) {
-        console.error('Failed to copy replay download URL', copyError);
-        throw new Error('clipboard_unavailable');
-      }
+      await navigator.clipboard.writeText(url);
 
       // Show copied confirmation
-      setCopiedPath(path);
+      setCopiedPath(replay.path);
       setTimeout(() => setCopiedPath(null), 1200);
-
-      if (typeof downloadCount === 'number') {
-        setReplays(prev =>
-          sortReplays(
-            prev.map(entry =>
-              entry.path === path ? { ...entry, downloads: downloadCount } : entry
-            )
-          )
-        );
-      } else {
-        void loadReplays();
-      }
     } catch (error) {
-      const code = error instanceof Error ? error.message : 'download_failed';
-      setActionErrorCode(code || 'download_failed');
+      console.error('Failed to copy replay page URL', error);
+      setActionErrorCode('clipboard_unavailable');
     } finally {
       setCopyingPath(null);
     }
-  }, [loadReplays, requestSignedUrl]);
+  }, []);
 
   const handleSaveDetails = useCallback(async () => {
     if (!preview?.path) return;
@@ -1022,9 +1021,32 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   {/* Header with title and actions - title left, buttons right */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-semibold text-white truncate" title={replay.originalName}>
-                        {replay.submittedName || replay.replayName || replay.originalName}
-                      </h4>
+                      {replay.id && onReplayClick ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const slug = generateReplaySlug({
+                              submitted_name: replay.submittedName,
+                              replay_name: replay.replayName,
+                              original_name: replay.originalName,
+                            });
+                            onReplayClick(`${slug}-${replay.id}`);
+                          }}
+                          onMouseEnter={() => {
+                            if (prefetchReplay && replay.id) {
+                              prefetchReplay(replay.id);
+                            }
+                          }}
+                          className="text-sm font-semibold text-white hover:text-blue-400 transition-colors truncate block text-left cursor-pointer"
+                          title={`View ${replay.submittedName || replay.replayName || replay.originalName}`}
+                        >
+                          {replay.submittedName || replay.replayName || replay.originalName}
+                        </button>
+                      ) : (
+                        <h4 className="text-sm font-semibold text-white truncate" title={replay.originalName}>
+                          {replay.submittedName || replay.replayName || replay.originalName}
+                        </h4>
+                      )}
                       <div className="flex items-center gap-3 text-xs text-neutral-400 mt-1">
                         <span className="text-neutral-200 font-medium">
                           {formatDownloadsCount(replay.downloads)} {formatDownloadsCount(replay.downloads) === 1 ? 'download' : 'downloads'}
@@ -1102,7 +1124,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleCopyLink(replay.path)}
+                        onClick={() => void handleCopyLink(replay)}
                         disabled={copyingPath === replay.path}
                         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-xs font-medium text-neutral-200 transition-colors hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
                       >
