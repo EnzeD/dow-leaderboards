@@ -68,7 +68,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
       stale: false,
       rows: limitedRows
     }, {
-      headers: { "Cache-Control": "public, s-maxage=300" }
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }
     });
   } catch (e) {
     console.error("cache/combined-1v1-multi/[limit] fetch failed:", e);
@@ -79,7 +79,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
         stale: true,
         rows: []
       }),
-      { status: 502, headers: { "Cache-Control": "public, s-maxage=60" } }
+      { status: 502, headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } }
     );
   }
 }

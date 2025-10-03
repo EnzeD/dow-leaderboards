@@ -155,7 +155,8 @@ const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTab
 
   // Filter states
   const [selectedFactions, setSelectedFactions] = useState<Set<string>>(new Set());
-  const [eloRange, setEloRange] = useState<{ min: number; max: number }>({ min: 0, max: 3000 });
+  // Store user's custom ELO selection (null means "use full range")
+  const [customEloRange, setCustomEloRange] = useState<{ min: number; max: number } | null>(null);
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
   const [aliasSearch, setAliasSearch] = useState<string>('');
@@ -210,6 +211,11 @@ const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTab
     return { min: min === Infinity ? 0 : Math.floor(min / 100) * 100, max: max === -Infinity ? 3000 : Math.ceil(max / 100) * 100 };
   }, [replays]);
 
+  // Derive effective ELO range: use custom range if set, otherwise use full limits (NO FLASH!)
+  const eloRange = useMemo(() => {
+    return customEloRange || eloLimits;
+  }, [customEloRange, eloLimits]);
+
   // Filter replays based on active filters
   const filteredReplays = useMemo(() => {
     return replays.filter(replay => {
@@ -243,30 +249,36 @@ const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTab
         if (!selectedMaps.has(mapDisplayName)) return false;
       }
 
-      // ELO filter
-      if (Array.isArray(replay.profiles)) {
-        const hasEloInRange = replay.profiles.some(p => {
-          const enriched = p as EnrichedReplayProfile;
-          if (enriched.faction_rating) {
-            return enriched.faction_rating >= eloRange.min && enriched.faction_rating <= eloRange.max;
-          }
-          return eloRange.min === eloLimits.min && eloRange.max === eloLimits.max; // Include players without ELO if range is at default
-        });
-        if (!hasEloInRange) return false;
+      // ELO filter (only apply if custom range is set)
+      if (customEloRange) {
+        if (Array.isArray(replay.profiles)) {
+          const hasEloInRange = replay.profiles.some(p => {
+            const enriched = p as EnrichedReplayProfile;
+            if (enriched.faction_rating) {
+              return enriched.faction_rating >= customEloRange.min && enriched.faction_rating <= customEloRange.max;
+            }
+            return false; // Exclude players without ELO when filter is active
+          });
+          if (!hasEloInRange) return false;
+        }
       }
 
       return true;
     });
-  }, [replays, selectedFactions, selectedFormats, selectedMaps, eloRange, eloLimits, aliasSearch]);
+  }, [replays, selectedFactions, selectedFormats, selectedMaps, customEloRange, aliasSearch]);
 
   // Check if any filters are active
-  const hasActiveFilters = selectedFactions.size > 0 || selectedFormats.size > 0 || selectedMaps.size > 0 || eloRange.min !== eloLimits.min || eloRange.max !== eloLimits.max || aliasSearch.trim() !== '';
+  const hasActiveFilters = selectedFactions.size > 0 ||
+    selectedFormats.size > 0 ||
+    selectedMaps.size > 0 ||
+    customEloRange !== null ||
+    aliasSearch.trim() !== '';
 
   const clearAllFilters = () => {
     setSelectedFactions(new Set());
     setSelectedFormats(new Set());
     setSelectedMaps(new Set());
-    setEloRange({ min: eloLimits.min, max: eloLimits.max });
+    setCustomEloRange(null);
     setAliasSearch('');
   };
 
@@ -793,22 +805,44 @@ const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTab
             <h3 className="text-xl font-semibold text-white">Community Replays</h3>
             <p className="text-sm text-neutral-400">Top most downloaded replays recently.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={loadingList}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {loadingList ? 'Refreshing...' : 'Refresh list'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window === 'undefined') return;
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', 'replays');
+                navigator.clipboard.writeText(url.toString());
+                setCopiedPath('share-button');
+                setTimeout(() => setCopiedPath(null), 1200);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12v7a1 1 0 001 1h12a1 1 0 001-1v-7M16 6l-4-4m0 0L8 6m4-4v12" />
+              </svg>
+              <span className={`text-xs font-semibold ${copiedPath === 'share-button' ? 'text-green-400' : ''}`}>
+                {copiedPath === 'share-button' ? 'Link copied' : 'Share'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loadingList}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <svg className={`w-4 h-4 ${loadingList ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {loadingList ? 'Refreshing...' : 'Refresh list'}
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
         {replays.length > 0 && (
           <div className="space-y-3 bg-neutral-900/50 p-4 rounded-lg border border-neutral-700/40">
+            {/* First row of filters */}
             <div className="flex flex-wrap gap-3 items-center">
               {/* Player Alias Search */}
               <div className="flex items-center gap-2">
@@ -866,61 +900,85 @@ const ReplaysTab = ({ onPlayerClick, onReplayClick, prefetchReplay }: ReplaysTab
                   </select>
                 </div>
               )}
-
-              {/* ELO Range Slider */}
-              {eloLimits.max > eloLimits.min && (
-                <div className="flex items-center gap-2 flex-1 min-w-[300px]">
-                  <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">ELO:</label>
-                  {/* Min label */}
-                  <div className="flex items-center justify-center w-12 h-7 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
-                    {eloRange.min}
-                  </div>
-
-                  {/* Dual slider container */}
-                  <div className="relative flex-1 h-2 overflow-hidden">
-                    {/* Track background */}
-                    <div className="absolute top-0 left-0 w-full h-full bg-neutral-700 rounded-full" />
-
-                    {/* Active range highlight */}
-                    <div
-                      className="absolute top-0 h-full bg-blue-500 rounded-full"
-                      style={{
-                        left: `${((eloRange.min - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`,
-                        right: `${100 - ((eloRange.max - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`
-                      }}
-                    />
-
-                    {/* Min slider */}
-                    <input
-                      type="range"
-                      min={eloLimits.min}
-                      max={eloLimits.max}
-                      step={50}
-                      value={eloRange.min}
-                      onChange={(e) => setEloRange({ ...eloRange, min: Math.min(parseInt(e.target.value), eloRange.max) })}
-                      className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:-mt-1.5 [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                    />
-
-                    {/* Max slider */}
-                    <input
-                      type="range"
-                      min={eloLimits.min}
-                      max={eloLimits.max}
-                      step={50}
-                      value={eloRange.max}
-                      onChange={(e) => setEloRange({ ...eloRange, max: Math.max(parseInt(e.target.value), eloRange.min) })}
-                      className="absolute top-0 left-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-runnable-track]:h-0 [&::-webkit-slider-runnable-track]:bg-transparent [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:-mt-1.5 [&::-moz-range-track]:h-0 [&::-moz-range-track]:bg-transparent [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                    />
-                  </div>
-
-                  {/* Max label */}
-                  <div className="flex items-center justify-center w-12 h-7 bg-blue-600/20 border border-blue-500/40 rounded text-white text-xs font-bold">
-                    {eloRange.max}
-                  </div>
-                </div>
-              )}
-
             </div>
+
+            {/* ELO Range Slider on separate row */}
+            {eloLimits.max > eloLimits.min && (
+              <div className="flex items-center gap-3 w-full">
+                <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">ELO:</label>
+
+                {/* Min input */}
+                <input
+                  type="number"
+                  value={eloRange.min}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || eloLimits.min;
+                    setCustomEloRange({ min: Math.min(val, eloRange.max - 50), max: eloRange.max });
+                  }}
+                  min={eloLimits.min}
+                  max={eloRange.max - 50}
+                  step={50}
+                  className="w-20 px-2 py-1 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+                />
+
+                {/* Slider container with proper height */}
+                <div className="relative flex-1 h-8 flex items-center max-w-2xl">
+                  {/* Track background */}
+                  <div className="absolute w-full h-2 bg-neutral-700 rounded-full" />
+
+                  {/* Active range highlight - gray when no custom filter, blue when filtered */}
+                  <div
+                    className={`absolute h-2 rounded-full pointer-events-none ${
+                      customEloRange === null
+                        ? 'bg-neutral-600'  // Gray when showing all (no filter)
+                        : 'bg-blue-500'      // Blue when filter is active
+                    }`}
+                    style={{
+                      left: `${((eloRange.min - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`,
+                      width: `${((eloRange.max - eloRange.min) / (eloLimits.max - eloLimits.min)) * 100}%`
+                    }}
+                  />
+
+                  {/* Min range input - positioned absolute */}
+                  <input
+                    type="range"
+                    min={eloLimits.min}
+                    max={eloLimits.max}
+                    step={50}
+                    value={eloRange.min}
+                    onChange={(e) => setCustomEloRange({ min: Math.min(parseInt(e.target.value), eloRange.max - 50), max: eloRange.max })}
+                    className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:hover:shadow-md [&::-webkit-slider-thumb]:transition-shadow [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:hover:shadow-md [&::-moz-range-thumb]:transition-shadow"
+                    style={{ zIndex: eloRange.min === eloRange.max - 50 ? 2 : 1 }}
+                  />
+
+                  {/* Max range input - positioned absolute */}
+                  <input
+                    type="range"
+                    min={eloLimits.min}
+                    max={eloLimits.max}
+                    step={50}
+                    value={eloRange.max}
+                    onChange={(e) => setCustomEloRange({ min: eloRange.min, max: Math.max(parseInt(e.target.value), eloRange.min + 50) })}
+                    className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:hover:shadow-md [&::-webkit-slider-thumb]:transition-shadow [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-blue-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:shadow-sm [&::-moz-range-thumb]:hover:shadow-md [&::-moz-range-thumb]:transition-shadow"
+                    style={{ zIndex: eloRange.max === eloRange.min + 50 ? 2 : 1 }}
+                  />
+                </div>
+
+                {/* Max input */}
+                <input
+                  type="number"
+                  value={eloRange.max}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || eloLimits.max;
+                    setCustomEloRange({ min: eloRange.min, max: Math.max(val, eloRange.min + 50) });
+                  }}
+                  min={eloRange.min + 50}
+                  max={eloLimits.max}
+                  step={50}
+                  className="w-20 px-2 py-1 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+                />
+              </div>
+            )}
 
             {/* Race/Faction Filter - Inline with Clear All button */}
             {availableFactions.length > 0 && (

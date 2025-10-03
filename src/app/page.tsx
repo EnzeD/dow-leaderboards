@@ -14,6 +14,7 @@ import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 import { getLevelFromXP } from "@/lib/xp-levels";
+import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -499,6 +500,7 @@ export default function Home() {
   const [_selectedPlayer, _setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
   const [triggerAutocomplete, setTriggerAutocomplete] = useState(false);
   const [combinedLimit, setCombinedLimit] = useState<number>(200);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [combinedViewMode, setCombinedViewMode] = useState<'best' | 'all'>('best');
   const [lbExpanded, setLbExpanded] = useState(false);
   const [recentMatchLimits, setRecentMatchLimits] = useState<Record<string, number>>({});
@@ -609,6 +611,12 @@ export default function Home() {
     }
   };
 
+  const handleClearCache = () => {
+    clearAllCache();
+    // Force refresh current view by reloading the page
+    window.location.reload();
+  };
+
   useEffect(() => {
     if (matchTypes.length === 0) return;
     if (!matchTypes.includes(selectedMatchType)) {
@@ -624,7 +632,7 @@ export default function Home() {
 
   // Load leaderboards on mount
   useEffect(() => {
-    fetch("/api/leaderboards")
+    cachedFetch("/api/leaderboards", { ttl: 24 * 60 * 60 * 1000 }) // 24h cache
       .then(r => r.json())
       .then(data => {
         setLeaderboards(data.items || []);
@@ -736,6 +744,12 @@ export default function Home() {
       if (initialFromUrl.combinedViewMode) {
         setCombinedViewMode(initialFromUrl.combinedViewMode);
       }
+    } else if (initialFromUrl.view === 'favorites') {
+      setActiveTab('favorites');
+    } else if (initialFromUrl.view === 'stats') {
+      setActiveTab('stats');
+    } else if (initialFromUrl.view === 'replays') {
+      setActiveTab('replays');
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -818,12 +832,12 @@ export default function Home() {
   // Load ladder when selection changes
   useEffect(() => {
     if (isCombinedMode) {
-      // Fetch combined 1v1 data (CDN cached)
+      // Fetch combined 1v1 data (client-side cached)
       setLoading(true);
       const base = combinedViewMode === 'all'
         ? '/api/cache/combined-1v1-multi'
         : '/api/cache/combined-1v1';
-      fetch(`${base}/${combinedLimit}`)
+      cachedFetch(`${base}/${combinedLimit}`) // 5min default cache
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -834,7 +848,7 @@ export default function Home() {
       // Fetch single leaderboard data
       if (!selectedId) return;
       setLoading(true);
-      fetch(`/api/cache/leaderboard/${selectedId}`)
+      cachedFetch(`/api/cache/leaderboard/${selectedId}`) // 5min default cache
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -865,8 +879,18 @@ export default function Home() {
     let comparison = 0;
 
     if (sortField === "lastMatchDate") {
-      const aTime = a.lastMatchDate instanceof Date ? a.lastMatchDate.getTime() : 0;
-      const bTime = b.lastMatchDate instanceof Date ? b.lastMatchDate.getTime() : 0;
+      // Parse dates from both Date objects and ISO strings (from JSON)
+      const getTime = (date: any) => {
+        if (!date) return 0;
+        if (date instanceof Date) return date.getTime();
+        if (typeof date === 'string') {
+          const parsed = new Date(date);
+          return isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+        }
+        return 0;
+      };
+      const aTime = getTime(a.lastMatchDate);
+      const bTime = getTime(b.lastMatchDate);
       comparison = aTime - bTime;
     } else if (sortField === "rankDelta") {
       const normalize = (value: number | null | undefined) =>
@@ -912,7 +936,7 @@ export default function Home() {
     } else if (selectedId) {
       // Fetch extended rows for this specific leaderboard (up to 1000)
       setLbExpanded(true);
-      fetch(`/api/cache/leaderboard/${selectedId}/1000`)
+      cachedFetch(`/api/cache/leaderboard/${selectedId}/1000`) // 5min default cache
         .then(r => r.json())
         .then(data => {
           setLadderData(data);
@@ -937,7 +961,7 @@ export default function Home() {
     } else if (selectedId) {
       if (!lbExpanded) return;
       try {
-        fetch(`/api/cache/leaderboard/${selectedId}`)
+        cachedFetch(`/api/cache/leaderboard/${selectedId}`) // 5min default cache
           .then(r => r.json())
           .then(data => setLadderData(data))
           .catch(() => {});
@@ -981,7 +1005,7 @@ export default function Home() {
     setSearchLastUpdated(null);
 
     try {
-      const response = await fetch(`/api/cache/player/by-alias/${encodeURIComponent(q)}`);
+      const response = await cachedFetch(`/api/cache/player/by-alias/${encodeURIComponent(q)}`); // 5min default cache
       let data: any = null;
       try {
         data = await response.json();
@@ -1004,8 +1028,17 @@ export default function Home() {
     }
   };
 
+  // Track if this is the first mount to avoid overwriting URL from initialization
+  const isFirstMount = useRef(true);
+
   // Keep URL in sync as state changes (without pushing)
   useEffect(() => {
+    // Skip sync on first mount - let the initialization useEffect handle it
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
     const state: AppState = {
       view: activeTab,
       searchQuery,
@@ -1875,17 +1908,28 @@ export default function Home() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </a>
-                  <a
-                    href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => {
+                      setMobileNavOpen(false);
+                      setShowFeedbackModal(true);
+                    }}
                     className="flex items-center justify-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-300 transition-colors duration-300 hover:bg-neutral-800/70 hover:text-white"
                   >
                     Feedback
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                     </svg>
-                  </a>
+                  </button>
+                  <button
+                    onClick={handleClearCache}
+                    className="col-span-2 flex items-center justify-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-300 transition-colors duration-300 hover:bg-neutral-800/70 hover:text-white"
+                    title="Clear cached data and refresh"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh data
+                  </button>
                 </div>
               </div>
             </div>
@@ -2001,17 +2045,15 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
             </a>
-            <a
-              href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setShowFeedbackModal(true)}
               className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
             >
               Provide Feedback
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
-            </a>
+            </button>
             <button
               onClick={() => setActiveTab('support')}
               className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
@@ -2728,7 +2770,27 @@ export default function Home() {
                         {/* Recent Match History */}
                         {result.recentMatches && result.recentMatches.length > 0 && (
                           <div className="mt-4 pt-3 border-t border-neutral-600/40">
-                            <h5 className="text-sm text-neutral-300 mb-2">Recent Match History</h5>
+                            <div className="flex items-center gap-2 mb-2">
+                              <h5 className="text-sm text-neutral-300">Recent Match History</h5>
+                              <div className="group relative">
+                                <svg
+                                  className="w-4 h-4 text-neutral-500 cursor-help"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  />
+                                </svg>
+                                <div className="absolute left-0 top-6 w-72 p-3 bg-neutral-800 border border-neutral-600 rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 text-xs text-neutral-300 leading-relaxed">
+                                  Missing a recent match? Matches are only recorded when the winner clicks &quot;NO&quot; to skip exploring the map at the end of the game. Always press &quot;NO&quot; to ensure your match appears in the history.
+                                </div>
+                              </div>
+                            </div>
                             {(() => {
                               const aliasForKey = result?.personalStats?.profile?.alias ?? result?.playerName ?? result?.alias;
                               const fallbackKey = `result-${index}`;
@@ -3236,14 +3298,12 @@ export default function Home() {
                 >
                   Project GitHub Repository
                 </a>
-                <a
-                  href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-fit transition hover:text-white"
+                <button
+                  onClick={() => setShowFeedbackModal(true)}
+                  className="w-fit text-left transition hover:text-white"
                 >
                   Community Feedback Thread
-                </a>
+                </button>
               </div>
             </div>
 
@@ -3426,6 +3486,114 @@ export default function Home() {
               )}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )}
+  {/* Feedback Modal */}
+  {showFeedbackModal && (
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 px-4 py-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feedback-modal-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setShowFeedbackModal(false);
+        }
+      }}
+    >
+      <div className="relative w-full max-w-md rounded-2xl border border-neutral-700/50 bg-neutral-950/95 p-6 shadow-2xl">
+        <button
+          type="button"
+          onClick={() => setShowFeedbackModal(false)}
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/80 text-neutral-400 transition hover:border-neutral-500 hover:text-white"
+          aria-label="Close feedback modal"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+
+        <div className="space-y-4">
+          <h3 id="feedback-modal-title" className="text-lg font-semibold text-white">Provide feedback</h3>
+          <p className="text-sm text-neutral-300">Join the discussion and share your feedback on these platforms:</p>
+
+          <div className="space-y-3">
+            <a
+              href="https://steamcommunity.com/app/3556750/discussions/0/673972930560257123/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-neutral-700/50 bg-neutral-900/60 px-4 py-3 text-neutral-100 transition-all duration-200 hover:border-neutral-500 hover:bg-neutral-800/70 hover:text-white"
+              onClick={() => setShowFeedbackModal(false)}
+            >
+              <div className="flex items-center gap-3">
+                <img
+                  src="/assets/steam-logo.svg"
+                  alt="Steam"
+                  className="h-5 w-5"
+                />
+                <span className="font-medium">Steam Discussions</span>
+              </div>
+              <svg className="h-4 w-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+
+            <a
+              href="https://www.reddit.com/r/dawnofwar/comments/1nguikt/i_built_a_dawn_of_war_definitive_edition/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-neutral-700/50 bg-neutral-900/60 px-4 py-3 text-neutral-100 transition-all duration-200 hover:border-neutral-500 hover:bg-neutral-800/70 hover:text-white"
+              onClick={() => setShowFeedbackModal(false)}
+            >
+              <div className="flex items-center gap-3">
+                <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+                </svg>
+                <span className="font-medium">Reddit Thread</span>
+              </div>
+              <svg className="h-4 w-4 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+
+            <div className="rounded-lg border border-neutral-700/50 bg-neutral-900/60 p-4">
+              <div className="mb-2 flex items-center gap-3">
+                <svg className="h-5 w-5 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+                </svg>
+                <span className="font-medium text-white">Official Relic Discord</span>
+              </div>
+              <div className="flex flex-col gap-2 text-sm">
+                <a
+                  href="https://discord.com/channels/722144726421209089/1417154758052941926"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded border border-neutral-700/40 bg-neutral-800/50 px-3 py-2 text-neutral-200 transition-all hover:border-neutral-500 hover:bg-neutral-800/70 hover:text-white"
+                  onClick={() => setShowFeedbackModal(false)}
+                >
+                  <span className="text-sm">Go to feedback channel</span>
+                  <svg className="h-3.5 w-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <a
+                  href="https://discord.gg/UjhKnHajje"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded border border-indigo-600/30 bg-indigo-900/20 px-3 py-2 text-indigo-200 transition-all hover:border-indigo-500/50 hover:bg-indigo-900/30 hover:text-indigo-100"
+                  onClick={() => setShowFeedbackModal(false)}
+                >
+                  <span className="text-sm">Join the server first</span>
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
