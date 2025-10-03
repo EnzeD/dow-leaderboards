@@ -397,7 +397,7 @@ export default function ReplayDetailInTab({ replaySlug, onBack, onProfileClick, 
         {replay.submittedComment && (
           <div className="mt-8 pt-6 border-t border-neutral-700/40">
             <h3 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-2">
-              Uploader's Comment
+              Uploader&apos;s Comment
             </h3>
             <p className="text-neutral-200 leading-relaxed">
               {replay.submittedComment}

@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect, useRef, Fragment, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
@@ -366,7 +366,6 @@ type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | '
 
 export default function Home() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   type AppState = {
     view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
@@ -642,8 +641,10 @@ export default function Home() {
 
   // URL sync for replay detail view
   useEffect(() => {
-    const tab = searchParams.get('tab');
-    const replayParam = searchParams.get('replay');
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    const replayParam = params.get('replay');
 
     if (tab === 'replays' && replayParam) {
       setActiveTab('replays');
@@ -655,7 +656,7 @@ export default function Home() {
       // Clear replay selection if we navigate away from replays tab
       setSelectedReplaySlug(null);
     }
-  }, [searchParams, selectedReplaySlug]);
+  }, [selectedReplaySlug]);
 
   // Handle browser back/forward for replay navigation
   useEffect(() => {
