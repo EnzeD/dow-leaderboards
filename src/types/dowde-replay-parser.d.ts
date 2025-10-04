@@ -9,6 +9,12 @@ declare module 'dowde-replay-parser' {
     replayname?: string;
     mapname?: string;
     matchduration?: string;
+    /** Raw duration in seconds exposed by newer versions of the parser */
+    matchdurationseconds?: number;
+    matchDurationSeconds?: number;
+    /** Optional formatted duration label exposed by newer versions of the parser */
+    matchdurationlabel?: string;
+    matchDurationLabel?: string;
     profiles?: ReplayProfile[];
     [key: string]: any;
   }

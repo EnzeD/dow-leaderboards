@@ -344,14 +344,46 @@ export async function POST(req: NextRequest) {
       const parsed = parseReplay(tmpPath) as any;
       await unlink(tmpPath).catch(() => {});
 
-      // parsed.matchduration is like "MM:SS" string
-      const md = typeof parsed?.matchduration === 'string' ? parsed.matchduration : null;
-      if (md && /^\d{1,2}:\d{2}$/.test(md)) {
-        const [m, s] = md.split(':').map((v: string) => Number(v));
-        if (Number.isFinite(m) && Number.isFinite(s)) {
-          matchDurationSeconds = m * 60 + s;
-          matchDurationLabel = md;
+      const formatDurationLabel = (seconds: number) => {
+        const safeSeconds = Math.max(0, Math.round(seconds));
+        const minutes = Math.floor(safeSeconds / 60);
+        const secondsPart = safeSeconds - minutes * 60;
+        return `${String(minutes).padStart(2, '0')}:${String(secondsPart).padStart(2, '0')}`;
+      };
+      const parseDurationLabel = (label: string) => {
+        if (!/^\d{1,2}:\d{2}$/.test(label)) {
+          return null;
         }
+        const [m, s] = label.split(':').map((v: string) => Number(v));
+        if (!Number.isFinite(m) || !Number.isFinite(s)) {
+          return null;
+        }
+        return m * 60 + s;
+      };
+
+      const rawSecondsFromParser = [
+        typeof parsed?.matchdurationseconds === 'number' ? parsed.matchdurationseconds : null,
+        typeof parsed?.matchDurationSeconds === 'number' ? parsed.matchDurationSeconds : null,
+      ].find((value) => typeof value === 'number' && Number.isFinite(value));
+
+      const labelFromParser = [
+        typeof parsed?.matchDurationLabel === 'string' ? parsed.matchDurationLabel : null,
+        typeof parsed?.matchdurationlabel === 'string' ? parsed.matchdurationlabel : null,
+        typeof parsed?.matchduration === 'string' ? parsed.matchduration : null,
+      ].find((value) => typeof value === 'string' && value.length > 0) ?? null;
+
+      const secondsFromLabel = labelFromParser ? parseDurationLabel(labelFromParser) : null;
+
+      if (typeof rawSecondsFromParser === 'number') {
+        const normalizedSeconds = Math.max(0, Math.round(rawSecondsFromParser));
+        matchDurationSeconds = normalizedSeconds;
+        const label = secondsFromLabel !== null
+          ? formatDurationLabel(secondsFromLabel)
+          : formatDurationLabel(normalizedSeconds);
+        matchDurationLabel = label;
+      } else if (secondsFromLabel !== null) {
+        matchDurationSeconds = secondsFromLabel;
+        matchDurationLabel = formatDurationLabel(secondsFromLabel);
       }
       // Normalize faction names to match the rest of the codebase
       const normalizedProfiles = Array.isArray(parsed?.profiles)
