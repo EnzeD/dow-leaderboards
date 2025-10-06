@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
   const limit = coerceInt(url.searchParams.get("limit"), 50);
 
   try {
-    const { data, error } = await supabase.rpc<MapRow>("premium_get_map_stats", {
+    const { data, error } = await supabase.rpc("premium_get_map_stats", {
       p_profile_id: profileId,
       p_since: windowStart,
       p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = (data ?? []).map((row) => ({
+    const rows = ((data as MapRow[]) ?? []).map((row: MapRow) => ({
       mapIdentifier: normalizeMapIdentifier(row.map_identifier),
       mapName: row.map_name ?? "Unknown Map",
       matchTypeId: row.match_type_id,

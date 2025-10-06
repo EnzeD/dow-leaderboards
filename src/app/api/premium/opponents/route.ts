@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
   const limit = coerceInt(url.searchParams.get("limit"), 10);
 
   try {
-    const { data, error } = await supabase.rpc<OpponentRow>("premium_get_opponent_stats", {
+    const { data, error } = await supabase.rpc("premium_get_opponent_stats", {
       p_profile_id: profileId,
       p_since: windowStart,
       p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = (data ?? []).map((row) => {
+    const rows = ((data as OpponentRow[]) ?? []).map((row: OpponentRow) => {
       const opponentProfile = normalizeProfileId(row.opponent_profile_id ?? null);
       return {
         opponentProfileId: opponentProfile,

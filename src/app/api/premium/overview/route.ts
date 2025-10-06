@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data, error } = await supabase.rpc<OverviewRow>("premium_get_profile_overview", {
+    const { data, error } = await supabase.rpc("premium_get_profile_overview", {
       p_profile_id: profileId,
     }).maybeSingle();
 
@@ -83,7 +83,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (!data) {
+    const typedData = data as OverviewRow | null;
+
+    if (!typedData) {
       return attachCacheHeaders(
         NextResponse.json<OverviewResponse>({
           activated: true,
@@ -101,8 +103,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const wins = Number(data.total_wins ?? 0);
-    const losses = Number(data.total_losses ?? 0);
+    const wins = Number(typedData.total_wins ?? 0);
+    const losses = Number(typedData.total_losses ?? 0);
     const totalLeaderboardMatches = wins + losses;
 
     return attachCacheHeaders(
@@ -110,14 +112,14 @@ export async function GET(req: NextRequest) {
         activated: true,
         profileId,
         totals: {
-          matches: Number(data.total_matches ?? 0),
-          matchesLast7Days: Number(data.matches_last_7_days ?? 0),
+          matches: Number(typedData.total_matches ?? 0),
+          matchesLast7Days: Number(typedData.matches_last_7_days ?? 0),
           leaderboardWins: wins,
           leaderboardLosses: losses,
           leaderboardTotal: totalLeaderboardMatches,
-          leaderboardWinrate: data.winrate === null || data.winrate === undefined ? null : Number(data.winrate),
+          leaderboardWinrate: typedData.winrate === null || typedData.winrate === undefined ? null : Number(typedData.winrate),
         },
-        lastXpSync: data.last_xp_sync ?? null,
+        lastXpSync: typedData.last_xp_sync ?? null,
       })
     );
   } catch (error) {

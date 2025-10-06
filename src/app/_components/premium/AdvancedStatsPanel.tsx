@@ -56,7 +56,7 @@ export default function AdvancedStatsPanel({
 
   const contextValue = useMemo(() => ({
     ...activation,
-    ready: Boolean(profileId) && (activation.activated || activatedOverride),
+    ready: Boolean(profileId) && (activation.activated || Boolean(activatedOverride)),
   }), [activation, activatedOverride, profileId]);
 
   const profileIdStr = useMemo(() => {
@@ -65,7 +65,6 @@ export default function AdvancedStatsPanel({
     return cast.length > 0 ? cast : null;
   }, [profileId]);
 
-  const [selectedLeaderboardId, setSelectedLeaderboardId] = useState<number | "best" | "all" | null>(null);
   const [windowDays, setWindowDays] = useState<number>(90);
   const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
@@ -76,9 +75,6 @@ export default function AdvancedStatsPanel({
     setActiveSection("elo");
   }, [profileIdStr]);
 
-  useEffect(() => {
-    setSelectedLeaderboardId(null);
-  }, [profileIdStr]);
 
   useEffect(() => {
     if (!profileIdStr || !contextValue.ready) {
@@ -163,21 +159,6 @@ export default function AdvancedStatsPanel({
     );
   }
 
-  const options = buildLeaderboardOptions(leaderboards);
-
-  const handleLeaderboardChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
-    if (value === "best" || value === "all") {
-      setSelectedLeaderboardId(value);
-    } else if (value === "") {
-      setSelectedLeaderboardId(null);
-    } else {
-      const parsed = Number.parseInt(value, 10);
-      if (!Number.isNaN(parsed)) {
-        setSelectedLeaderboardId(parsed);
-      }
-    }
-  };
 
   const containerClass = variant === "embedded"
     ? "rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg space-y-4"
@@ -213,20 +194,6 @@ export default function AdvancedStatsPanel({
         <option value={180}>Last 180 days</option>
         <option value={365}>Last 365 days</option>
       </select>
-      <label className="text-xs text-neutral-400" htmlFor="advanced-stats-leaderboard">Leaderboard</label>
-      <select
-        id="advanced-stats-leaderboard"
-        value={selectedLeaderboardId ?? ""}
-        onChange={handleLeaderboardChange}
-        className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-200"
-      >
-        <option value="">All leaderboards</option>
-        <option value="best">Best leaderboard</option>
-        <option value="all">Show all placements</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
     </div>
   );
 
@@ -259,7 +226,7 @@ export default function AdvancedStatsPanel({
           <EloHistoryCard
             profileId={profileIdStr}
             windowDays={windowDays}
-            leaderboardId={selectedLeaderboardId}
+            leaderboardId={null}
           />
         );
       case "matchups":

@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
   const windowStart = resolveSinceDate(windowDays);
 
   try {
-    const { data, error } = await supabase.rpc<EloHistoryRow>("premium_get_elo_history", {
+    const { data, error } = await supabase.rpc("premium_get_elo_history", {
       p_profile_id: profileId,
       p_leaderboard_id: typeof leaderboardId === "number" ? leaderboardId : null,
       p_since: windowStart,
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const samples = (data ?? []).map((row) => ({
+    const samples = ((data as EloHistoryRow[]) ?? []).map((row: EloHistoryRow) => ({
       timestamp: row.snapshot_at,
       leaderboardId: row.leaderboard_id,
       rating: row.rating,

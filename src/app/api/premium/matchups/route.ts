@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
   const matchTypeId = typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed) ? matchTypeParsed : undefined;
 
   try {
-    const { data, error } = await supabase.rpc<MatchupRow>("premium_get_matchup_stats", {
+    const { data, error } = await supabase.rpc("premium_get_matchup_stats", {
       p_profile_id: profileId,
       p_since: windowStart,
       p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const rows = (data ?? []).map((row) => ({
+    const rows = ((data as MatchupRow[]) ?? []).map((row: MatchupRow) => ({
       myRaceId: row.my_race_id,
       opponentRaceId: row.opponent_race_id,
       matches: row.matches ?? 0,

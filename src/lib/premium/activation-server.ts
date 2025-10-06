@@ -67,7 +67,7 @@ export const resolveActivationStatus = async (profileId: string): Promise<Activa
 
   try {
     const { data, error } = await supabaseAdmin
-      .from<ActivationRecord>("premium_feature_activations")
+      .from("premium_feature_activations")
       .select("profile_id, activated_at, expires_at")
       .eq("profile_id", profileId)
       .maybeSingle();
@@ -81,7 +81,9 @@ export const resolveActivationStatus = async (profileId: string): Promise<Activa
       };
     }
 
-    if (!data) {
+    const typedData = data as ActivationRecord | null;
+
+    if (!typedData) {
       return {
         activated: false,
         forced: false,
@@ -89,14 +91,14 @@ export const resolveActivationStatus = async (profileId: string): Promise<Activa
       };
     }
 
-    if (data.expires_at) {
-      const expiresAtDate = new Date(data.expires_at);
+    if (typedData.expires_at) {
+      const expiresAtDate = new Date(typedData.expires_at);
       if (!Number.isNaN(expiresAtDate.getTime()) && expiresAtDate.getTime() < Date.now()) {
         return {
           activated: false,
           forced: false,
           reason: "expired",
-          expiresAt: data.expires_at,
+          expiresAt: typedData.expires_at,
         };
       }
     }
@@ -105,8 +107,8 @@ export const resolveActivationStatus = async (profileId: string): Promise<Activa
       activated: true,
       forced: false,
       reason: "database",
-      activatedAt: data.activated_at,
-      expiresAt: data.expires_at,
+      activatedAt: typedData.activated_at,
+      expiresAt: typedData.expires_at,
     };
   } catch (error) {
     console.error("[premium] activation status unexpected error", error);

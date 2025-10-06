@@ -25,102 +25,275 @@
   - Supply mock data fixtures and feature-flagged UI for safe QA.
   - Document verification steps and sanity checks for each release.
 
-## Activation Strategy (Phase 0)
-- Add a Supabase table `premium_feature_activations` (`profile_id`, `activated_at`, `expires_at`, `notes`, `created_at`, `updated_at`).
-- Seed the table manually for internal testers; provide a simple Supabase SQL script and an admin helper script for local development that toggles activation.
-- Expose an API helper `GET /api/premium/activation-status?profileId=...` that returns `{ activated: boolean, expiresAt?: string }`; default to `false` when the table or key is absent so we can simulate activation locally via an env flag (e.g. `NEXT_PUBLIC_FORCE_ADVANCED_STATS_FOR_PROFILE_ID`).
-- Cache the activation lookup for a short TTL (30s) inside the Next.js layer to avoid repeatedly hitting Supabase on every render.
-- *Human operator checklist:* Run the activation table migration in Supabase after code review, manage the seed data via dashboard SQL editor, and coordinate feature-flag flips when ready.
+## Activation Strategy (Phase 0) ✅ COMPLETED
+- ✅ Added Supabase table `premium_feature_activations` (migration `0023_advanced_stats_baseline.sql`)
+  - Fields: `profile_id`, `activated_at`, `expires_at`, `notes`, `created_at`, `updated_at`
+  - Primary key on `profile_id`, foreign key to `players(profile_id)`
+  - RLS enabled with service role policy
+- ✅ Implemented API endpoint `GET /api/premium/activation-status?profileId=...`
+  - Returns `{ activated: boolean, activatedAt?: string, expiresAt?: string, reason?: string }`
+  - 30s cache headers (`s-maxage=30`)
+- ✅ Environment override support for testing:
+  - `NEXT_PUBLIC_FORCE_ADVANCED_STATS=true` - Force all profiles activated
+  - `NEXT_PUBLIC_FORCE_ADVANCED_STATS_PROFILE=123,456` - Force specific profiles
+- ✅ Client hook `useAdvancedStatsActivation(profileId)` with caching
+- ✅ Server utility `src/lib/premium/activation-server.ts` with `resolveActivationStatus()`
+
+**TODO (Human operator):**
+- Run migration `0023_advanced_stats_baseline.sql` in production Supabase
+- Manually insert test users into `premium_feature_activations` table for pilot testing
 
 ## Data Architecture
-- **Source tables**: leverage `matches`, `match_participants`, `match_team_results`, `leaderboard_snapshots`, and `player_leaderboard_stats`.
-- **Normalization helpers**: reuse existing faction-map metadata (`RACE_ID_TO_FACTION`, `assets/maps.json`) to keep labels consistent.
-- **Time windows**: default each stat to the last 90 days with options to extend to "All tracked"; keep the window configurable to limit load.
-- **Activated player scoping**: All queries must accept `profile_id` + optional `leaderboard_id` to ensure we never compute global aggregates inadvertently.
+
+### Source Tables (Existing)
+- **`player_leaderboard_stats`**: Time-series snapshots of rating/rank per player per leaderboard
+- **`matches`**: Match metadata (map, duration, completion time, match type)
+- **`match_participants`**: Player participation with faction, team, outcome, rating deltas
+- **`match_team_results`**: Team-level outcomes
+- **`players`**: Player profiles with aliases, Steam IDs, XP/level
+
+### Elo History Data Availability ⚠️ IMPORTANT
+- **Current snapshot coverage**: Daily cron job captures `player_leaderboard_stats` snapshots for **top 200 players per leaderboard only**
+- **Historical depth**: Snapshots started a few days ago (limited historical data currently available)
+- **Coverage gap**: Premium users **outside top 200** will have **no Elo history** until a dedicated crawl job is implemented
+- **Known limitation**: Elo history will only work for currently top-ranked players in MVP launch
+
+**TODO - Post-MVP (Critical for full premium rollout):**
+- Implement background job to snapshot stats for all activated premium users (regardless of rank)
+  - Job should run daily alongside existing top-200 cron
+  - Query `premium_feature_activations` table to identify profiles requiring snapshot
+  - Fetch current stats from Relic API for each activated profile
+  - Insert into `player_leaderboard_stats` with current rating/rank
+  - Consider rate limiting and batch processing to avoid API throttling (≤8 req/s effective)
+  - Fallback gracefully in UI when insufficient historical data exists (<5 snapshots)
+
+### Data Processing Strategy
+- **No new aggregate tables**: All stats computed on-demand via SQL functions
+- **Time windows**: default 90 days, configurable to 30/60/90/180/365 days
+- **Player scoping**: All queries accept `profile_id` + optional `leaderboard_id`
+- **Faction mapping**: Reuse existing `races` table and `RACE_ID_TO_FACTION` utils
+- **Map metadata**: Reuse `assets/maps.json` for map names/thumbnails
 
 ## Backend Work Breakdown
-1. **Schema additions (migration `0023_advanced_stats_baseline.sql`)**
-   - Create materialized views or summary tables:
-     - `player_rating_timeseries` (profile_id, leaderboard_id, captured_at, rating, source, match_id?) powered by either leaderboard snapshots or per-match rating data.
-     - `player_matchup_aggregates` (profile_id, my_faction_id, opponent_faction_id, wins, losses, last_played_at).
-     - `player_map_aggregates` (profile_id, map_slug, wins, losses, total_matches, last_played_at).
-     - `player_opponent_aggregates` (profile_id, opponent_profile_id, wins, losses, matches, last_played_at, opponent_alias_snapshot).
-   - Add indexes on `(profile_id, leaderboard_id)` or analogous keys to support the API filters.
-   - Ensure triggers keep `updated_at` fields current (reuse `set_updated_at`).
-   - *Human operator:* Execute the migration on staging then production, confirm no locks or long-running queries, and snapshot the database before rollout if possible.
 
-2. **Aggregation jobs**
-   - Extend existing crawler / enrichment scripts to populate the new summary tables whenever match data is ingested.
-   - For backfill, write a one-off script (Node or SQL function) that iterates historical matches and seeds the aggregates.
-   - Schedule nightly refresh jobs (e.g., Supabase cron or hosted script) to recompute the previous 24h window, ensuring stats stay fresh if historical data changes.
-   - *Human operator:* Kick off the initial backfill from the Supabase dashboard or CLI during a low-traffic window and monitor for timeouts; configure cron schedules once baseline performance is validated.
+### 1. Schema Additions ✅ COMPLETED
+**Migration `0023_advanced_stats_baseline.sql`**
+- ✅ Created `premium_feature_activations` table
+- ✅ Added RLS policies (service role only)
+- ✅ Set up `updated_at` trigger
 
-3. **API surface** (all behind activation guard)
-   - `GET /api/premium/elo-history?profileId&leaderboardId&window=` → returns ordered samples `{ timestamp, rating, source }` plus metadata (current rating, max, min).
-   - `GET /api/premium/matchups?profileId&window=` → returns the full 9x9 (or relevant) matrix keyed by factions with counts + winrate; include totals for fallback UI.
-   - `GET /api/premium/maps?profileId&leaderboardId?&window=` → returns array of `{ mapId, mapName, matches, wins, losses, winrate, lastPlayed }` sorted by volume.
-   - `GET /api/premium/opponents?profileId&leaderboardId?&window=&limit=10` → returns top opponents array with alias, matches, wins, losses, winrate, lastPlayed.
-   - Apply caching headers (`s-maxage=120`, `stale-while-revalidate=600`) and short-term in-memory caches per profile to minimize load.
-   - Share a common response envelope including `generatedAt` timestamp and window parameters for debugging.
+**Note:** Original plan mentioned aggregate tables (`player_matchup_aggregates`, etc.) but implementation uses **on-demand SQL functions** instead - simpler and leverages existing data.
 
-4. **Security & validation**
-   - Require either `profileId` query param matching the authenticated Supabase session (future subscription work) or accept only server calls (current release) with server-side gating.
-   - Log access attempts in a lightweight Supabase table `premium_feature_audit` to aid future billing instrumentation.
-   - *Human operator:* Review audit logs periodically via Supabase dashboard and ensure service keys remain scoped appropriately.
+### 2. SQL Functions ✅ COMPLETED
+**Migration `0024_advanced_stats_functions.sql`**
+- ✅ `premium_get_elo_history(profile_id, leaderboard_id, since, limit)`
+  - Queries `player_leaderboard_stats` for rating/rank snapshots
+  - Returns time-series data ordered by `snapshot_at`
+  - Filters by leaderboard and time window
+- ✅ `premium_get_matchup_stats(profile_id, since, match_type_id)`
+  - Joins `match_participants` to pair player with opponents
+  - Aggregates wins/losses by faction matchup (my_race_id vs opponent_race_id)
+  - Returns winrate matrix data
+- ✅ `premium_get_map_stats(profile_id, since, match_type_id, limit)`
+  - Aggregates performance by map from `matches` + `match_participants`
+  - Returns matches/wins/losses/winrate per map
+- ✅ `premium_get_opponent_stats(profile_id, since, match_type_id, limit)`
+  - Finds frequent opponents with head-to-head record
+  - Joins on opposite teams, excludes computer players
+
+**Migration `0025_premium_profile_overview.sql`**
+- ✅ `premium_get_profile_overview(profile_id)`
+  - Summary stats: total matches, last 7 days activity
+  - Aggregate wins/losses from `player_leaderboard_stats` (latest snapshot per leaderboard)
+  - Overall winrate calculation
+  - Last XP sync timestamp from `players` table
+
+**TODO (Human operator):**
+- Run migrations `0024_advanced_stats_functions.sql` and `0025_premium_profile_overview.sql` in production
+- Test each function with sample profile IDs to verify performance (<200ms p95)
+
+### 3. API Endpoints ✅ COMPLETED
+All routes implement activation gating (403 if not activated) and 30s cache headers.
+
+- ✅ `GET /api/premium/activation-status?profileId=X`
+- ✅ `GET /api/premium/overview?profileId=X`
+  - Calls `premium_get_profile_overview()`
+  - Returns total matches, recent activity, W/L record, winrate
+- ✅ `GET /api/premium/elo-history?profileId=X&leaderboardId=Y&windowDays=90`
+  - Calls `premium_get_elo_history()`
+  - Returns rating timeline with rank data
+- ✅ `GET /api/premium/matchups?profileId=X&windowDays=90`
+  - Calls `premium_get_matchup_stats()`
+  - Returns faction vs faction matrix
+- ✅ `GET /api/premium/maps?profileId=X&windowDays=90`
+  - Calls `premium_get_map_stats()`
+  - Returns map performance table
+- ✅ `GET /api/premium/opponents?profileId=X&windowDays=90&limit=10`
+  - Calls `premium_get_opponent_stats()`
+  - Returns top opponents list
+
+**Cache Strategy:**
+- All routes use `Cache-Control: private, max-age=0, s-maxage=30`
+- Client-side activation status cached in-memory per profile
+
+**Security:**
+- All routes verify activation via `resolveActivationStatus()`
+- Uses Supabase service role client for privileged queries
+- No authentication required (public API, gated by activation table)
+
+**TODO (Future):**
+- Consider adding audit logging table `premium_feature_audit` for billing instrumentation
+- Add rate limiting per IP if abuse occurs
 
 ## Frontend Work Breakdown
-1. **Activation gating**
-   - Add a client utility `useAdvancedStatsActivation(profileId)` that checks the env override first, then the API.
-   - Update search result cards and player profile route (when implemented) to branch between teaser vs. advanced stats content.
-   - Provide skeleton loaders and "upgrade" messaging fallbacks.
 
-2. **Shared foundations**
-   - Create a new layout section (e.g., `src/app/_components/AdvancedStatsPanel.tsx`) to host the four widgets with a consistent header, refresh timestamp, and window selector.
-   - Implement reusable filter controls: leaderboard dropdown (prefilled from available ladders), time-range pill switcher, and faction color legend.
+### 1. Activation Gating ✅ COMPLETED
+- ✅ React hook `useAdvancedStatsActivation(profileId)` (`src/hooks/useAdvancedStatsActivation.ts`)
+  - Checks env overrides first, then API
+  - In-memory cache to avoid repeated calls
+  - Returns `{ activated, loading, refresh, error, ... }`
+- ✅ Context provider `AdvancedStatsContext` for sharing activation state
 
-3. **Elo Ratings Over Time**
-   - Use `react-chartjs-2` or `visx` (already in bundle?) to render a line chart with tooltip, min/max markers, and leaderboard filter.
-   - Allow toggling between absolute rating and delta view; include annotation for roster changes when data is available.
-   - Handle sparse data gracefully (fallback to step chart or "insufficient data" message).
+### 2. Core Panel Component ✅ COMPLETED
+- ✅ `AdvancedStatsPanel.tsx` - Main container
+  - Orchestrates teaser vs full stats views
+  - Filter controls: time window (30/60/90/180/365 days) + leaderboard selector
+  - Tab navigation: Elo History | Matchups | Maps | Opponents
+  - Supports `variant="embedded"` (inline in search) and `"standalone"`
+  - Fetches profile overview on mount
+- ✅ `AdvancedStatsTeaser.tsx` - Shown when not activated
+  - Explains premium features
+  - "Request Access" button (calls `onRequestAccess` prop)
+- ✅ `useCombinedLeaderboards.ts` - Hook to fetch all leaderboards for filters
 
-4. **Win Rate per Match-up**
-   - Build a heatmap grid component (9 factions x 9) with color scale ranging from red (low winrate) to green (high) and cell tooltips showing counts.
-   - Highlight diagonal cells (mirror match) separately and optionally collapse factions with <5 matches into "Insufficient data" row.
-   - Provide toggle between percentage and raw record display for accessibility.
+### 3. Stats Card Components ✅ IMPLEMENTED
+- ✅ `ProfileOverviewCard.tsx`
+  - Displays total matches, last 7 days activity, W/L record, winrate
+  - Loading/error states
+- ✅ `EloHistoryCard.tsx`
+  - Fetches data from `/api/premium/elo-history`
+  - Renders line chart (implementation TBD - chart library needed)
+  - Filters by selected leaderboard + time window
+- ✅ `MatchupMatrixCard.tsx`
+  - Fetches data from `/api/premium/matchups`
+  - Renders heatmap grid (implementation TBD)
+  - Color-coded winrate (red = low, green = high)
+- ✅ `MapPerformanceCard.tsx`
+  - Fetches data from `/api/premium/maps`
+  - Sortable table with map names, matches, W/L, winrate
+  - Map thumbnails TBD
+- ✅ `FrequentOpponentsCard.tsx`
+  - Fetches data from `/api/premium/opponents`
+  - Top 10 opponents list with head-to-head records
+  - Links to opponent profiles TBD
 
-5. **Win Rate per Map**
-   - Render a sortable table with map thumbnail (from `assets/maps.json`/`public/maps`), matches, wins, losses, winrate, last played.
-   - Support search/filter by map name and include a "minimum matches" filter to hide noisy data.
+**TODO (Chart Implementation):**
+- Install chart library (`recharts`, `chart.js`, or `visx`)
+- Implement actual line chart in `EloHistoryCard`
+- Implement heatmap visualization in `MatchupMatrixCard`
+- Add map thumbnail images and integrate into `MapPerformanceCard`
+- Add "Insufficient data" fallback messaging when <5 data points
 
-6. **Frequent Opponents**
-   - Display top 10 opponents as a list with avatar placeholder, alias, matches played, record, and winrate trend indicator.
-   - Link each opponent to the search/profile flow; include tooltips showing the faction distribution of those matches if data available.
+### 4. UI Integration ✅ COMPLETED
+**Changes to `src/app/page.tsx`:**
+- ✅ Removed "Stats" tab placeholder (was showing "Coming Soon")
+- ✅ Added "Activate advanced statistics" button in search results
+  - Toggles `AdvancedStatsPanel` in embedded mode
+  - Shows inline below the selected player's search result
+  - Shows teaser if not activated, full stats if activated
+- ✅ State management for active advanced stats panel per player
 
-7. **State management & UX polish**
-   - Persist selected filters in query string (e.g., `?leaderboard=18&window=90d`) to allow sharing links.
-   - Add export buttons (CSV/PNG) for future premium value, stub them out for now with TODOs.
-   - Ensure responsive design: charts collapse into stacked cards on mobile.
+### 5. State Management & UX ⚠️ PARTIAL
+- ✅ Filter state managed in `AdvancedStatsPanel` (time window, leaderboard)
+- ✅ Active section tab state
+- ⚠️ TODO: Persist filters in query string for shareable links
+- ⚠️ TODO: Export buttons (CSV/PNG) - stubbed out for future
+- ⚠️ TODO: Mobile responsive chart layouts
 
-## Simulation & Local Development
-- Add mock activation via `.env.local` flag `NEXT_PUBLIC_FORCE_ADVANCED_STATS=true` and optional `NEXT_PUBLIC_FORCE_ADVANCED_STATS_PROFILE=1234` to bypass API gating during UI work.
-- Provide mock JSON fixtures for each API (stored in `public/mock/advanced-stats/`) so the frontend can be developed before backend completion; the fetch hooks can fall back to these fixtures when `NEXT_PUBLIC_USE_MOCK_ADV_STATS` is enabled.
-- *Human operator:* Manage real environment variables in Vercel/Supabase dashboards and ensure mock flags stay disabled in production.
+## Testing & Validation ⚠️ NOT STARTED
 
-## Testing & Validation
-- **Backend**: write integration tests (via Supabase SQL + pgTap or Node scripts) covering aggregation correctness, especially for mirrors/2v2+ matches.
-- **Frontend**: add unit tests for data formatting utilities and screenshot tests (Playwright) for the heatmap + chart components using mock data.
-- **Performance**: load-test the API endpoints using k6 or artillery to ensure p95 < 200ms with realistic cache hit rates.
-- **Data QA**: create a verification notebook (Jupyter or SQL doc) comparing Supabase aggregate outputs against sampled raw match data for a few players.
+**TODO:**
+- Backend integration tests for SQL functions
+- Frontend unit tests for data formatting utilities
+- Screenshot/visual regression tests for charts (Playwright)
+- Performance testing (k6/artillery) - target p95 < 200ms
+- Data QA - verify aggregate correctness against raw match data samples
 
 ## Rollout Steps
-1. Land migrations + backfill scripts, verify in staging database.
-2. Deploy backend endpoints, guarded by feature flag and activation table.
-3. Merge frontend using mock data path; progressively enable real API in staging.
-4. Activate a handful of pilot users (manual insert) and monitor logs + Supabase metrics.
-5. Gather feedback, iterate on UI polish, then plan subscription/paywall integration in a follow-up milestone.
-- *Human operator:* Own the staging/prod promotion checklist—apply migrations, validate Supabase metrics, and flip any runtime flags only after confirming smoke tests.
 
-## Future Considerations (Post-MVP)
-- Replace manual activation with billing/subscription checks (Stripe + webhook) and real-time Supabase row-level security.
-- Expand analytics to include build-order insights, teammate synergy, and per-time-of-day performance once core views are stable.
-- Evaluate edge caching or pre-rendering for heavy charts if adoption spikes.
+### Completed ✅
+1. ✅ Migrations authored and committed to repo
+2. ✅ Backend API endpoints implemented with activation gating
+3. ✅ Frontend components built with teaser/activated branching
+4. ✅ Environment override system for local development
+
+### Remaining (Human Operator) ⚠️
+1. **Database migrations** (Supabase Dashboard):
+   - Apply `0023_advanced_stats_baseline.sql` (creates `premium_feature_activations`)
+   - Apply `0024_advanced_stats_functions.sql` (creates SQL functions)
+   - Apply `0025_premium_profile_overview.sql` (creates overview function)
+   - Verify no long-running queries or lock contention
+
+2. **Pilot user activation**:
+   - Manually insert test users into `premium_feature_activations`:
+     ```sql
+     INSERT INTO premium_feature_activations (profile_id, notes)
+     VALUES (123456, 'Internal testing - top 200 player');
+     ```
+   - Test with both top-200 players (have Elo history) and lower-ranked players (no Elo history)
+
+3. **Production deployment**:
+   - Merge `feat/advanced-stats` branch to `main`
+   - Deploy to Vercel (migrations already applied)
+   - Verify all API endpoints return 403 for non-activated users
+   - Test activation flow with pilot users
+
+4. **Monitoring**:
+   - Check Supabase query performance dashboard
+   - Monitor API response times (should be <200ms p95)
+   - Verify cache hit rates
+
+5. **Feature flag consideration** (optional):
+   - Currently no global feature flag - activation is per-user
+   - Consider adding `NEXT_PUBLIC_ENABLE_ADVANCED_STATS` if you need global kill switch
+
+## Known Limitations & Future Work
+
+### Critical for Full Rollout
+1. **Elo history coverage gap** (see Data Architecture section above)
+   - Only top 200 players have snapshots currently
+   - Need dedicated cron job for premium users outside top 200
+   - Fallback UI needed when <5 snapshots available
+
+2. **Chart visualization incomplete**
+   - Card components exist but need chart library integration
+   - Line chart for Elo history
+   - Heatmap for matchup matrix
+
+3. **Map thumbnails missing**
+   - `MapPerformanceCard` references map images that may not exist yet
+   - Need to add map preview images to `/public/maps/`
+
+### Nice-to-Have (Post-MVP)
+- Query string persistence for filter state (shareable links)
+- Export to CSV/PNG functionality
+- Mobile-optimized chart layouts
+- Billing integration (replace manual activation with Stripe)
+- Audit logging for access tracking
+- Advanced analytics: build orders, teammate synergy, time-of-day performance
+- Edge caching for heavy charts if adoption spikes
+
+## Summary of Implementation Status
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Database schema | ✅ Complete | 3 migrations ready to apply |
+| SQL functions | ✅ Complete | All 5 functions implemented |
+| API endpoints | ✅ Complete | 6 routes with activation gating |
+| Activation system | ✅ Complete | Hook + server utilities + env overrides |
+| Frontend panel | ✅ Complete | Main container + tab navigation |
+| Stats cards | ⚠️ Partial | Components exist, charts need implementation |
+| UI integration | ✅ Complete | Embedded in search results |
+| Testing | ❌ Not started | Need integration + performance tests |
+| Production deployment | ❌ Pending | Awaiting migration application + pilot testing |
+| Elo history for all users | ❌ Future work | Only top 200 covered currently |
