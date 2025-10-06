@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { Buffer } from 'node:buffer';
 import { writeFile, unlink } from 'node:fs/promises';
@@ -7,20 +6,11 @@ import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { parseReplay } from 'dowde-replay-parser';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
-import { createHash } from 'crypto';
 import { Filter } from 'bad-words';
-
-const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const REPLAYS_BUCKET = process.env.SUPABASE_REPLAYS_BUCKET ?? 'replays';
+import { generateSignedReplayUrl, getClientIpHash, REPLAYS_BUCKET, supabaseAdmin } from './shared';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB prototype limit
-const SIGNED_URL_TTL_SECONDS = 60 * 60; // 1 hour access window
 const MAX_UPLOADS_PER_HOUR = 20; // Rate limit per IP
-
-const supabaseAdmin = SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
-  : null;
 
 const profanityFilter = new Filter();
 
@@ -36,18 +26,6 @@ const sanitizeBaseName = (input: string): string => {
 const buildObjectKey = (originalName: string): string => {
   const base = sanitizeBaseName(originalName).slice(0, 80) || 'replay';
   return `${randomUUID()}__${base}.rec`;
-};
-
-const getClientIpHash = (req: NextRequest): string => {
-  // Get IP from various headers (handling proxies/load balancers)
-  const forwarded = req.headers.get('x-forwarded-for');
-  const realIp = req.headers.get('x-real-ip');
-  const cfConnectingIp = req.headers.get('cf-connecting-ip');
-
-  const ip = cfConnectingIp || forwarded?.split(',')[0]?.trim() || realIp || 'unknown';
-
-  // Hash the IP for privacy (SHA256)
-  return createHash('sha256').update(ip).digest('hex');
 };
 
 const sanitizeInput = (input: string, maxLength: number): string => {
@@ -76,42 +54,20 @@ export async function GET(req: NextRequest) {
   const path = searchParams.get('path');
 
   if (path) {
-    const { data, error } = await supabaseAdmin
-      .storage
-      .from(REPLAYS_BUCKET)
-      .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+    try {
+      const { url, downloadCount, alreadyDownloaded } = await generateSignedReplayUrl(req, path);
 
-    if (error || !data?.signedUrl) {
-      console.error('Failed to create signed URL for replay', error);
-      return NextResponse.json({ error: 'signed_url_failed' }, { status: 500 });
-    }
-
-    let downloadCount: number | null = null;
-    let wasIncremented = false;
-
-    // Get client IP hash for duplicate prevention
-    const ipHash = getClientIpHash(req);
-
-    const { data: incremented, error: incrementError } = await supabaseAdmin
-      .rpc('increment_replay_download', {
-        path_input: path,
-        ip_hash_input: ipHash
+      return NextResponse.json({
+        url,
+        downloadCount,
+        alreadyDownloaded
+      }, {
+        headers: { 'Cache-Control': 'no-store' }
       });
-
-    if (incrementError) {
-      console.error('Failed to increment replay download count', incrementError);
-    } else if (incremented && typeof incremented === 'object') {
-      downloadCount = Number(incremented.download_count ?? null);
-      wasIncremented = Boolean(incremented.incremented);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : 'signed_url_failed';
+      return NextResponse.json({ error: code || 'signed_url_failed' }, { status: 500, headers: { 'Cache-Control': 'no-store' } });
     }
-
-    return NextResponse.json({
-      url: data.signedUrl,
-      downloadCount,
-      alreadyDownloaded: !wasIncremented
-    }, {
-      headers: { 'Cache-Control': 'no-store' }
-    });
   }
 
   // Get client IP hash for ownership verification

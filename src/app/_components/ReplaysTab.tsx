@@ -457,9 +457,18 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     setDownloadingPath(path);
 
     try {
-      const { url, downloadCount } = await requestSignedUrl(path);
+      const response = await fetch(`/api/replays/download?path=${encodeURIComponent(path)}`);
 
-      if (typeof downloadCount === 'number') {
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const code = payload?.error ?? 'download_failed';
+        throw new Error(code);
+      }
+
+      const downloadCountHeader = response.headers.get('X-Download-Count');
+      const downloadCount = typeof downloadCountHeader === 'string' ? Number(downloadCountHeader) : NaN;
+
+      if (Number.isFinite(downloadCount)) {
         setReplays(prev =>
           sortReplays(
             prev.map(entry =>
@@ -471,27 +480,25 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         void loadReplays();
       }
 
-      // Find the replay to get its name
-      const replay = replays.find(r => r.path === path);
-      const replayName = replay?.submittedName || replay?.replayName || replay?.originalName || 'replay';
-
-      // Sanitize the replay name for use in filename
-      const sanitizedName = replayName
-        .replace(/\.rec$/i, '') // Remove .rec if already present
-        .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special characters
-        .replace(/\s+/g, ' ') // Normalize spaces
-        .trim();
-
-      // Create the filename
-      const filename = `${sanitizedName}.rec`;
-
-      // Download the file with custom filename
-      const response = await fetch(url);
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = filename;
+
+      const filenameHeader = response.headers.get('X-Replay-Filename');
+      if (filenameHeader) {
+        a.download = filenameHeader;
+      } else {
+        const replay = replays.find(r => r.path === path);
+        const replayName = replay?.submittedName || replay?.replayName || replay?.originalName || 'replay';
+        const sanitizedName = replayName
+          .replace(/\.rec$/i, '')
+          .replace(/[^a-zA-Z0-9\s\-_]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        a.download = `${sanitizedName || 'replay'}.rec`;
+      }
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -502,7 +509,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     } finally {
       setDownloadingPath(null);
     }
-  }, [loadReplays, requestSignedUrl, replays]);
+  }, [loadReplays, replays]);
 
   const handleCopyLink = useCallback(async (path: string) => {
     if (!path) return;
@@ -517,8 +524,12 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     try {
       const { url, downloadCount } = await requestSignedUrl(path);
 
+      const shareUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/api/replays/download?path=${encodeURIComponent(path)}`
+        : null;
+
       try {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(shareUrl ?? url);
       } catch (copyError) {
         console.error('Failed to copy replay download URL', copyError);
         throw new Error('clipboard_unavailable');
