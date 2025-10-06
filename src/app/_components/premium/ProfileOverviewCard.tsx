@@ -9,7 +9,8 @@ export type ProfileOverview = {
   leaderboardLosses: number;
   leaderboardTotal: number;
   leaderboardWinrate: number | null;
-  lastXpSync: string | null;
+  mainRace: string | null;
+  mainRacePercentage: number | null;
 };
 
 export type ProfileOverviewCardProps = {
@@ -79,9 +80,11 @@ export default function ProfileOverviewCard({ overview, loading, error }: Profil
           </p>
         </div>
         <div className="rounded-lg border border-neutral-700/40 bg-neutral-900/70 p-4">
-          <p className="text-xs uppercase tracking-wide text-neutral-400">Last crawl (XP)</p>
-          <p className="mt-1 text-sm text-neutral-200">{formatDateTime(overview.lastXpSync)}</p>
-          <p className="mt-1 text-[0.65rem] text-neutral-500">TODO: replace with premium crawl timestamp when job tracking is available.</p>
+          <p className="text-xs uppercase tracking-wide text-neutral-400">Main race</p>
+          <p className="mt-1 text-xl font-semibold text-white">{overview.mainRace || "—"}</p>
+          <p className="mt-1 text-xs text-neutral-400">
+            {formatPercent(overview.mainRacePercentage)} of matches
+          </p>
         </div>
       </div>
     );

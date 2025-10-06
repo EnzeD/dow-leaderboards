@@ -28,9 +28,9 @@ export default function AdvancedStatsTeaser({ alias, loading, refresh, onRequest
         <div>
           <h3 className="text-lg font-semibold text-white">Advanced statistics</h3>
           <p className="text-sm text-neutral-400">
-            This profile is not yet activated for premium analytics. Unlock Elo trends, matchup intelligence, and more.
+            This profile is not yet activated for advanced analytics. Unlock Elo trends, matchup intelligence, and more.
           </p>
-          <p className="text-xs text-neutral-500 mt-1">{alias || "Player"} can request access via the premium program.</p>
+          <p className="text-xs text-neutral-500 mt-1">{alias || "Player"} can request access via the advanced statistics program.</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-3 text-sm text-neutral-300">
@@ -87,7 +87,7 @@ export default function AdvancedStatsTeaser({ alias, loading, refresh, onRequest
             Request access
           </button>
         )}
-        <span className="text-xs text-neutral-500">Premium telemetry in development — activation managed via Supabase dashboard.</span>
+        <span className="text-xs text-neutral-500">Advanced telemetry in development — activation managed via Supabase dashboard.</span>
       </div>
     </div>
   );

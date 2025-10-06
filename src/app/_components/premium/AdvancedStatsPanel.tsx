@@ -39,8 +39,9 @@ type OverviewApiResponse = {
     leaderboardLosses?: number;
     leaderboardTotal?: number;
     leaderboardWinrate?: number | string | null;
+    mainRace?: string | null;
+    mainRacePercentage?: number | null;
   };
-  lastXpSync?: string | null;
   reason?: string;
 };
 
@@ -116,7 +117,8 @@ export default function AdvancedStatsPanel({
             leaderboardWinrate: payload.totals.leaderboardWinrate === null || payload.totals.leaderboardWinrate === undefined
               ? null
               : Number(payload.totals.leaderboardWinrate),
-            lastXpSync: payload.lastXpSync ?? null,
+            mainRace: payload.totals.mainRace ?? null,
+            mainRacePercentage: payload.totals.mainRacePercentage ?? null,
           });
         } else {
           setOverview(null);
@@ -171,8 +173,7 @@ export default function AdvancedStatsPanel({
 
   const intro = (
     <div>
-      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Premium analytics</p>
-      <h3 className={titleClass}>Advanced statistics</h3>
+      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Advanced analytics</p>
       <p className={descriptionClass}>
         Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
       </p>

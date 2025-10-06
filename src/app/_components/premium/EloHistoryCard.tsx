@@ -293,6 +293,14 @@ export default function EloHistoryCard({ profileId, leaderboardId, windowDays }:
     return fallback?.display_name || fallback?.name || `Leaderboard ${selectedLeaderboard}`;
   }, [selectedLeaderboard, playerLeaderboards, availableLeaderboards]);
 
+  // Name without rating for table header
+  const selectedLeaderboardNameOnly = useMemo(() => {
+    if (selectedLeaderboard === 0) return '1v1 Combined';
+
+    const fallback = availableLeaderboards.find(l => l.id === selectedLeaderboard);
+    return fallback?.display_name || fallback?.name || `Leaderboard ${selectedLeaderboard}`;
+  }, [selectedLeaderboard, availableLeaderboards]);
+
   // Calculate rank axis domain to show meaningful range
   const rankDomain = useMemo(() => {
     if (chartData.length === 0) return [0, 100];
@@ -493,7 +501,7 @@ export default function EloHistoryCard({ profileId, leaderboardId, windowDays }:
           {/* Data table (collapsed by default) */}
           <details className="group">
             <summary className="cursor-pointer text-sm font-medium text-neutral-300 hover:text-white">
-              View detailed data ({chartData.length} snapshots for {selectedLeaderboardName})
+              View detailed data ({chartData.length} snapshots for {selectedLeaderboardNameOnly})
             </summary>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm text-neutral-200">
