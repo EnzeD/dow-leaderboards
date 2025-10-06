@@ -10,6 +10,7 @@ import EloHistoryCard from "./EloHistoryCard";
 import MatchupMatrixCard from "./MatchupMatrixCard";
 import MapPerformanceCard from "./MapPerformanceCard";
 import FrequentOpponentsCard from "./FrequentOpponentsCard";
+import ProfileOverviewCard, { ProfileOverview } from "./ProfileOverviewCard";
 
 export type AdvancedStatsPanelProps = {
   profileId?: string | number | null;
@@ -28,6 +29,21 @@ const SECTIONS: Array<{ id: AdvancedStatsSection; label: string }> = [
   { id: "opponents", label: "Opponents" },
 ];
 
+type OverviewApiResponse = {
+  activated: boolean;
+  profileId: string;
+  totals?: {
+    matches?: number;
+    matchesLast7Days?: number;
+    leaderboardWins?: number;
+    leaderboardLosses?: number;
+    leaderboardTotal?: number;
+    leaderboardWinrate?: number | string | null;
+  };
+  lastXpSync?: string | null;
+  reason?: string;
+};
+
 export default function AdvancedStatsPanel({
   profileId,
   alias,
@@ -43,15 +59,94 @@ export default function AdvancedStatsPanel({
     ready: Boolean(profileId) && (activation.activated || activatedOverride),
   }), [activation, activatedOverride, profileId]);
 
+  const profileIdStr = useMemo(() => {
+    if (profileId === undefined || profileId === null) return null;
+    const cast = String(profileId).trim();
+    return cast.length > 0 ? cast : null;
+  }, [profileId]);
+
   const [selectedLeaderboardId, setSelectedLeaderboardId] = useState<number | "best" | "all" | null>(null);
   const [windowDays, setWindowDays] = useState<number>(90);
   const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
+  const [overview, setOverview] = useState<ProfileOverview | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(false);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveSection("elo");
-  }, [profileId]);
+  }, [profileIdStr]);
 
-  if (!profileId) {
+  useEffect(() => {
+    setSelectedLeaderboardId(null);
+  }, [profileIdStr]);
+
+  useEffect(() => {
+    if (!profileIdStr || !contextValue.ready) {
+      setOverview(null);
+      setOverviewLoading(false);
+      setOverviewError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const controller = new AbortController();
+
+    const fetchOverview = async () => {
+      setOverviewLoading(true);
+      setOverviewError(null);
+      try {
+        const response = await fetch(`/api/premium/overview?profileId=${encodeURIComponent(profileIdStr)}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          signal: controller.signal,
+        });
+
+        const payload = await response.json().catch(() => ({} as OverviewApiResponse)) as OverviewApiResponse;
+
+        if (!response.ok) {
+          const reason = typeof payload?.reason === "string" ? payload.reason : `HTTP_${response.status}`;
+          throw new Error(reason);
+        }
+
+        if (cancelled) return;
+
+        if (payload?.totals) {
+          setOverview({
+            matches: Number(payload.totals.matches ?? 0),
+            matchesLast7Days: Number(payload.totals.matchesLast7Days ?? 0),
+            leaderboardWins: Number(payload.totals.leaderboardWins ?? 0),
+            leaderboardLosses: Number(payload.totals.leaderboardLosses ?? 0),
+            leaderboardTotal: Number(payload.totals.leaderboardTotal ?? 0),
+            leaderboardWinrate: payload.totals.leaderboardWinrate === null || payload.totals.leaderboardWinrate === undefined
+              ? null
+              : Number(payload.totals.leaderboardWinrate),
+            lastXpSync: payload.lastXpSync ?? null,
+          });
+        } else {
+          setOverview(null);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        if ((error as Error).name === "AbortError") return;
+        console.error("[premium] overview fetch failed", error);
+        setOverview(null);
+        setOverviewError((error as Error).message ?? "overview_fetch_failed");
+      } finally {
+        if (!cancelled) {
+          setOverviewLoading(false);
+        }
+      }
+    };
+
+    fetchOverview();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [profileIdStr, contextValue.ready]);
+
+  if (!profileIdStr) {
     return null;
   }
 
@@ -91,12 +186,14 @@ export default function AdvancedStatsPanel({
   const titleClass = variant === "embedded" ? "text-lg font-semibold text-white" : "text-2xl font-semibold text-white";
   const descriptionClass = variant === "embedded" ? "text-xs text-neutral-400" : "text-sm text-neutral-400 mt-1";
 
+  const displayName = alias || (profileIdStr ?? "this profile");
+
   const intro = (
     <div>
       <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Premium analytics</p>
       <h3 className={titleClass}>Advanced statistics</h3>
       <p className={descriptionClass}>
-        Detailed insights for {alias || `profile ${profileId}`} across ratings, matchups, maps, and opponents.
+        Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
       </p>
     </div>
   );
@@ -160,7 +257,7 @@ export default function AdvancedStatsPanel({
       case "elo":
         return (
           <EloHistoryCard
-            profileId={profileId}
+            profileId={profileIdStr}
             windowDays={windowDays}
             leaderboardId={selectedLeaderboardId}
           />
@@ -168,7 +265,7 @@ export default function AdvancedStatsPanel({
       case "matchups":
         return (
           <MatchupMatrixCard
-            profileId={profileId}
+            profileId={profileIdStr}
             windowDays={windowDays}
             matchTypeId={null}
           />
@@ -176,7 +273,7 @@ export default function AdvancedStatsPanel({
       case "maps":
         return (
           <MapPerformanceCard
-            profileId={profileId}
+            profileId={profileIdStr}
             windowDays={windowDays}
             matchTypeId={null}
           />
@@ -185,7 +282,7 @@ export default function AdvancedStatsPanel({
       default:
         return (
           <FrequentOpponentsCard
-            profileId={profileId}
+            profileId={profileIdStr}
             windowDays={windowDays}
             matchTypeId={null}
           />
@@ -209,6 +306,8 @@ export default function AdvancedStatsPanel({
             </div>
           </header>
         )}
+
+        <ProfileOverviewCard overview={overview} loading={overviewLoading} error={overviewError} />
 
         {variant === "embedded" ? sectionNav : (
           <div className="px-1">{sectionNav}</div>
