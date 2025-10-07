@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { parseFactionFromName } from '@/lib/relic';
 
@@ -5,7 +6,7 @@ export interface ReplayPlayerMatch {
   alias: string;
   profile_id: string;
   confidence: number;
-  method: 'exact' | 'fuzzy' | 'manual';
+  method: 'id' | 'exact' | 'fuzzy' | 'manual';
   faction?: string;
   rating?: number;
   rank?: number;
@@ -17,7 +18,7 @@ export interface ReplayPlayerLink {
   replay_player_alias: string;
   profile_id: string;
   match_confidence: number;
-  match_method: string;
+  match_method: 'id' | 'exact' | 'fuzzy' | 'manual';
   rating?: number;
   rank?: number;
   leaderboard_id?: number;
@@ -29,6 +30,7 @@ export interface EnrichedReplayProfile {
   alias: string;
   faction: string;
   team: number;
+  id?: number | null;
   profile_id?: string;
   match_confidence?: number;
   current_alias?: string;
@@ -124,10 +126,15 @@ export async function matchReplayPlayersToDatabase(replayPath: string): Promise<
 /**
  * Saves player matches to the database
  */
-export async function saveReplayPlayerLinks(replayPath: string, matches: ReplayPlayerMatch[]): Promise<boolean> {
+export async function saveReplayPlayerLinks(
+  replayPath: string,
+  matches: ReplayPlayerMatch[],
+  client: SupabaseClient<any, any, any> = supabase
+): Promise<boolean> {
   try {
+    const db = client ?? supabase;
     // First, delete existing links for this replay
-    await supabase
+    await db
       .from('replay_player_links')
       .delete()
       .eq('replay_path', replayPath);
@@ -145,7 +152,7 @@ export async function saveReplayPlayerLinks(replayPath: string, matches: ReplayP
         leaderboard_id: match.leaderboard_id || null
       }));
 
-      const { error } = await supabase
+      const { error } = await db
         .from('replay_player_links')
         .insert(links);
 
@@ -165,9 +172,13 @@ export async function saveReplayPlayerLinks(replayPath: string, matches: ReplayP
 /**
  * Gets existing player links for a replay
  */
-export async function getReplayPlayerLinks(replayPath: string): Promise<ReplayPlayerLink[]> {
+export async function getReplayPlayerLinks(
+  replayPath: string,
+  client: SupabaseClient<any, any, any> = supabase
+): Promise<ReplayPlayerLink[]> {
   try {
-    const { data, error } = await supabase
+    const db = client ?? supabase;
+    const { data, error } = await db
       .from('replay_player_links')
       .select('*')
       .eq('replay_path', replayPath);
@@ -190,18 +201,20 @@ export async function getReplayPlayerLinks(replayPath: string): Promise<ReplayPl
 export async function enrichReplayProfiles(
   replayPath: string,
   profiles: Array<{ alias: string; faction: string; team: number }>,
-  mapName?: string | null
+  mapName?: string | null,
+  client?: SupabaseClient<any, any, any>
 ): Promise<EnrichedReplayProfile[]> {
   try {
+    const db = client ?? supabase;
     // Get existing links
-    const links = await getReplayPlayerLinks(replayPath);
+    const links = await getReplayPlayerLinks(replayPath, db);
     const linkMap = new Map(links.map(link => [link.replay_player_alias, link]));
 
     // If no links exist, try to create them
     if (links.length === 0) {
       const matches = await matchReplayPlayersToDatabase(replayPath);
       if (matches.length > 0) {
-        await saveReplayPlayerLinks(replayPath, matches);
+        await saveReplayPlayerLinks(replayPath, matches, db);
         // Update linkMap with new matches
         matches.forEach(match => {
           linkMap.set(match.alias, {

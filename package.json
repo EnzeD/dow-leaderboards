@@ -23,7 +23,7 @@
     "autoprefixer": "^10.4.21",
     "bad-words": "^4.0.0",
     "dotenv": "^16.4.5",
-    "dowde-replay-parser": "git+https://codeberg.org/ReubenUKGB/dowde-replay-parser.git#cf6bc81e3811e526d76aad1c51e3c63da004424e",
+    "dowde-replay-parser": "^1.5.5",
     "flag-icons": "^7.5.0",
     "next": "14.2.5",
     "react": "^18",

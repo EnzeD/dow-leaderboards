@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
             };
           }));
 
-          await saveReplayPlayerLinks(objectKey, enrichedMatches);
+          await saveReplayPlayerLinks(objectKey, enrichedMatches, supabaseAdmin!);
           console.log(`Linked ${enrichedMatches.length} players with ELO data for replay ${objectKey}`);
         }
       } catch (linkError) {
@@ -428,7 +428,7 @@ export async function POST(req: NextRequest) {
   let enrichedProfiles = null;
   if (metaRow && Array.isArray(metaRow.profiles) && metaRow.profiles.length > 0) {
     try {
-      enrichedProfiles = await enrichReplayProfiles(objectKey, metaRow.profiles, metaRow.map_name);
+      enrichedProfiles = await enrichReplayProfiles(objectKey, metaRow.profiles, metaRow.map_name, supabaseAdmin!);
     } catch (error) {
       console.error('Failed to enrich profiles for upload response', error);
       enrichedProfiles = metaRow.profiles; // Fallback to original profiles

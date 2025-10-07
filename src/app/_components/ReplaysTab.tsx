@@ -5,7 +5,7 @@ import { EnrichedReplayProfile, getGameModeFromMapName } from '@/lib/replay-play
 import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
 import { getMapName, getMapImage } from '@/lib/mapMetadata';
 
-type Player = { alias: string; team: number; faction: string };
+type Player = { alias: string; team: number; faction: string; id?: number | null; playertype?: string | null };
 
 type ReplayListEntry = {
   path: string;
