@@ -15,7 +15,8 @@
     "crawl:status": "node scripts/crawl-status.mjs",
     "crawl:watch": "node scripts/crawl-status.mjs --watch",
     "crawl:cleanup": "node scripts/crawl-cleanup.mjs",
-    "crawl:concurrent": "node scripts/crawl-player-matches-concurrent.mjs"
+    "crawl:concurrent": "node scripts/crawl-player-matches-concurrent.mjs",
+    "backfill:replay-links": "node scripts/backfill-replay-player-links.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
