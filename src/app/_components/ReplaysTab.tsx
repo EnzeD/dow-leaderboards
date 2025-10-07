@@ -27,6 +27,14 @@ type ReplayListEntry = {
   canEdit?: boolean;
 };
 
+type SortMode = 'downloads' | 'elo' | 'recent';
+
+const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
+  { id: 'downloads', label: 'Most downloaded' },
+  { id: 'elo', label: 'Highest ELO avg' },
+  { id: 'recent', label: 'Newest upload' },
+];
+
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILE_SIZE_MB = Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024));
 
@@ -85,14 +93,69 @@ const formatDate = (value: string | null) => {
   return parsed.toLocaleString();
 };
 
-const sortReplays = (entries: ReplayListEntry[]) => {
+const calculateAverageElo = (replay: ReplayListEntry): number | null => {
+  if (!Array.isArray(replay.profiles)) {
+    return null;
+  }
+
+  const ratings = replay.profiles
+    .map(profile => (profile as EnrichedReplayProfile).faction_rating)
+    .filter((rating): rating is number => typeof rating === 'number' && Number.isFinite(rating));
+
+  if (ratings.length === 0) {
+    return null;
+  }
+
+  const total = ratings.reduce((sum, rating) => sum + rating, 0);
+  return total / ratings.length;
+};
+
+const sortReplays = (entries: ReplayListEntry[], mode: SortMode) => {
   return [...entries].sort((a, b) => {
+    const timeA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+    const timeB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+
+    if (mode === 'downloads') {
+      const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
+      if (downloadDelta !== 0) {
+        return downloadDelta;
+      }
+      return timeB - timeA;
+    }
+
+    if (mode === 'recent') {
+      const timeDelta = timeB - timeA;
+      if (timeDelta !== 0) {
+        return timeDelta;
+      }
+      return (b.downloads ?? 0) - (a.downloads ?? 0);
+    }
+
+    // Highest ELO average
+    const eloA = calculateAverageElo(a);
+    const eloB = calculateAverageElo(b);
+
+    if (eloA === null && eloB === null) {
+      const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
+      if (downloadDelta !== 0) {
+        return downloadDelta;
+      }
+      return timeB - timeA;
+    }
+
+    if (eloA === null) return 1;
+    if (eloB === null) return -1;
+
+    const eloDelta = eloB - eloA;
+    if (eloDelta !== 0) {
+      return eloDelta;
+    }
+
     const downloadDelta = (b.downloads ?? 0) - (a.downloads ?? 0);
     if (downloadDelta !== 0) {
       return downloadDelta;
     }
-    const timeA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
-    const timeB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+
     return timeB - timeA;
   });
 };
@@ -154,6 +217,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
   const [aliasSearch, setAliasSearch] = useState<string>('');
+  const [sortMode, setSortMode] = useState<SortMode>('downloads');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -261,6 +325,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     });
   }, [replays, selectedFactions, selectedFormats, selectedMaps, customEloRange, aliasSearch]);
 
+  const sortedFilteredReplays = useMemo(() => {
+    return sortReplays(filteredReplays, sortMode);
+  }, [filteredReplays, sortMode]);
+
   // Check if any filters are active
   const hasActiveFilters = selectedFactions.size > 0 ||
     selectedFormats.size > 0 ||
@@ -328,7 +396,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         })
         .filter((entry: ReplayListEntry) => Boolean(entry.path));
 
-      setReplays(sortReplays(normalized));
+      setReplays(normalized);
       setActionErrorCode(null);
     } catch (error) {
       const code = error instanceof Error ? error.message : 'list_failed';
@@ -469,13 +537,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       const downloadCount = typeof downloadCountHeader === 'string' ? Number(downloadCountHeader) : NaN;
 
       if (Number.isFinite(downloadCount)) {
-        setReplays(prev =>
-          sortReplays(
-            prev.map(entry =>
-              entry.path === path ? { ...entry, downloads: downloadCount } : entry
-            )
-          )
-        );
+        setReplays(prev => prev.map(entry =>
+          entry.path === path ? { ...entry, downloads: downloadCount } : entry
+        ));
       } else {
         void loadReplays();
       }
@@ -540,13 +604,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       setTimeout(() => setCopiedPath(null), 1200);
 
       if (typeof downloadCount === 'number') {
-        setReplays(prev =>
-          sortReplays(
-            prev.map(entry =>
-              entry.path === path ? { ...entry, downloads: downloadCount } : entry
-            )
-          )
-        );
+        setReplays(prev => prev.map(entry =>
+          entry.path === path ? { ...entry, downloads: downloadCount } : entry
+        ));
       } else {
         void loadReplays();
       }
@@ -1053,6 +1113,34 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </div>
         )}
 
+        {replays.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+              Sort by
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {SORT_OPTIONS.map(option => {
+                const isActive = sortMode === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setSortMode(option.id)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
+                      isActive
+                        ? 'bg-blue-600/30 border-blue-500/60 text-blue-100 shadow-sm'
+                        : 'bg-neutral-800/70 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/70 hover:text-neutral-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {listErrorMessage && (
           <div className="rounded-md border border-red-700/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
             {listErrorMessage}
@@ -1080,10 +1168,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredReplays.map((replay) => {
+            {sortedFilteredReplays.map((replay) => {
               const mapDisplayName = getMapName(replay.mapName);
               const mapImagePath = getMapImage(replay.mapName);
               const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
+              const averageElo = calculateAverageElo(replay);
 
 
               return (
@@ -1100,6 +1189,12 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         </span>
                         <span>•</span>
                         <span>{formatDate(replay.uploadedAt)}</span>
+                        {averageElo !== null && (
+                          <>
+                            <span>•</span>
+                            <span className="text-neutral-200 font-medium">Avg ELO {Math.round(averageElo)}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap items-center">
