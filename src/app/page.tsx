@@ -58,6 +58,8 @@ type FavoriteDataEntry = {
 
 const DEFAULT_RECENT_MATCH_LIMIT = 10;
 const FAVORITES_COOKIE = 'dow_favorites';
+const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
+const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
 const premiumTeaserEnabled = ['1', 'true', 'on', 'yes'].includes(
   (process.env.NEXT_PUBLIC_ENABLE_PREMIUM_TEASER ?? '').toLowerCase()
@@ -506,7 +508,7 @@ export default function Home() {
   const [premiumEmailValue, setPremiumEmailValue] = useState('');
   const [premiumEmailStatus, setPremiumEmailStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [premiumEmailError, setPremiumEmailError] = useState<string | null>(null);
-  const [activeAdvancedStats, setActiveAdvancedStats] = useState<{ profileId: string; alias?: string | null } | null>(null);
+  const [hiddenAdvancedStats, setHiddenAdvancedStats] = useState<Record<string, boolean>>({});
 
   // Live Steam player count (DoW:DE) - Cached via Supabase
   const [playerCount, setPlayerCount] = useState<number | null>(null);
@@ -544,6 +546,22 @@ export default function Home() {
       }
     } catch (error) {
       console.warn('Failed to load favourites from cookie', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const initial: Record<string, boolean> = {};
+    for (const cookie of document.cookie.split("; ")) {
+      if (!cookie.startsWith(ADVANCED_STATS_HIDE_COOKIE_PREFIX)) continue;
+      const [key, value] = cookie.split("=");
+      if (!key) continue;
+      const profileId = key.slice(ADVANCED_STATS_HIDE_COOKIE_PREFIX.length);
+      if (!profileId) continue;
+      initial[profileId] = value === "1";
+    }
+    if (Object.keys(initial).length > 0) {
+      setHiddenAdvancedStats(initial);
     }
   }, []);
 
@@ -1335,14 +1353,19 @@ export default function Home() {
     const profileId = (details.profileId || '').trim();
     if (!profileId) return;
 
-    setActiveAdvancedStats((current) => {
-      if (current?.profileId === profileId) {
-        return null;
+    setHiddenAdvancedStats((previous) => {
+      const currentlyHidden = previous[profileId] ?? false;
+      const nextHidden = !currentlyHidden;
+      const next = { ...previous, [profileId]: nextHidden };
+      if (typeof document !== "undefined") {
+        const cookieName = `${ADVANCED_STATS_HIDE_COOKIE_PREFIX}${profileId}`;
+        if (nextHidden) {
+          document.cookie = `${cookieName}=1; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
+        } else {
+          document.cookie = `${cookieName}=; path=/; max-age=0; SameSite=Lax`;
+        }
       }
-      return {
-        profileId,
-        alias: details.playerName ?? details.alias ?? profileId,
-      };
+      return next;
     });
     setMobileNavOpen(false);
   };
@@ -2550,97 +2573,24 @@ export default function Home() {
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
-                        {premiumTeaserEnabled && (
-                          <div className="mt-4 rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex flex-1 items-start gap-3">
-                                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
-                                  <svg
-                                    className="h-5 w-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M4 20h16" />
-                                    <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
-                                    <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
-                                    <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
-                                  </svg>
-                                </span>
-                                <div className="space-y-1">
-                                  <p className="text-sm font-semibold text-white">Advanced statistics</p>
-                                  <p className="text-xs text-neutral-300">
-                                    Get access to maximum stats while supporting the website.
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
-                                <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
-                                <span>Everything you need to climb.</span>
-                              </div>
+                        {profileIdStr ? (() => {
+                          const hidden = hiddenAdvancedStats[profileIdStr] ?? false;
+                          if (hidden) return null;
+                          return (
+                            <div className="mt-4">
+                              <AdvancedStatsPanel
+                                profileId={profileIdStr}
+                                alias={aliasPrimary || aliasFallback}
+                                onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
+                                  alias: aliasPrimary || aliasFallback,
+                                  profileId: profileIdStr,
+                                  playerName: result.playerName,
+                                }) : undefined}
+                                variant="embedded"
+                              />
                             </div>
-                            <div className="mt-3 rounded-lg border border-yellow-500/20 bg-neutral-950/70 p-4">
-                              <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-yellow-300">
-                                <span>Matchup intelligence</span>
-                                <span className="text-neutral-500">Advanced view</span>
-                              </div>
-                              <div className="mt-3 grid h-14 w-full grid-cols-6 gap-1" aria-hidden="true">
-                                {['a', 'b', 'c', 'd', 'e', 'f'].map((token) => (
-                                  <div
-                                    key={token}
-                                    className="rounded-md bg-gradient-to-b from-yellow-500/25 via-yellow-500/10 to-yellow-500/5 blur-sm"
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <ul className="mt-4 space-y-1.5 text-xs text-neutral-200">
-                              {[ 
-                                'A dedicated bot that will build your data every day',
-                                'ELO ratings over time',
-                                'Win rate per match-up',
-                                'Win rate per maps',
-                                'Win rate against frequent opponents',
-                                'Unlimited match history (starting after activation)'
-                              ].map((benefit) => (
-                                <li key={benefit} className="flex items-start gap-2">
-                                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
-                                    <svg
-                                      className="h-3 w-3"
-                                      viewBox="0 0 16 16"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden="true"
-                                    >
-                                      <path d="M3.5 8.5l2.5 2.5 6-6" />
-                                    </svg>
-                                  </span>
-                                  <span>{benefit}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {profileIdStr && activeAdvancedStats?.profileId === profileIdStr && (
-                          <div className="mt-4">
-                            <AdvancedStatsPanel
-                              profileId={profileIdStr}
-                              alias={aliasPrimary || aliasFallback}
-                              onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
-                                alias: aliasPrimary || aliasFallback,
-                                profileId: profileIdStr,
-                                playerName: result.playerName,
-                              }) : undefined}
-                              variant="embedded"
-                            />
-                          </div>
-                        )}
+                          );
+                        })() : null}
                         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <p className="text-xs text-neutral-300 sm:max-w-md">
                             Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
@@ -2656,7 +2606,7 @@ export default function Home() {
                                     })}
                                     className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
                                   >
-                                    View advanced statistics
+                                    {hiddenAdvancedStats[profileIdStr] ? "View advanced statistics" : "Hide advanced statistics"}
                                   </button>
                                 )}
                             {premiumTeaserEnabled && (
@@ -3071,12 +3021,12 @@ export default function Home() {
                               type="button"
                               onClick={() => handleOpenAdvancedStats({
                                 alias: entry.alias,
-                                profileId: entry.profileId,
+                                profileId: String(entry.profileId),
                                 playerName: entry.playerName,
                               })}
                               className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 rounded-md border border-yellow-500/40 transition-colors text-xs font-semibold"
                             >
-                              View advanced statistics
+                              {hiddenAdvancedStats[String(entry.profileId)] ? "View advanced statistics" : "Hide advanced statistics"}
                             </button>
                           )}
                           </div>
@@ -3104,14 +3054,14 @@ export default function Home() {
 
                       {result && renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 3)}
 
-                      {entry.profileId && activeAdvancedStats?.profileId === entry.profileId && (
+                      {entry.profileId && !(hiddenAdvancedStats[String(entry.profileId)] ?? false) && (
                         <div className="mt-4">
                           <AdvancedStatsPanel
-                            profileId={entry.profileId}
+                            profileId={String(entry.profileId)}
                             alias={entry.alias}
                             onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
                               alias: entry.alias,
-                              profileId: entry.profileId,
+                              profileId: String(entry.profileId),
                               playerName: entry.playerName,
                             }) : undefined}
                             variant="embedded"

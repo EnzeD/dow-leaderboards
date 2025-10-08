@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdvancedStatsContext, useAdvancedStatsContext } from "./AdvancedStatsContext";
 import { useAdvancedStatsActivation } from "@/hooks/useAdvancedStatsActivation";
 import { Leaderboard } from "@/lib/relic";
@@ -55,10 +55,12 @@ export default function AdvancedStatsPanel({
   const activation = useAdvancedStatsActivation(profileId);
   const leaderboards = useCombinedLeaderboards();
 
+  const activated = activation.activated || Boolean(activatedOverride);
+
   const contextValue = useMemo(() => ({
     ...activation,
-    ready: Boolean(profileId) && (activation.activated || Boolean(activatedOverride)),
-  }), [activation, activatedOverride, profileId]);
+    ready: Boolean(profileId) && activated,
+  }), [activation, activated, profileId]);
 
   const profileIdStr = useMemo(() => {
     if (profileId === undefined || profileId === null) return null;
@@ -148,19 +150,7 @@ export default function AdvancedStatsPanel({
     return null;
   }
 
-  if (!contextValue.ready) {
-    return (
-      <AdvancedStatsContext.Provider value={contextValue}>
-        <AdvancedStatsTeaser
-          alias={alias}
-          refresh={contextValue.refresh}
-          loading={contextValue.loading}
-          onRequestAccess={onRequestAccess}
-        />
-      </AdvancedStatsContext.Provider>
-    );
-  }
-
+  const locked = Boolean(profileIdStr) && !activated;
 
   const containerClass = variant === "embedded"
     ? "rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg space-y-4"
@@ -180,6 +170,10 @@ export default function AdvancedStatsPanel({
     </div>
   );
 
+  const handleActivateClick = useCallback(() => {
+    contextValue.refresh();
+  }, [contextValue]);
+
   const controls = (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
       <label className="text-xs text-neutral-400" htmlFor="advanced-stats-window">Time window</label>
@@ -197,6 +191,18 @@ export default function AdvancedStatsPanel({
       </select>
     </div>
   );
+
+  if (locked) {
+    return (
+      <AdvancedStatsContext.Provider value={contextValue}>
+        <LockedAdvancedStatsPreview
+          onActivate={handleActivateClick}
+          loading={contextValue.loading}
+          displayName={displayName}
+        />
+      </AdvancedStatsContext.Provider>
+    );
+  }
 
   const sectionNav = (
     <div className="flex flex-wrap gap-2">
@@ -299,3 +305,195 @@ const buildLeaderboardOptions = (leaderboards: Leaderboard[]): Array<{ value: nu
 };
 
 export const useAdvancedStats = () => useAdvancedStatsContext();
+
+const VALUE_POINTS = [
+  "A dedicated bot keeps your stats fresh every day",
+  "Elo ratings tracked over time",
+  "Win rate broken down by faction match-up",
+  "Map-by-map performance with recent form",
+  "Head-to-head records against frequent opponents",
+  "Unlimited match history (from activation onward)",
+  "Most importantly: support this website for the long term <3",
+];
+
+const LOCKED_SECTION_DESCRIPTIONS: Record<AdvancedStatsSection, string> = {
+  elo: "See rating and rank trends for every leaderboard you compete in.",
+  matchups: "Spot your strongest and weakest faction match-ups instantly.",
+  maps: "Plan your vetoes with map-specific win rates and recency insights.",
+  opponents: "Study frequent rivals with rich head-to-head records.",
+};
+
+type LockedAdvancedStatsPreviewProps = {
+  onActivate: () => void;
+  loading: boolean;
+  displayName: string;
+};
+
+function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: LockedAdvancedStatsPreviewProps) {
+  const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
+
+  return (
+    <div className="space-y-6 rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
+      <header className="rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-1 items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
+              <svg
+                className="h-5 w-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 20h16" />
+                <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-white">Advanced statistics</p>
+              <p className="text-xs text-neutral-300">
+                Get access to maximum stats while supporting the website.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
+            <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
+            <span>Everything you need to climb.</span>
+          </div>
+        </div>
+        <div className="mt-3 rounded-lg border border-yellow-500/20 bg-neutral-950/70 p-4">
+          <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-yellow-300">
+            <span>Matchup intelligence</span>
+            <span className="text-neutral-500">Advanced view</span>
+          </div>
+          <div className="mt-3 grid h-14 w-full grid-cols-6 gap-1" aria-hidden="true">
+            {['a', 'b', 'c', 'd', 'e', 'f'].map((token) => (
+              <div
+                key={token}
+                className="rounded-md bg-gradient-to-b from-yellow-500/25 via-yellow-500/10 to-yellow-500/5 blur-sm"
+              />
+            ))}
+          </div>
+        </div>
+      </header>
+      <section className="rounded-2xl border border-yellow-500/20 bg-neutral-950/90 px-4 py-3 shadow-lg">
+        <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Advanced analytics</p>
+        <p className="mt-1 text-sm text-neutral-300">
+          Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
+        </p>
+      </section>
+      <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why upgrade</h3>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {VALUE_POINTS.map((point) => (
+            <li key={point} className="flex items-start gap-3 text-sm text-neutral-200">
+              <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
+                <svg
+                  className="h-3 w-3"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3.5 8.5l2.5 2.5 6-6" />
+                </svg>
+              </span>
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold uppercase tracking-[0.25em] text-neutral-400">General information</h4>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <LockedStatCard
+            title="Matches in database"
+            subtitle="+182 in the last 7 days"
+          />
+          <LockedStatCard
+            title="Leaderboard record"
+            subtitle="Total 1,248 · Win rate 62.4%"
+          />
+          <LockedStatCard
+            title="Main race"
+            subtitle="58% of matches"
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {SECTIONS.map(({ id, label }) => {
+            const active = activeSection === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveSection(id)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
+                  active
+                    ? "bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow"
+                    : "bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-6 shadow-xl">
+          <div className="pointer-events-none select-none opacity-70 blur-sm">
+            <div className="h-48 rounded-xl border border-neutral-700/40 bg-neutral-800/40">
+              <div className="h-full w-full bg-gradient-to-br from-neutral-800/60 via-neutral-900/40 to-neutral-800/30" />
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-16 rounded-lg border border-neutral-700/40 bg-neutral-800/40" />
+              ))}
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-neutral-950/70 px-6 text-center">
+            <p className="text-sm text-neutral-200">
+              {LOCKED_SECTION_DESCRIPTIONS[activeSection]}
+            </p>
+            <button
+              type="button"
+              onClick={onActivate}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-yellow-400/30 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:opacity-70"
+            >
+              Activate advanced statistics
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  );
+}
+
+type LockedStatCardProps = {
+  title: string;
+  subtitle: string;
+};
+
+const LockedStatCard = ({ title, subtitle }: LockedStatCardProps) => (
+  <div className="relative overflow-hidden rounded-lg border border-neutral-700/40 bg-neutral-900/70 p-4">
+    <div className="absolute inset-0 bg-neutral-950/50 backdrop-blur-sm" aria-hidden />
+    <div className="relative space-y-2 text-neutral-300">
+      <p className="text-xs uppercase tracking-wide text-neutral-400">{title}</p>
+      <p className="text-xl font-semibold text-white blur-sm select-none">1,248</p>
+      <p className="text-xs text-neutral-400 blur-sm select-none">{subtitle}</p>
+    </div>
+  </div>
+);
