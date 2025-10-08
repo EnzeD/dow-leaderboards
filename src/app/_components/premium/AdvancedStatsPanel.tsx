@@ -146,6 +146,10 @@ export default function AdvancedStatsPanel({
     };
   }, [profileIdStr, contextValue.ready]);
 
+  const handleActivateClick = useCallback(() => {
+    contextValue.refresh();
+  }, [contextValue]);
+
   if (!profileIdStr) {
     return null;
   }
@@ -169,10 +173,6 @@ export default function AdvancedStatsPanel({
       </p>
     </div>
   );
-
-  const handleActivateClick = useCallback(() => {
-    contextValue.refresh();
-  }, [contextValue]);
 
   const controls = (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -357,7 +357,7 @@ function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: Locked
             <div className="space-y-1">
               <p className="text-sm font-semibold text-white">Advanced statistics</p>
               <p className="text-xs text-neutral-300">
-                Get access to maximum stats while supporting the website.
+                Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
               </p>
             </div>
           </div>
@@ -366,27 +366,7 @@ function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: Locked
             <span>Everything you need to climb.</span>
           </div>
         </div>
-        <div className="mt-3 rounded-lg border border-yellow-500/20 bg-neutral-950/70 p-4">
-          <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-yellow-300">
-            <span>Matchup intelligence</span>
-            <span className="text-neutral-500">Advanced view</span>
-          </div>
-          <div className="mt-3 grid h-14 w-full grid-cols-6 gap-1" aria-hidden="true">
-            {['a', 'b', 'c', 'd', 'e', 'f'].map((token) => (
-              <div
-                key={token}
-                className="rounded-md bg-gradient-to-b from-yellow-500/25 via-yellow-500/10 to-yellow-500/5 blur-sm"
-              />
-            ))}
-          </div>
-        </div>
       </header>
-      <section className="rounded-2xl border border-yellow-500/20 bg-neutral-950/90 px-4 py-3 shadow-lg">
-        <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Advanced analytics</p>
-        <p className="mt-1 text-sm text-neutral-300">
-          Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
-        </p>
-      </section>
       <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
         <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why upgrade</h3>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -412,23 +392,7 @@ function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: Locked
         </ul>
       </section>
 
-      <section className="space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-[0.25em] text-neutral-400">General information</h4>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <LockedStatCard
-            title="Matches in database"
-            subtitle="+182 in the last 7 days"
-          />
-          <LockedStatCard
-            title="Leaderboard record"
-            subtitle="Total 1,248 · Win rate 62.4%"
-          />
-          <LockedStatCard
-            title="Main race"
-            subtitle="58% of matches"
-          />
-        </div>
-      </section>
+      <AdvancedStatsGeneralInfo />
 
       <section className="space-y-4">
         <div className="flex flex-wrap gap-2">
@@ -487,6 +451,17 @@ type LockedStatCardProps = {
   subtitle: string;
 };
 
+const AdvancedStatsGeneralInfo = () => (
+  <section className="space-y-3">
+    <h4 className="text-sm font-semibold uppercase tracking-[0.25em] text-neutral-400">General information</h4>
+    <div className="grid gap-3 sm:grid-cols-3">
+      <LockedStatCard title="Matches in database" subtitle="+182 in the last 7 days" />
+      <LockedStatCard title="Leaderboard record" subtitle="Total 1,248 · Win rate 62.4%" />
+      <LockedStatCard title="Main race" subtitle="58% of matches" />
+    </div>
+  </section>
+);
+
 const LockedStatCard = ({ title, subtitle }: LockedStatCardProps) => (
   <div className="relative overflow-hidden rounded-lg border border-neutral-700/40 bg-neutral-900/70 p-4">
     <div className="absolute inset-0 bg-neutral-950/50 backdrop-blur-sm" aria-hidden />
@@ -495,5 +470,44 @@ const LockedStatCard = ({ title, subtitle }: LockedStatCardProps) => (
       <p className="text-xl font-semibold text-white blur-sm select-none">1,248</p>
       <p className="text-xs text-neutral-400 blur-sm select-none">{subtitle}</p>
     </div>
+  </div>
+);
+
+export const AdvancedStatsCollapsedPreview = ({ displayName }: { displayName: string }) => (
+  <div className="space-y-4 rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
+    <header className="rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-1 items-start gap-3">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
+            <svg
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 20h16" />
+              <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
+              <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
+              <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">Advanced statistics</p>
+            <p className="text-xs text-neutral-300">
+              Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
+          <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
+          <span>Everything you need to climb.</span>
+        </div>
+      </div>
+    </header>
+    <AdvancedStatsGeneralInfo />
   </div>
 );

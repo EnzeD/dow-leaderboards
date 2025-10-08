@@ -7,7 +7,7 @@ import Link from "next/link";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
-import AdvancedStatsPanel from "@/app/_components/premium/AdvancedStatsPanel";
+import AdvancedStatsPanel, { AdvancedStatsCollapsedPreview } from "@/app/_components/premium/AdvancedStatsPanel";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -2573,24 +2573,27 @@ export default function Home() {
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
-                        {profileIdStr ? (() => {
-                          const hidden = hiddenAdvancedStats[profileIdStr] ?? false;
-                          if (hidden) return null;
-                          return (
-                            <div className="mt-4">
-                              <AdvancedStatsPanel
-                                profileId={profileIdStr}
-                                alias={aliasPrimary || aliasFallback}
-                                onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
-                                  alias: aliasPrimary || aliasFallback,
-                                  profileId: profileIdStr,
-                                  playerName: result.playerName,
-                                }) : undefined}
-                                variant="embedded"
-                              />
-                            </div>
-                          );
-                        })() : null}
+                        {profileIdStr && (
+                          <div className="mt-4">
+                            {hiddenAdvancedStats[profileIdStr]
+                              ? (
+                                <AdvancedStatsCollapsedPreview
+                                  displayName={aliasPrimary || aliasFallback || profileIdStr}
+                                />
+                              ) : (
+                                <AdvancedStatsPanel
+                                  profileId={profileIdStr}
+                                  alias={aliasPrimary || aliasFallback}
+                                  onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
+                                    alias: aliasPrimary || aliasFallback,
+                                    profileId: profileIdStr,
+                                    playerName: result.playerName,
+                                  }) : undefined}
+                                  variant="embedded"
+                                />
+                              )}
+                          </div>
+                        )}
                         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <p className="text-xs text-neutral-300 sm:max-w-md">
                             Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
@@ -3054,18 +3057,25 @@ export default function Home() {
 
                       {result && renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 3)}
 
-                      {entry.profileId && !(hiddenAdvancedStats[String(entry.profileId)] ?? false) && (
+                      {entry.profileId && (
                         <div className="mt-4">
-                          <AdvancedStatsPanel
-                            profileId={String(entry.profileId)}
-                            alias={entry.alias}
-                            onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
-                              alias: entry.alias,
-                              profileId: String(entry.profileId),
-                              playerName: entry.playerName,
-                            }) : undefined}
-                            variant="embedded"
-                          />
+                          {hiddenAdvancedStats[String(entry.profileId)]
+                            ? (
+                              <AdvancedStatsCollapsedPreview
+                                displayName={entry.alias || entry.playerName || String(entry.profileId)}
+                              />
+                            ) : (
+                              <AdvancedStatsPanel
+                                profileId={String(entry.profileId)}
+                                alias={entry.alias}
+                                onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
+                                  alias: entry.alias,
+                                  profileId: String(entry.profileId),
+                                  playerName: entry.playerName,
+                                }) : undefined}
+                                variant="embedded"
+                              />
+                            )}
                         </div>
                       )}
                     </div>
