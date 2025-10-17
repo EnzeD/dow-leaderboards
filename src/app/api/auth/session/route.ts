@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
 import { getSupabaseAdmin } from "@/lib/premium/activation-server";
 import { getLevelFromXP } from "@/lib/xp-levels";
-
-const sanitizeEmail = (email: string | undefined): string | null => {
-  if (!email) return null;
-  return email.trim().toLowerCase();
-};
+import { fetchSteamSummaryByProfile } from "@/lib/steam";
 
 export async function GET() {
   const session = await auth0.getSession();
@@ -29,20 +26,18 @@ export async function GET() {
         alias: string | null;
         country: string | null;
         level: number | null;
+        steamId64: string | null;
+        avatarUrl: string | null;
       }
     | null = null;
 
   if (supabase) {
-    const { error } = await supabase
-      .from("app_users")
-      .upsert(
-        {
-          auth0_sub: session.user.sub,
-          email: sanitizeEmail(session.user.email ?? undefined),
-          email_verified: session.user.email_verified ?? null,
-        },
-        { onConflict: "auth0_sub" },
-      );
+    const { error } = await upsertAppUser({
+      supabase,
+      auth0Sub: session.user.sub,
+      email: sanitizeEmail(session.user.email ?? undefined),
+      emailVerified: session.user.email_verified ?? null,
+    });
 
     if (error) {
       console.error("[auth] failed to upsert app_users", error);
@@ -68,18 +63,35 @@ export async function GET() {
         if (appUser.primary_profile_id) {
           const { data: player, error: playerError } = await supabase
             .from("players")
-            .select("profile_id, current_alias, country, xp")
+            .select("profile_id, current_alias, country, xp, steam_id64")
             .eq("profile_id", appUser.primary_profile_id)
             .maybeSingle();
 
           if (playerError) {
             console.error("[auth] failed to fetch linked profile", playerError);
           } else if (player) {
+            let steamId64 = player.steam_id64 ?? null;
+            let avatarUrl: string | null = null;
+
+            if (steamId64) {
+              const summary = await fetchSteamSummaryByProfile(player.profile_id, steamId64);
+
+              if (summary) {
+                avatarUrl =
+                  summary.avatarFull ??
+                  summary.avatarMedium ??
+                  summary.avatar ??
+                  null;
+              }
+            }
+
             profile = {
               profileId: player.profile_id,
               alias: player.current_alias ?? null,
               country: player.country ?? null,
               level: getLevelFromXP(player.xp ?? undefined),
+              steamId64,
+              avatarUrl,
             };
           }
         }

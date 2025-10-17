@@ -13,6 +13,8 @@ type AccountProfile = {
   alias: string | null;
   country: string | null;
   level: number | null;
+  steamId64: string | null;
+  avatarUrl: string | null;
 };
 
 type AccountResponse = {

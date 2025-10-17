@@ -16,6 +16,7 @@ import { getMapName, getMapImage } from "@/lib/mapMetadata";
 import { getLevelFromXP } from "@/lib/xp-levels";
 import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
 import { useAccount } from "@/app/_components/AccountProvider";
+import { AccountIcon } from "@/components/icons";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -28,6 +29,41 @@ import sistersIcon from "../../assets/factions/sister.png";
 import spaceMarineIcon from "../../assets/factions/spacemarine.png";
 import tauIcon from "../../assets/factions/tau.png";
 import type { StaticImageData } from 'next/image';
+
+function AccountBadge({ avatarUrl }: { avatarUrl?: string | null }) {
+  const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    setErrored(false);
+  }, [avatarUrl]);
+
+  const showAvatar = Boolean(avatarUrl && !errored);
+
+  if (showAvatar) {
+    return (
+      <span
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-800/80 text-white shadow-sm"
+        aria-hidden
+      >
+        <img
+          src={avatarUrl ?? undefined}
+          alt=""
+          className="h-[18px] w-[18px] rounded-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-800/80 text-white shadow-sm"
+      aria-hidden
+    >
+      <AccountIcon className="h-3.5 w-3.5" />
+    </span>
+  );
+}
 
 type LadderData = {
   leaderboardId: number;
@@ -476,6 +512,7 @@ export default function Home() {
   const accountLink = "/account";
   const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
   const linkedAlias = account?.profile?.alias ?? null;
+  const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -1903,7 +1940,7 @@ export default function Home() {
                     className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
                     title={linkedAlias ? `Manage ${linkedAlias}` : "Manage account"}
                   >
-                    <span className={`h-2 w-2 rounded-full ${linkedAlias ? "bg-emerald-400" : "bg-amber-400"}`} aria-hidden />
+                    <AccountBadge avatarUrl={linkedAvatarUrl} />
                     <span className="max-w-[10rem] truncate">{accountButtonLabel}</span>
                   </Link>
                 ) : (
@@ -1911,7 +1948,7 @@ export default function Home() {
                     href={loginLink}
                     className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
                   >
-                    <span className="h-2 w-2 rounded-full bg-sky-400" aria-hidden />
+                    <AccountBadge avatarUrl={null} />
                     Log in
                   </a>
                 )}

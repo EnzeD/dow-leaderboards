@@ -223,7 +223,6 @@ export async function fetchAllRows(leaderboardId: number, max: number = 10000) {
 }
 
 export async function resolveNames(profileIds: string[]): Promise<Record<string, string>> {
-  // Chunk to avoid very long URLs and respect rate limits.
   const uniq = Array.from(new Set(profileIds));
   const out: Record<string, string> = {};
   const size = 25;

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
+import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
 import { getSupabaseAdmin } from "@/lib/premium/activation-server";
-
-const sanitizeEmail = (email: string | undefined): string | null => {
-  if (!email) return null;
-  return email.trim().toLowerCase();
-};
 
 export async function POST(request: NextRequest) {
   const session = await auth0.getSession();
@@ -45,17 +41,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "profile_not_found" }, { status: 404 });
   }
 
-  const { error } = await supabase
-    .from("app_users")
-    .upsert(
-      {
-        auth0_sub: session.user.sub,
-        email: sanitizeEmail(session.user.email ?? undefined),
-        email_verified: session.user.email_verified ?? null,
-        primary_profile_id: player.profile_id,
-      },
-      { onConflict: "auth0_sub" },
-    );
+  const { error } = await upsertAppUser({
+    supabase,
+    auth0Sub: session.user.sub,
+    email: sanitizeEmail(session.user.email ?? undefined),
+    emailVerified: session.user.email_verified ?? null,
+    additionalFields: {
+      primary_profile_id: player.profile_id,
+    },
+  });
 
   if (error) {
     console.error("[account] failed to link profile", error);

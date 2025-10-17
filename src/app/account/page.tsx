@@ -4,6 +4,7 @@ import { auth0 } from "@/lib/auth0";
 import { getSupabaseAdmin } from "@/lib/premium/activation-server";
 import { DeleteAccountButton } from "@/app/_components/DeleteAccountButton";
 import { AccountProfileLinker } from "@/app/_components/AccountProfileLinker";
+import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -29,6 +30,17 @@ export default async function AccountPage() {
   let profileCountry: string | null = null;
 
   if (supabase) {
+    const { error: upsertError } = await upsertAppUser({
+      supabase,
+      auth0Sub: session.user.sub,
+      email: sanitizeEmail(session.user.email ?? undefined),
+      emailVerified: session.user.email_verified ?? null,
+    });
+
+    if (upsertError) {
+      console.error("[account] failed to sync app_users", upsertError);
+    }
+
     const { data, error } = await supabase
       .from("app_users")
       .select(
