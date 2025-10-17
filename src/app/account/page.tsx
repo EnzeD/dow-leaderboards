@@ -5,6 +5,10 @@ import { getSupabaseAdmin } from "@/lib/premium/activation-server";
 import { DeleteAccountButton } from "@/app/_components/DeleteAccountButton";
 import { AccountProfileLinker } from "@/app/_components/AccountProfileLinker";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
+import {
+  GoPremiumButton,
+  ManageSubscriptionButton,
+} from "@/app/_components/premium/GoPremiumButton";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -13,7 +17,18 @@ const formatDateTime = (iso: string | null | undefined) => {
   return date.toLocaleString();
 };
 
-export default async function AccountPage() {
+const isFutureDate = (iso: string | null | undefined): boolean => {
+  if (!iso) return false;
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return false;
+  return parsed > Date.now();
+};
+
+type PageProps = {
+  searchParams?: Record<string, string | string[] | undefined>;
+};
+
+export default async function AccountPage({ searchParams }: PageProps) {
   const session = await auth0.getSession();
 
   if (!session) {
@@ -53,7 +68,9 @@ export default async function AccountPage() {
       premiumExpiresAt = data.premium_expires_at ?? null;
       stripeCustomerId = data.stripe_customer_id ?? null;
       stripeSubscriptionId = data.stripe_subscription_id ?? null;
-      primaryProfileId = data.primary_profile_id ?? null;
+      primaryProfileId = data.primary_profile_id
+        ? Number.parseInt(String(data.primary_profile_id), 10)
+        : null;
 
       if (primaryProfileId) {
         const { data: player, error: playerError } = await supabase
@@ -89,6 +106,11 @@ export default async function AccountPage() {
 
   const baseUrl = resolveBaseUrl();
   const logoutUrl = `/auth/logout?returnTo=${encodeURIComponent(baseUrl)}`;
+  const premiumActive = isFutureDate(premiumExpiresAt);
+  const checkoutStatusRaw = searchParams?.checkout;
+  const checkoutStatus = Array.isArray(checkoutStatusRaw)
+    ? checkoutStatusRaw[0]
+    : checkoutStatusRaw;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
@@ -105,6 +127,18 @@ export default async function AccountPage() {
           Manage your login, subscription, and premium analytics access.
         </p>
       </header>
+
+      {checkoutStatus === "success" && (
+        <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/15 px-6 py-4 text-sm text-emerald-100 shadow-lg">
+          Subscription confirmed! Stripe will finalise your payment shortly, and premium access unlocks automatically.
+        </div>
+      )}
+
+      {checkoutStatus === "cancelled" && (
+        <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-6 py-4 text-sm text-amber-100 shadow-lg">
+          Checkout cancelled. You can try again anytime using the Go Premium button below.
+        </div>
+      )}
 
       <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
         <h2 className="text-xl font-semibold text-white">Profile</h2>
@@ -152,6 +186,9 @@ export default async function AccountPage() {
 
       <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
         <h2 className="text-xl font-semibold text-white">Premium & Billing</h2>
+        <p className="mt-2 text-sm text-neutral-400">
+          Unlock advanced analytics and premium ladders with a monthly subscription.
+        </p>
         <dl className="mt-4 grid gap-3 text-sm text-neutral-300 md:grid-cols-2">
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
@@ -178,6 +215,21 @@ export default async function AccountPage() {
             </dd>
           </div>
         </dl>
+        <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
+          <GoPremiumButton
+            profileId={primaryProfileId}
+            premiumExpiresAt={premiumExpiresAt}
+          />
+          <ManageSubscriptionButton
+            stripeCustomerId={stripeCustomerId}
+            premiumExpiresAt={premiumExpiresAt}
+          />
+          {premiumActive && (
+            <span className="text-xs uppercase tracking-wide text-emerald-300/80">
+              Premium active
+            </span>
+          )}
+        </div>
       </section>
 
       <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
