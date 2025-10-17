@@ -1941,7 +1941,7 @@ export default function Home() {
                     title={linkedAlias ? `Manage ${linkedAlias}` : "Manage account"}
                   >
                     <AccountBadge avatarUrl={linkedAvatarUrl} />
-                    <span className="max-w-[10rem] truncate">{accountButtonLabel}</span>
+                    <span className="max-w-[8rem] truncate">{accountButtonLabel}</span>
                   </Link>
                 ) : (
                   <a
