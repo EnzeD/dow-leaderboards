@@ -60,6 +60,8 @@ export async function POST(request: Request) {
     parseProfileId(body?.profileId) ??
     parseProfileId(body?.profile_id) ??
     parseProfileId(body?.profileID);
+  const requestedSuccessUrl = typeof body?.successUrl === "string" ? body.successUrl : null;
+  const requestedCancelUrl = typeof body?.cancelUrl === "string" ? body.cancelUrl : null;
 
   const { data: appUser, error: lookupError } = await supabase
     .from("app_users")
@@ -126,8 +128,24 @@ export async function POST(request: Request) {
   }
 
   const baseUrl = resolveBaseUrl();
-  const successUrl = `${baseUrl}account?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${baseUrl}account?checkout=cancelled`;
+  const baseUrlParsed = new URL(baseUrl);
+
+  const sanitizeReturnUrl = (value: string | null, options?: { allowSessionPlaceholder?: boolean }) => {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      if (url.origin !== baseUrlParsed.origin) return null;
+      if (!options?.allowSessionPlaceholder) {
+        url.searchParams.delete("session_id");
+      }
+      return url.toString();
+    } catch {
+      return null;
+    }
+  };
+
+  const successUrl = sanitizeReturnUrl(requestedSuccessUrl, { allowSessionPlaceholder: true }) ?? `${baseUrl}account?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = sanitizeReturnUrl(requestedCancelUrl) ?? `${baseUrl}account?checkout=cancelled`;
 
   let checkoutSessionUrl: string | null = null;
 

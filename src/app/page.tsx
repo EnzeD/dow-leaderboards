@@ -100,6 +100,23 @@ const FAVORITES_COOKIE = 'dow_favorites';
 const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
 const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
+const UPGRADE_POINTS = [
+  "A dedicated bot keeps your stats fresh every day",
+  "Elo ratings tracked over time",
+  "Win rate broken down by faction match-up",
+  "Map-by-map performance with recent form",
+  "Head-to-head records against frequent opponents",
+  "Unlimited match history (from activation onward)",
+  "Most importantly: support this website for the long term <3",
+];
+
+type UpgradeIntent = {
+  profileId: string;
+  alias?: string | null;
+  playerName?: string | null;
+  source: "search" | "favorites";
+  redirectUrl?: string;
+};
 const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
 
 const buildFavoriteKey = (
@@ -505,7 +522,7 @@ export default function Home() {
   };
 
   const { user: authUser, isLoading: authLoading } = useUser();
-  const { account, loading: accountLoading } = useAccount();
+  const { account, loading: accountLoading, refresh: refreshAccount } = useAccount();
   const accountLink = "/account";
   const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
   const isAuthenticated = Boolean(authUser);
@@ -516,10 +533,8 @@ export default function Home() {
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
   const advancedStatsCta = {
-    label: isAuthenticated ? "Subscribe to unlock advanced analytics" : "Log in to unlock advanced analytics",
-    description: isAuthenticated
-      ? "Start a premium subscription to unlock daily tracking, matchup insights, and more."
-      : "Sign in so we can link this profile and unlock premium analytics for you.",
+    label: "Activate advanced statistics",
+    description: "$4.99/month • Unlock Elo trends, matchup intel, and more.",
     loading: authLoading || accountLoading,
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
@@ -551,6 +566,58 @@ export default function Home() {
   const [favoriteData, setFavoriteData] = useState<Record<string, FavoriteDataEntry>>({});
   const [favoritesLoading, setFavoritesLoading] = useState(false);
   const [hiddenAdvancedStats, setHiddenAdvancedStats] = useState<Record<string, boolean>>({});
+  const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
+  const persistStoredUpgradeIntent = useCallback((payload: UpgradeIntent & { redirectUrl: string }) => {
+    if (typeof window === "undefined") return;
+    const serialized = JSON.stringify(payload);
+    try {
+      window.sessionStorage.setItem(ADVANCED_STATS_INTENT_STORAGE_KEY, serialized);
+    } catch {}
+    try {
+      window.localStorage.setItem(ADVANCED_STATS_INTENT_STORAGE_KEY, serialized);
+    } catch {}
+  }, []);
+
+  const readStoredUpgradeIntent = useCallback((): (UpgradeIntent & { redirectUrl?: string }) | null => {
+    if (typeof window === "undefined") return null;
+    const read = (storage: Storage) => {
+      try {
+        const raw = storage.getItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as UpgradeIntent & { redirectUrl?: string };
+      } catch {
+        return null;
+      }
+    };
+    const sessionValue = read(window.sessionStorage);
+    if (sessionValue) return sessionValue;
+    return read(window.localStorage);
+  }, []);
+
+  const clearStoredUpgradeIntent = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.removeItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+    } catch {}
+    try {
+      window.localStorage.removeItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+    } catch {}
+  }, []);
+
+  const openUpgradeModal = useCallback((payload: UpgradeIntent) => {
+    setUpgradeError(null);
+    setUpgradeLoading(false);
+    setUpgradeIntent(payload);
+  }, []);
+
+  const closeUpgradeModal = useCallback(() => {
+    setUpgradeIntent(null);
+    setUpgradeLoading(false);
+    setUpgradeError(null);
+  }, []);
 
   // Live Steam player count (DoW:DE) - Cached via Supabase
   const [playerCount, setPlayerCount] = useState<number | null>(null);
@@ -606,6 +673,93 @@ export default function Home() {
       setHiddenAdvancedStats(initial);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has("subscribePrompt")) return;
+
+      const stored = readStoredUpgradeIntent();
+      if (stored && stored.profileId) {
+        openUpgradeModal({
+          profileId: String(stored.profileId),
+          alias: stored.alias ?? null,
+          playerName: stored.playerName ?? null,
+          source: stored.source ?? "search",
+          redirectUrl: stored.redirectUrl,
+        });
+      }
+
+      params.delete("subscribePrompt");
+      const newSearch = params.toString();
+      const nextUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", nextUrl);
+    } catch (error) {
+      console.warn("[premium] failed to restore upgrade prompt", error);
+    }
+  }, [openUpgradeModal, readStoredUpgradeIntent]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const hasSuccess = params.has("subscribeSuccess");
+    const hasCancelled = params.has("subscribeCancelled");
+    const sessionId = params.get("session_id")?.trim() ?? null;
+    if (!hasSuccess && !hasCancelled && !sessionId) return;
+
+    const handleReturn = async () => {
+      try {
+        const stored = readStoredUpgradeIntent();
+
+        if (hasSuccess && stored?.profileId) {
+          setHiddenAdvancedStats((previous) => ({
+            ...previous,
+            [stored.profileId]: false,
+          }));
+          try {
+            const cookieName = `${ADVANCED_STATS_HIDE_COOKIE_PREFIX}${stored.profileId}`;
+            document.cookie = `${cookieName}=0; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
+          } catch {}
+        }
+
+        closeUpgradeModal();
+        setUpgradeLoading(false);
+        setUpgradeError(null);
+
+        if (sessionId) {
+          try {
+            await fetch("/api/premium/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId }),
+            });
+            if (typeof refreshAccount === "function") {
+              await refreshAccount();
+            }
+          } catch (error) {
+            console.warn("[premium] sync after checkout failed", error);
+          }
+        }
+
+        clearStoredUpgradeIntent();
+        if (params.has("session_id")) params.delete("session_id");
+        params.delete("subscribeSuccess");
+        params.delete("subscribeCancelled");
+        const newSearch = params.toString();
+        const nextUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`;
+
+        setTimeout(() => {
+          window.location.replace(nextUrl);
+        }, 50);
+      } catch (error) {
+        console.warn("[premium] failed to finalise subscription redirect", error);
+      }
+    };
+
+    handleReturn();
+  }, [clearStoredUpgradeIntent, closeUpgradeModal, readStoredUpgradeIntent, refreshAccount, setHiddenAdvancedStats]);
 
   const getIsAdvancedStatsHidden = useCallback(
     (profileId?: string | null) => {
@@ -1319,6 +1473,24 @@ export default function Home() {
     setMobileNavOpen(false);
   };
 
+  const handleUpgradeRequest = (details: { profileId?: string; alias?: string | null; playerName?: string | null; source: "search" | "favorites" }) => {
+    const profileId = (details.profileId || "").trim();
+    if (!profileId) return;
+    const redirectUrl = rememberAdvancedStatsIntent({
+      profileId,
+      alias: details.alias ?? null,
+      playerName: details.playerName ?? null,
+      source: details.source,
+    });
+    openUpgradeModal({
+      profileId,
+      alias: details.alias ?? null,
+      playerName: details.playerName ?? null,
+      source: details.source,
+      redirectUrl,
+    });
+  };
+
   const rememberAdvancedStatsIntent = (payload: AdvancedStatsIntentPayload): string => {
     if (typeof window === "undefined") {
       return "/";
@@ -1336,16 +1508,13 @@ export default function Home() {
       const fullUrl = buildUrl(state);
       const parsedUrl = new URL(fullUrl);
       const redirectUrl = parsedUrl.toString();
-      window.sessionStorage.setItem(
-        ADVANCED_STATS_INTENT_STORAGE_KEY,
-        JSON.stringify({
-          profileId: trimmedProfileId,
-          alias: fallbackQuery || `Profile ${trimmedProfileId}`,
-          source: payload.source,
-          redirectUrl,
-          storedAt: new Date().toISOString(),
-        }),
-      );
+      persistStoredUpgradeIntent({
+        profileId: trimmedProfileId,
+        alias: fallbackQuery || `Profile ${trimmedProfileId}`,
+        playerName: payload.playerName ?? null,
+        source: payload.source,
+        redirectUrl,
+      });
       return redirectUrl;
     } catch (error) {
       console.warn("Failed to persist advanced stats intent", error);
@@ -1353,31 +1522,118 @@ export default function Home() {
     }
   };
 
-  const handleActivateAdvancedStats = ({
-    profileId,
-    alias,
-    playerName,
-    source,
-  }: AdvancedStatsIntentPayload) => {
-    const trimmedProfileId = profileId.trim();
-    if (!trimmedProfileId) return;
-    if (typeof window === "undefined") return;
+  const handleUpgradeConfirm = async () => {
+    if (!upgradeIntent) return;
+    const intent = upgradeIntent;
 
-    rememberAdvancedStatsIntent({
-      profileId: trimmedProfileId,
-      alias,
-      playerName,
-      source,
+    const baseRedirect = intent.redirectUrl || rememberAdvancedStatsIntent(intent);
+
+    const normalizeRedirectPath = (path: string): string => {
+      if (!path) return "/";
+      if (path.startsWith("http://") || path.startsWith("https://")) {
+        try {
+          const parsed = new URL(path);
+          const relative = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          return relative || "/";
+        } catch {
+          return "/";
+        }
+      }
+      return path.startsWith("/") ? path : `/${path}`;
+    };
+
+    const normalizedRedirect = normalizeRedirectPath(baseRedirect);
+
+    const buildRelativeWithParam = (path: string, key: string) => {
+      const url = new URL(path, window.location.origin);
+      url.searchParams.set(key, "1");
+      return `${url.pathname}${url.search}${url.hash}`;
+    };
+
+    const loginRedirect = buildRelativeWithParam(normalizedRedirect, "subscribePrompt");
+
+    persistStoredUpgradeIntent({
+      profileId: intent.profileId,
+      alias: intent.alias ?? null,
+      playerName: intent.playerName ?? null,
+      source: intent.source,
+      redirectUrl: normalizedRedirect,
     });
 
-    const accountSubscribePath = `/account?subscribe=1&subscribeIntent=1&profileId=${encodeURIComponent(trimmedProfileId)}`;
-
-    if (!authUser) {
-      window.location.href = `/login?redirectTo=${encodeURIComponent(accountSubscribePath)}`;
+    if (!isAuthenticated) {
+      window.location.href = `/login?redirectTo=${encodeURIComponent(loginRedirect)}`;
       return;
     }
 
-    window.location.href = accountSubscribePath;
+    const buildAbsoluteReturnUrl = (path: string, params: Record<string, string>): string => {
+      const url = new URL(path, window.location.origin);
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.set(key, value);
+      });
+      return url.toString();
+    };
+
+    const successUrl = buildAbsoluteReturnUrl(normalizedRedirect, {
+      subscribeSuccess: "1",
+      session_id: "{CHECKOUT_SESSION_ID}",
+    });
+
+    const cancelUrl = buildAbsoluteReturnUrl(normalizedRedirect, {
+      subscribeCancelled: "1",
+    });
+
+    setUpgradeLoading(true);
+    setUpgradeError(null);
+
+    try {
+      const profileNumeric = Number.parseInt(intent.profileId, 10);
+      if (!Number.isFinite(profileNumeric) || profileNumeric <= 0) {
+        throw new Error("invalid_profile_id");
+      }
+
+      const linkResponse = await fetch("/api/account/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: profileNumeric }),
+      });
+
+      if (!linkResponse.ok) {
+        const payload = await linkResponse.json().catch(() => null);
+        const message = payload?.error ?? "Unable to link profile. Please try again.";
+        throw new Error(message);
+      }
+
+      const checkoutResponse = await fetch("/api/premium/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: profileNumeric,
+          successUrl,
+          cancelUrl,
+        }),
+      });
+
+      if (!checkoutResponse.ok) {
+        const payload = await checkoutResponse.json().catch(() => null);
+        const message = payload?.error ?? "Unable to start checkout. Please try again.";
+        throw new Error(message);
+      }
+
+      const payload = await checkoutResponse.json().catch(() => null);
+      const url = payload?.url;
+      if (typeof url === "string" && url.length > 0) {
+        closeUpgradeModal();
+        window.location.href = url;
+        return;
+      }
+
+      throw new Error("checkout_missing_url");
+    } catch (error) {
+      console.error("[premium] upgrade flow failed", error);
+      const message = error instanceof Error && error.message ? error.message : "Unexpected error starting subscription.";
+      setUpgradeError(message);
+      setUpgradeLoading(false);
+    }
   };
 
   const activateTabFromFooter = (tab: TabType) => {
@@ -1705,6 +1961,7 @@ export default function Home() {
   }, []);
 
   return (
+    <>
     <div className="min-h-screen text-white">
       <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
         {/* Header */}
@@ -2604,7 +2861,7 @@ export default function Home() {
                                 <AdvancedStatsPanel
                                   profileId={profileIdStr}
                                   alias={aliasPrimary || aliasFallback}
-                                  onRequestAccess={() => handleActivateAdvancedStats({
+                                  onRequestAccess={() => handleUpgradeRequest({
                                     profileId: profileIdStr,
                                     alias: aliasPrimary || aliasFallback,
                                     playerName: result.playerName,
@@ -3077,7 +3334,7 @@ export default function Home() {
                               <AdvancedStatsPanel
                                 profileId={String(entry.profileId)}
                                 alias={entry.alias}
-                                onRequestAccess={() => handleActivateAdvancedStats({
+                                onRequestAccess={() => handleUpgradeRequest({
                                   profileId: String(entry.profileId),
                                   alias: entry.alias,
                                   playerName: entry.playerName,
@@ -3363,6 +3620,83 @@ export default function Home() {
       </div>
     </div>
   )}
+  {upgradeIntent && (
+    <div
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 py-8"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upgrade-modal-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          closeUpgradeModal();
+        }
+      }}
+    >
+      <div className="relative w-full max-w-lg rounded-2xl border border-yellow-500/30 bg-neutral-950/95 p-6 shadow-2xl">
+        <button
+          type="button"
+          onClick={closeUpgradeModal}
+          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/80 text-neutral-400 transition hover:border-neutral-500 hover:text-white"
+          aria-label="Close upgrade dialog"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+        <div className="space-y-5 pr-2">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-yellow-200">
+              Premium Upgrade
+            </div>
+            <h3 id="upgrade-modal-title" className="text-xl font-semibold text-white">
+              Unlock advanced analytics for {upgradeIntent.alias?.trim() || upgradeIntent.playerName?.trim() || upgradeIntent.profileId}
+            </h3>
+            <p className="text-sm text-neutral-300">
+              $4.99/month • Detailed Elo history, matchup insights, map performance, and more—updated daily for your linked profile.
+            </p>
+          </div>
+          <ul className="grid gap-3 text-sm text-neutral-100 sm:grid-cols-2">
+            {UPGRADE_POINTS.map((point) => (
+              <li key={point} className="flex items-start gap-3 rounded-lg border border-neutral-700/50 bg-neutral-900/70 px-3 py-2">
+                <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
+                  <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3.5 8.5l2.5 2.5 6-6" />
+                  </svg>
+                </span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <button
+              type="button"
+              onClick={closeUpgradeModal}
+              className="inline-flex items-center justify-center rounded-md border border-neutral-700/70 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+            >
+              Maybe later
+            </button>
+            <button
+              type="button"
+              onClick={handleUpgradeConfirm}
+              disabled={upgradeLoading}
+              className="inline-flex items-center justify-center rounded-md border border-yellow-400/60 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {upgradeLoading
+                ? "Opening checkout…"
+                : isAuthenticated
+                  ? "Subscribe"
+                  : "Sign in to subscribe"}
+            </button>
+          </div>
+          {upgradeError && (
+            <p className="text-xs font-semibold text-red-300">{upgradeError}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
 </div>
+</>
 );
 }

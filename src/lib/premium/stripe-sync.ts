@@ -164,11 +164,16 @@ export async function syncStripeSubscription({
   const subscriptionCancelsAtPeriodEnd = Boolean(
     resolvedSubscription?.cancel_at_period_end,
   );
-  const currentPeriodEnd = resolvedSubscription?.current_period_end
-    ? new Date(resolvedSubscription.current_period_end * 1000).toISOString()
+  const subscriptionWithPeriods = resolvedSubscription as Stripe.Subscription & {
+    current_period_end?: number | null;
+    current_period_start?: number | null;
+  } | null;
+
+  const currentPeriodEnd = subscriptionWithPeriods?.current_period_end
+    ? new Date(subscriptionWithPeriods.current_period_end * 1000).toISOString()
     : null;
-  const currentPeriodStart = resolvedSubscription?.current_period_start
-    ? new Date(resolvedSubscription.current_period_start * 1000).toISOString()
+  const currentPeriodStart = subscriptionWithPeriods?.current_period_start
+    ? new Date(subscriptionWithPeriods.current_period_start * 1000).toISOString()
     : new Date().toISOString();
   const updatePayload: Record<string, unknown> = {
     stripe_customer_id: stripeCustomerId,

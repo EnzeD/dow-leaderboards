@@ -8,7 +8,7 @@ const STRIPE_SECRET_KEY =
   process.env.NEXT_STRIPE_SECRET_KEY ??
   null;
 
-const STRIPE_API_VERSION: Stripe.LatestApiVersion = "2023-10-16";
+const STRIPE_API_VERSION: Stripe.LatestApiVersion = "2025-09-30.clover";
 
 let stripeClient: Stripe | null = null;
 

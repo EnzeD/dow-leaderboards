@@ -113,11 +113,16 @@ const updatePremiumForSubscription = async (
     }
   }
 
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
+  const subscriptionWithPeriods = subscription as Stripe.Subscription & {
+    current_period_end?: number | null;
+    current_period_start?: number | null;
+  };
+
+  const periodEnd = subscriptionWithPeriods.current_period_end
+    ? new Date(subscriptionWithPeriods.current_period_end * 1000).toISOString()
     : null;
-  const periodStart = subscription.current_period_start
-    ? new Date(subscription.current_period_start * 1000).toISOString()
+  const periodStart = subscriptionWithPeriods.current_period_start
+    ? new Date(subscriptionWithPeriods.current_period_start * 1000).toISOString()
     : new Date().toISOString();
 
   const active = isSubscriptionActive(subscription.status);
