@@ -99,16 +99,7 @@ const FAVORITES_COOKIE = 'dow_favorites';
 const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
 const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
-const premiumTeaserEnabled = ['1', 'true', 'on', 'yes'].includes(
-  (process.env.NEXT_PUBLIC_ENABLE_PREMIUM_TEASER ?? '').toLowerCase()
-);
-const PREMIUM_PRICE_OPTIONS = ['No', '$2.99/month', '$4.99/month'] as const;
-type PremiumSurveyChoice = (typeof PREMIUM_PRICE_OPTIONS)[number];
-const PREMIUM_PRICE_DETAIL: Record<PremiumSurveyChoice, string | null> = {
-  'No': null,
-  '$2.99/month': 'Support your crawling jobs and bots.',
-  '$4.99/month': 'Support the website as well.',
-};
+const ADVANCED_STATS_INTENT_STORAGE_KEY = "dow_last_advanced_stats_intent";
 
 const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
 
@@ -414,6 +405,13 @@ export default function Home() {
     selectedId?: number;
     combinedViewMode?: 'best' | 'all';
   };
+
+  type AdvancedStatsIntentPayload = {
+    profileId: string;
+    alias?: string | null;
+    playerName?: string | null;
+    source: "search" | "favorites";
+  };
   
   // Build a URL string that reflects the given state via query params
   const buildUrl = (state: AppState): string => {
@@ -511,9 +509,17 @@ export default function Home() {
   const { account, loading: accountLoading } = useAccount();
   const accountLink = "/account";
   const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
+  const isAuthenticated = Boolean(authUser);
   const linkedAlias = account?.profile?.alias ?? null;
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
+  const advancedStatsCta = {
+    label: isAuthenticated ? "Subscribe to unlock advanced analytics" : "Log in to unlock advanced analytics",
+    description: isAuthenticated
+      ? "Start a premium subscription to unlock daily tracking, matchup insights, and more."
+      : "Sign in so we can link this profile and unlock premium analytics for you.",
+    loading: authLoading || accountLoading,
+  };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
@@ -542,18 +548,6 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Record<string, FavoriteEntry>>({});
   const [favoriteData, setFavoriteData] = useState<Record<string, FavoriteDataEntry>>({});
   const [favoritesLoading, setFavoritesLoading] = useState(false);
-  const [premiumPromptContext, setPremiumPromptContext] = useState<{
-    alias: string;
-    profileId?: string;
-    playerName?: string;
-  } | null>(null);
-  const [premiumPromptChoice, setPremiumPromptChoice] = useState<PremiumSurveyChoice | null>(null);
-  const [premiumPromptLoading, setPremiumPromptLoading] = useState(false);
-  const [premiumPromptError, setPremiumPromptError] = useState<string | null>(null);
-  const [premiumPromptResponseId, setPremiumPromptResponseId] = useState<string | null>(null);
-  const [premiumEmailValue, setPremiumEmailValue] = useState('');
-  const [premiumEmailStatus, setPremiumEmailStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [premiumEmailError, setPremiumEmailError] = useState<string | null>(null);
   const [hiddenAdvancedStats, setHiddenAdvancedStats] = useState<Record<string, boolean>>({});
 
   // Live Steam player count (DoW:DE) - Cached via Supabase
@@ -1289,112 +1283,6 @@ export default function Home() {
 
   const favoriteEntries = Object.values(favorites);
 
-  const resetPremiumPromptState = () => {
-    setPremiumPromptChoice(null);
-    setPremiumPromptError(null);
-    setPremiumPromptResponseId(null);
-    setPremiumEmailValue('');
-    setPremiumEmailStatus('idle');
-    setPremiumEmailError(null);
-    setPremiumPromptLoading(false);
-  };
-
-  const handleOpenPremiumPrompt = (details: { alias?: string | null; profileId?: string; playerName?: string | null }) => {
-    if (!premiumTeaserEnabled) return;
-    const alias = (details.alias ?? '').trim() || 'Unknown player';
-    setPremiumPromptContext({
-      alias,
-      profileId: details.profileId,
-      playerName: details.playerName ?? alias,
-    });
-    resetPremiumPromptState();
-  };
-
-  const handleClosePremiumPrompt = () => {
-    setPremiumPromptContext(null);
-    resetPremiumPromptState();
-  };
-
-  const handlePremiumSurveySelection = async (choice: PremiumSurveyChoice) => {
-    if (!premiumTeaserEnabled || !premiumPromptContext) return;
-    setPremiumPromptLoading(true);
-    setPremiumPromptError(null);
-    try {
-      const response = await fetch('/api/premium-interest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          alias: premiumPromptContext.alias,
-          profileId: premiumPromptContext.profileId,
-          playerName: premiumPromptContext.playerName,
-          choice,
-          responseId: premiumPromptResponseId ?? undefined,
-          source: 'search_teaser',
-        }),
-      });
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to record preference');
-      }
-
-      const payload = await response.json().catch(() => ({}));
-      if (payload && typeof payload.id === 'string') {
-        setPremiumPromptResponseId(payload.id);
-      }
-      setPremiumPromptChoice(choice);
-      setPremiumEmailStatus('idle');
-      setPremiumEmailError(null);
-    } catch (error) {
-      console.error('Failed to record premium interest', error);
-      setPremiumPromptError('We could not save your choice. Please try again.');
-    } finally {
-      setPremiumPromptLoading(false);
-    }
-  };
-
-  const handlePremiumEmailSubmit = async () => {
-    if (!premiumTeaserEnabled || !premiumPromptContext) return;
-    const email = premiumEmailValue.trim();
-    if (!email) {
-      setPremiumEmailError('Please enter an email address.');
-      setPremiumEmailStatus('error');
-      return;
-    }
-    setPremiumEmailStatus('loading');
-    setPremiumEmailError(null);
-    try {
-      const response = await fetch('/api/premium-interest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          alias: premiumPromptContext.alias,
-          profileId: premiumPromptContext.profileId,
-          playerName: premiumPromptContext.playerName,
-          choice: premiumPromptChoice,
-          email,
-          responseId: premiumPromptResponseId ?? undefined,
-          source: 'search_teaser',
-        }),
-      });
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to save email');
-      }
-
-      const payload = await response.json().catch(() => ({}));
-      if (payload && typeof payload.id === 'string') {
-        setPremiumPromptResponseId(payload.id);
-      }
-      setPremiumEmailStatus('success');
-    } catch (error) {
-      console.error('Failed to save premium interest email', error);
-      setPremiumEmailStatus('error');
-      setPremiumEmailError('We could not save your email. Please try again.');
-    }
-  };
-
   const handleOpenAdvancedStats = (details: { profileId?: string; alias?: string | null; playerName?: string | null }) => {
     const profileId = (details.profileId || '').trim();
     if (!profileId) return;
@@ -1416,19 +1304,65 @@ export default function Home() {
     setMobileNavOpen(false);
   };
 
-  useEffect(() => {
-    if (!premiumPromptContext) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleClosePremiumPrompt();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [premiumPromptContext]);
+  const rememberAdvancedStatsIntent = (payload: AdvancedStatsIntentPayload): string => {
+    if (typeof window === "undefined") {
+      return "/";
+    }
+
+    const trimmedProfileId = payload.profileId.trim();
+    const fallbackQuery = (payload.alias ?? payload.playerName ?? "").trim();
+    let redirectPath = window.location.pathname;
+
+    try {
+      const state: AppState = {
+        view: "search",
+        searchQuery: searchQuery || fallbackQuery,
+        searchProfileId: trimmedProfileId,
+      };
+      const path = buildUrl(state);
+      redirectPath = path || window.location.pathname;
+      const redirectUrl = `${window.location.origin}${redirectPath}`;
+      window.sessionStorage.setItem(
+        ADVANCED_STATS_INTENT_STORAGE_KEY,
+        JSON.stringify({
+          profileId: trimmedProfileId,
+          alias: fallbackQuery || `Profile ${trimmedProfileId}`,
+          source: payload.source,
+          redirectUrl,
+          storedAt: new Date().toISOString(),
+        }),
+      );
+      return redirectUrl;
+    } catch (error) {
+      console.warn("Failed to persist advanced stats intent", error);
+      return `${window.location.origin}${redirectPath}`;
+    }
+  };
+
+  const handleActivateAdvancedStats = ({
+    profileId,
+    alias,
+    playerName,
+    source,
+  }: AdvancedStatsIntentPayload) => {
+    const trimmedProfileId = profileId.trim();
+    if (!trimmedProfileId) return;
+    if (typeof window === "undefined") return;
+
+    const redirectUrl = rememberAdvancedStatsIntent({
+      profileId: trimmedProfileId,
+      alias,
+      playerName,
+      source,
+    });
+
+    if (!authUser) {
+      window.location.href = `/login?redirectTo=${encodeURIComponent(redirectUrl)}`;
+      return;
+    }
+
+    window.location.href = `/account?subscribe=1&profileId=${encodeURIComponent(trimmedProfileId)}`;
+  };
 
   const activateTabFromFooter = (tab: TabType) => {
     setActiveTab(tab);
@@ -2654,11 +2588,13 @@ export default function Home() {
                                 <AdvancedStatsPanel
                                   profileId={profileIdStr}
                                   alias={aliasPrimary || aliasFallback}
-                                  onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
-                                    alias: aliasPrimary || aliasFallback,
+                                  onRequestAccess={() => handleActivateAdvancedStats({
                                     profileId: profileIdStr,
+                                    alias: aliasPrimary || aliasFallback,
                                     playerName: result.playerName,
-                                  }) : undefined}
+                                    source: "search",
+                                  })}
+                                  ctaState={advancedStatsCta}
                                   variant="embedded"
                                 />
                               )}
@@ -2682,19 +2618,6 @@ export default function Home() {
                                     {hiddenAdvancedStats[profileIdStr] ? "View advanced statistics" : "Hide advanced statistics"}
                                   </button>
                                 )}
-                            {premiumTeaserEnabled && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPremiumPrompt({
-                                  alias: aliasPrimary || aliasFallback,
-                                  profileId: profileIdStr,
-                                  playerName: result.playerName,
-                                })}
-                                className="inline-flex items-center justify-center rounded-md border border-neutral-700/60 bg-neutral-900 px-3 py-2 text-sm font-semibold text-neutral-200 transition hover:text-white hover:border-neutral-500"
-                              >
-                                Request access
-                              </button>
-                            )}
                           </div>
                         </div>
 
@@ -3138,11 +3061,13 @@ export default function Home() {
                               <AdvancedStatsPanel
                                 profileId={String(entry.profileId)}
                                 alias={entry.alias}
-                                onRequestAccess={premiumTeaserEnabled ? () => handleOpenPremiumPrompt({
-                                  alias: entry.alias,
+                                onRequestAccess={() => handleActivateAdvancedStats({
                                   profileId: String(entry.profileId),
+                                  alias: entry.alias,
                                   playerName: entry.playerName,
-                                }) : undefined}
+                                  source: "favorites",
+                                })}
+                                ctaState={advancedStatsCta}
                                 variant="embedded"
                               />
                             )}
@@ -3314,132 +3239,6 @@ export default function Home() {
       </div>
     </div>
   </footer>
-  {premiumTeaserEnabled && premiumPromptContext && (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4 py-8"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="premium-survey-title"
-    >
-      <div className="relative w-full max-w-lg rounded-2xl border border-yellow-500/30 bg-neutral-950/95 p-6 shadow-2xl">
-        <button
-          type="button"
-          onClick={handleClosePremiumPrompt}
-          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/80 text-neutral-400 transition hover:border-neutral-500 hover:text-white"
-          aria-label="Close advanced statistics notice"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 6l12 12" />
-            <path d="M18 6L6 18" />
-          </svg>
-        </button>
-        <div className="space-y-4 pr-2">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 20h16" />
-                <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
-                <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
-                <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
-              </svg>
-            </span>
-            <div>
-              <h3 id="premium-survey-title" className="text-lg font-semibold text-white">Advanced statistics</h3>
-              <p className="text-xs text-neutral-400">{premiumPromptContext.playerName ?? premiumPromptContext.alias}</p>
-            </div>
-          </div>
-          <div className="space-y-3 text-sm text-neutral-200">
-            <p>Advanced statistics is not available yet.</p>
-            <p>Today it&apos;s not possible to display them with the Relic API alone, we need to set up bots, background jobs, and functions that cost some money.</p>
-            <p>This website stays free for everyone, so any participation would also help keep the hosting running, which is greatly appreciated!</p>
-            <p>Would you be interested in unlocking the advanced stats against a small price?</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            {PREMIUM_PRICE_OPTIONS.map((option) => {
-              const isSelected = premiumPromptChoice === option;
-              const detail = PREMIUM_PRICE_DETAIL[option];
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => handlePremiumSurveySelection(option)}
-                  disabled={premiumPromptLoading}
-                  className={`flex flex-col items-start gap-1 rounded-lg border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
-                    isSelected
-                      ? 'border-yellow-400 bg-yellow-400 text-neutral-900'
-                      : 'border-neutral-700/60 bg-neutral-900/70 text-neutral-100 hover:border-yellow-400/70 hover:text-white'
-                  } ${premiumPromptLoading ? 'opacity-70' : ''}`}
-                  aria-pressed={isSelected}
-                >
-                  <span className="flex w-full items-center justify-between">
-                    <span>{option}</span>
-                    {isSelected && (
-                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3.5 8.5l2.5 2.5 6-6" />
-                      </svg>
-                    )}
-                  </span>
-                  {detail && (
-                    <span className={`text-xs font-normal ${isSelected ? 'text-neutral-900/80' : 'text-neutral-400'}`}>
-                      {detail}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {premiumPromptError && (
-            <p className="text-xs font-semibold text-red-400">{premiumPromptError}</p>
-          )}
-          {premiumPromptChoice && (
-            <div className="rounded-lg border border-neutral-700/60 bg-neutral-900/60 p-4">
-              <p className="text-xs text-neutral-300">Drop your email and we&apos;ll notify you the moment advanced statistics go live.</p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="email"
-                  value={premiumEmailValue}
-                  onChange={(event) => {
-                    setPremiumEmailValue(event.target.value);
-                    if (premiumEmailStatus === 'error') {
-                      setPremiumEmailStatus('idle');
-                      setPremiumEmailError(null);
-                    }
-                  }}
-                  placeholder="you@example.com"
-                  className="w-full rounded-md border border-neutral-700/60 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
-                  disabled={premiumEmailStatus === 'loading' || premiumEmailStatus === 'success'}
-                  aria-label="Email address"
-                />
-                <button
-                  type="button"
-                  onClick={handlePremiumEmailSubmit}
-                  disabled={premiumEmailStatus === 'loading' || premiumEmailStatus === 'success'}
-                  className="inline-flex items-center justify-center rounded-md border border-yellow-400/40 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {premiumEmailStatus === 'loading' ? 'Saving...' : premiumEmailStatus === 'success' ? 'Saved' : 'Notify me'}
-                </button>
-              </div>
-              {premiumEmailError && (
-                <p className="mt-2 text-xs font-semibold text-red-400">{premiumEmailError}</p>
-              )}
-              {premiumEmailStatus === 'success' && !premiumEmailError && (
-                <p className="mt-2 text-xs text-green-400">Thanks! We&apos;ll keep you posted.</p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )}
   {/* Feedback Modal */}
   {showFeedbackModal && (
     <div

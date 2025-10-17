@@ -5,18 +5,24 @@ import { AdvancedStatsContext, useAdvancedStatsContext } from "./AdvancedStatsCo
 import { useAdvancedStatsActivation } from "@/hooks/useAdvancedStatsActivation";
 import { Leaderboard } from "@/lib/relic";
 import { useCombinedLeaderboards } from "../useCombinedLeaderboards";
-import AdvancedStatsTeaser from "./AdvancedStatsTeaser";
 import EloHistoryCard from "./EloHistoryCard";
 import MatchupMatrixCard from "./MatchupMatrixCard";
 import MapPerformanceCard from "./MapPerformanceCard";
 import FrequentOpponentsCard from "./FrequentOpponentsCard";
 import ProfileOverviewCard, { ProfileOverview } from "./ProfileOverviewCard";
 
+type LockedCtaState = {
+  label?: string;
+  description?: string;
+  loading?: boolean;
+};
+
 export type AdvancedStatsPanelProps = {
   profileId?: string | number | null;
   alias?: string | null;
   activatedOverride?: boolean;
   onRequestAccess?: () => void;
+  ctaState?: LockedCtaState;
   variant?: "standalone" | "embedded";
 };
 
@@ -50,6 +56,7 @@ export default function AdvancedStatsPanel({
   alias,
   activatedOverride,
   onRequestAccess,
+  ctaState,
   variant = "standalone",
 }: AdvancedStatsPanelProps) {
   const activation = useAdvancedStatsActivation(profileId);
@@ -147,8 +154,12 @@ export default function AdvancedStatsPanel({
   }, [profileIdStr, contextValue.ready]);
 
   const handleActivateClick = useCallback(() => {
+    if (onRequestAccess) {
+      onRequestAccess();
+      return;
+    }
     contextValue.refresh();
-  }, [contextValue]);
+  }, [contextValue, onRequestAccess]);
 
   if (!profileIdStr) {
     return null;
@@ -199,6 +210,9 @@ export default function AdvancedStatsPanel({
           onActivate={handleActivateClick}
           loading={contextValue.loading}
           displayName={displayName}
+          ctaLabel={ctaState?.label}
+          ctaDescription={ctaState?.description}
+          ctaLoading={ctaState?.loading}
         />
       </AdvancedStatsContext.Provider>
     );
@@ -327,10 +341,24 @@ type LockedAdvancedStatsPreviewProps = {
   onActivate: () => void;
   loading: boolean;
   displayName: string;
+  ctaLabel?: string;
+  ctaDescription?: string;
+  ctaLoading?: boolean;
 };
 
-function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: LockedAdvancedStatsPreviewProps) {
+function LockedAdvancedStatsPreview({
+  onActivate,
+  loading,
+  displayName,
+  ctaLabel,
+  ctaDescription,
+  ctaLoading,
+}: LockedAdvancedStatsPreviewProps) {
   const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
+  const effectiveLoading = loading || Boolean(ctaLoading);
+  const buttonLabel = effectiveLoading
+    ? "Opening..."
+    : ctaLabel ?? "Activate advanced statistics";
 
   return (
     <div className="space-y-6 rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
@@ -430,13 +458,18 @@ function LockedAdvancedStatsPreview({ onActivate, loading, displayName }: Locked
             <p className="text-sm text-neutral-200">
               {LOCKED_SECTION_DESCRIPTIONS[activeSection]}
             </p>
+            {ctaDescription && (
+              <p className="text-xs text-neutral-400">
+                {ctaDescription}
+              </p>
+            )}
             <button
               type="button"
               onClick={onActivate}
-              disabled={loading}
+              disabled={effectiveLoading}
               className="inline-flex items-center justify-center gap-2 rounded-md border border-yellow-400/30 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:opacity-70"
             >
-              Activate advanced statistics
+              {buttonLabel}
             </button>
           </div>
         </div>
