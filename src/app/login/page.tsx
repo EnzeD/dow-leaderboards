@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@auth0/nextjs-auth0";
 
@@ -18,7 +18,7 @@ const sanitizeReturnTo = (value: string | null): string => {
   return value;
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading } = useUser();
@@ -91,5 +91,21 @@ export default function LoginPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="flex min-h-screen items-center justify-center px-4">
+          <div className="w-full max-w-md rounded-2xl bg-neutral-900/90 p-8 text-center text-neutral-300 shadow-2xl ring-1 ring-neutral-700/70 backdrop-blur">
+            Loading login experience…
+          </div>
+        </div>
+      )}
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

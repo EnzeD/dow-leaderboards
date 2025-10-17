@@ -1,4 +1,11 @@
-import { handleAuth } from "@auth0/nextjs-auth0";
+import type { NextRequest } from "next/server";
 
-export const GET = handleAuth();
-export const POST = handleAuth();
+import { auth0 } from "@/lib/auth0";
+
+export function GET(req: NextRequest) {
+  return auth0.middleware(req);
+}
+
+export function POST(req: NextRequest) {
+  return auth0.middleware(req);
+}
