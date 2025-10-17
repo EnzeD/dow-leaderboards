@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth0 } from "@/lib/auth0";
-import { getSupabaseAdmin } from "@/lib/premium/activation-server";
+import { getSupabaseAdmin, isEnvForcedProfile } from "@/lib/premium/activation-server";
 import { DeleteAccountButton } from "@/app/_components/DeleteAccountButton";
 import { AccountProfileLinker } from "@/app/_components/AccountProfileLinker";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
@@ -9,6 +9,7 @@ import {
   GoPremiumButton,
   ManageSubscriptionButton,
 } from "@/app/_components/premium/GoPremiumButton";
+import { syncStripeSubscription } from "@/lib/premium/stripe-sync";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -22,6 +23,38 @@ const isFutureDate = (iso: string | null | undefined): boolean => {
   const parsed = Date.parse(iso);
   if (Number.isNaN(parsed)) return false;
   return parsed > Date.now();
+};
+
+const isStripeSubscriptionActive = (status: string | null | undefined): boolean => {
+  if (!status) return false;
+  switch (status) {
+    case "active":
+    case "trialing":
+    case "past_due":
+      return true;
+    default:
+      return false;
+  }
+};
+
+const resolveCheckoutSessionId = (
+  params?: Record<string, string | string[] | undefined>,
+): string | null => {
+  if (!params) return null;
+  const raw =
+    params.session_id ??
+    params.sessionId ??
+    params.sessionID ??
+    null;
+
+  if (!raw) return null;
+  if (Array.isArray(raw)) {
+    return raw.length > 0 ? raw[0] ?? null : null;
+  }
+  if (typeof raw === "string" && raw.trim().length > 0) {
+    return raw.trim();
+  }
+  return null;
 };
 
 type PageProps = {
@@ -39,10 +72,14 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
   let premiumExpiresAt: string | null = null;
   let stripeCustomerId: string | null = null;
-  let stripeSubscriptionId: string | null = null;
+  let stripeSubscriptionStatus: string | null = null;
+  let stripeSubscriptionCancelAtPeriodEnd = false;
   let primaryProfileId: number | null = null;
   let profileAlias: string | null = null;
   let profileCountry: string | null = null;
+  let premiumActivationExpiresAt: string | null = null;
+  let premiumActivationExists = false;
+  let premiumForced = false;
 
   if (supabase) {
     const { error: upsertError } = await upsertAppUser({
@@ -59,7 +96,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
     const { data, error } = await supabase
       .from("app_users")
       .select(
-        "premium_expires_at, stripe_customer_id, stripe_subscription_id, primary_profile_id",
+        "premium_expires_at, stripe_customer_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, primary_profile_id",
       )
       .eq("auth0_sub", session.user.sub)
       .maybeSingle();
@@ -67,12 +104,17 @@ export default async function AccountPage({ searchParams }: PageProps) {
     if (!error && data) {
       premiumExpiresAt = data.premium_expires_at ?? null;
       stripeCustomerId = data.stripe_customer_id ?? null;
-      stripeSubscriptionId = data.stripe_subscription_id ?? null;
+      stripeSubscriptionStatus = data.stripe_subscription_status ?? null;
+      stripeSubscriptionCancelAtPeriodEnd = Boolean(
+        data.stripe_subscription_cancel_at_period_end,
+      );
       primaryProfileId = data.primary_profile_id
         ? Number.parseInt(String(data.primary_profile_id), 10)
         : null;
 
       if (primaryProfileId) {
+        premiumForced = isEnvForcedProfile(String(primaryProfileId));
+
         const { data: player, error: playerError } = await supabase
           .from("players")
           .select("profile_id, current_alias, country")
@@ -83,11 +125,43 @@ export default async function AccountPage({ searchParams }: PageProps) {
           profileAlias = player.current_alias ?? null;
           profileCountry = player.country ?? null;
         }
+
+        const { data: activation, error: activationError } = await supabase
+          .from("premium_feature_activations")
+          .select("expires_at")
+          .eq("profile_id", primaryProfileId)
+          .maybeSingle();
+
+        if (!activationError && activation) {
+          premiumActivationExists = true;
+          premiumActivationExpiresAt = activation.expires_at ?? null;
+        }
       }
     }
   }
 
-  const authProvider = session.user.sub?.split("|")[0] ?? "auth0";
+  const checkoutSessionId = resolveCheckoutSessionId(searchParams);
+
+  if (supabase && !premiumForced && (stripeCustomerId || checkoutSessionId)) {
+    const syncResult = await syncStripeSubscription({
+      auth0Sub: session.user.sub,
+      checkoutSessionId,
+      existingCustomerId: stripeCustomerId ?? undefined,
+    });
+
+    if (syncResult) {
+      stripeCustomerId = syncResult.stripeCustomerId ?? stripeCustomerId;
+      stripeSubscriptionStatus =
+        syncResult.stripeSubscriptionStatus ?? stripeSubscriptionStatus;
+      stripeSubscriptionCancelAtPeriodEnd =
+        syncResult.stripeSubscriptionCancelAtPeriodEnd;
+      premiumExpiresAt = syncResult.premiumExpiresAt ?? premiumExpiresAt;
+      premiumActivationExists = syncResult.premiumActivationExists;
+      premiumActivationExpiresAt =
+        syncResult.premiumActivationExpiresAt ?? premiumActivationExpiresAt;
+      primaryProfileId = syncResult.primaryProfileId ?? primaryProfileId;
+    }
+  }
 
   const resolveBaseUrl = () => {
     const raw =
@@ -106,11 +180,51 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
   const baseUrl = resolveBaseUrl();
   const logoutUrl = `/auth/logout?returnTo=${encodeURIComponent(baseUrl)}`;
-  const premiumActive = isFutureDate(premiumExpiresAt);
+  const activationActive =
+    premiumForced ||
+    (premiumActivationExists &&
+      (!premiumActivationExpiresAt || isFutureDate(premiumActivationExpiresAt)));
+  const appUserPremiumActive = isFutureDate(premiumExpiresAt);
+  const premiumActive = activationActive || appUserPremiumActive;
+  const hasStripeCustomer = Boolean(stripeCustomerId);
   const checkoutStatusRaw = searchParams?.checkout;
   const checkoutStatus = Array.isArray(checkoutStatusRaw)
     ? checkoutStatusRaw[0]
     : checkoutStatusRaw;
+  const pendingActivation =
+    !premiumActive &&
+    hasStripeCustomer &&
+    ((checkoutStatus === "success" && !premiumExpiresAt) ||
+      stripeSubscriptionStatus === "incomplete" ||
+      stripeSubscriptionStatus === "incomplete_expired");
+  const subscriptionRenewing =
+    premiumActive &&
+    !stripeSubscriptionCancelAtPeriodEnd &&
+    isStripeSubscriptionActive(stripeSubscriptionStatus);
+  const accountStatusLabel = premiumActive
+    ? "Premium account"
+    : pendingActivation
+      ? "Premium account (activation pending)"
+      : "Free account";
+  const effectivePremiumExpiry = premiumExpiresAt ?? premiumActivationExpiresAt;
+  const showManageButton = hasStripeCustomer;
+  const showGoPremium = !premiumActive;
+  const hasRenewalDate = Boolean(effectivePremiumExpiry);
+  const expiryLabel = subscriptionRenewing ? "Subscription renews" : "Premium expires";
+  const expiryValueClass = hasRenewalDate
+    ? subscriptionRenewing
+      ? "text-base font-semibold text-emerald-200"
+      : "text-base font-semibold text-red-300"
+    : "text-base font-medium text-white";
+  const expiryDisplayValue = hasRenewalDate
+    ? formatDateTime(effectivePremiumExpiry)
+    : "—";
+  const premiumStatusNote = subscriptionRenewing
+    ? "Premium benefits renew automatically for your linked profile."
+    : premiumActive
+      ? "Premium benefits remain active until your expiry."
+      : null;
+  const premiumStatusTone = subscriptionRenewing ? "text-emerald-300" : "text-amber-300";
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
@@ -192,41 +306,40 @@ export default async function AccountPage({ searchParams }: PageProps) {
         <dl className="mt-4 grid gap-3 text-sm text-neutral-300 md:grid-cols-2">
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
-              Premium access expires
+              Status
             </dt>
-            <dd className="mt-1 text-base font-medium text-white">
-              {formatDateTime(premiumExpiresAt)}
+            <dd className="mt-1 text-base font-semibold text-white">
+              {accountStatusLabel}
             </dd>
           </div>
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
-              Stripe customer
+              {expiryLabel}
             </dt>
-            <dd className="mt-1 text-base font-medium text-white">
-              {stripeCustomerId ?? "—"}
-            </dd>
-          </div>
-          <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
-            <dt className="text-xs uppercase tracking-wide text-neutral-500">
-              Stripe subscription
-            </dt>
-            <dd className="mt-1 text-base font-medium text-white">
-              {stripeSubscriptionId ?? "—"}
+            <dd className={`mt-1 ${expiryValueClass}`}>
+              {expiryDisplayValue}
             </dd>
           </div>
         </dl>
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
-          <GoPremiumButton
-            profileId={primaryProfileId}
-            premiumExpiresAt={premiumExpiresAt}
-          />
-          <ManageSubscriptionButton
-            stripeCustomerId={stripeCustomerId}
-            premiumExpiresAt={premiumExpiresAt}
-          />
-          {premiumActive && (
-            <span className="text-xs uppercase tracking-wide text-emerald-300/80">
-              Premium active
+          {showGoPremium && !pendingActivation && (
+            <GoPremiumButton
+              profileId={primaryProfileId}
+              premiumExpiresAt={effectivePremiumExpiry}
+              isPremiumActive={premiumActive}
+            />
+          )}
+          {showManageButton && (
+            <ManageSubscriptionButton stripeCustomerId={stripeCustomerId} />
+          )}
+          {pendingActivation && (
+            <span className="text-xs text-amber-300">
+              Activation pending — refresh after a minute or open the billing portal to verify your payment.
+            </span>
+          )}
+          {premiumStatusNote && !pendingActivation && (
+            <span className={`text-xs ${premiumStatusTone}`}>
+              {premiumStatusNote}
             </span>
           )}
         </div>

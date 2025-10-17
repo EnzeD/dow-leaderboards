@@ -126,7 +126,7 @@ export async function POST(request: Request) {
   }
 
   const baseUrl = resolveBaseUrl();
-  const successUrl = `${baseUrl}account?checkout=success`;
+  const successUrl = `${baseUrl}account?checkout=success&session_id={CHECKOUT_SESSION_ID}`;
   const cancelUrl = `${baseUrl}account?checkout=cancelled`;
 
   let checkoutSessionUrl: string | null = null;
@@ -168,6 +168,10 @@ export async function POST(request: Request) {
     additionalFields: {
       primary_profile_id: profileId,
       stripe_customer_id: customerId,
+      stripe_subscription_id: null,
+      stripe_subscription_status: null,
+      stripe_subscription_cancel_at_period_end: null,
+      premium_expires_at: null,
     },
   });
 

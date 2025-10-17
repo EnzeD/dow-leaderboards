@@ -45,8 +45,8 @@ export async function GET() {
       const { data, error: fetchError } = await supabase
         .from("app_users")
         .select(
-          "stripe_customer_id, stripe_subscription_id, premium_expires_at, primary_profile_id",
-        )
+        "stripe_customer_id, stripe_subscription_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, premium_expires_at, primary_profile_id",
+      )
         .eq("auth0_sub", session.user.sub)
         .maybeSingle();
 
@@ -56,6 +56,9 @@ export async function GET() {
         appUser = {
           stripe_customer_id: data.stripe_customer_id ?? null,
           stripe_subscription_id: data.stripe_subscription_id ?? null,
+          stripe_subscription_status: data.stripe_subscription_status ?? null,
+          stripe_subscription_cancel_at_period_end:
+            data.stripe_subscription_cancel_at_period_end ?? null,
           premium_expires_at: data.premium_expires_at ?? null,
           primary_profile_id: data.primary_profile_id ?? null,
         };

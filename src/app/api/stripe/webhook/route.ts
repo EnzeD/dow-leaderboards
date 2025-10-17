@@ -5,8 +5,6 @@ import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/premium/activation-server";
 
-export const runtime = "nodejs";
-
 const webhookSecret =
   process.env.STRIPE_WEBHOOK_SECRET ??
   process.env.STRIPE_SIGNING_SECRET ??
@@ -127,6 +125,8 @@ const updatePremiumForSubscription = async (
   const updatePayload: Record<string, unknown> = {
     stripe_customer_id: stripeCustomerId,
     stripe_subscription_id: active ? stripeSubscriptionId : null,
+    stripe_subscription_status: subscription.status,
+    stripe_subscription_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
     premium_expires_at: periodEnd,
   };
 
@@ -180,11 +180,15 @@ const updatePremiumForSubscription = async (
   } else {
     const { error } = await supabase
       .from("premium_feature_activations")
-      .update({
-        expires_at: new Date().toISOString(),
-        notes: "stripe_auto",
-      })
-      .eq("profile_id", resolvedProfileId);
+      .upsert(
+        {
+          profile_id: resolvedProfileId,
+          activated_at: periodStart,
+          expires_at: periodEnd ?? new Date().toISOString(),
+          notes: "stripe_auto",
+        },
+        { onConflict: "profile_id" },
+      );
 
     if (error) {
       console.error("[stripe/webhook] failed to expire premium activation", error);

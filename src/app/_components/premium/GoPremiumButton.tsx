@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 type GoPremiumButtonProps = {
   profileId: number | null;
   premiumExpiresAt: string | null;
+  isPremiumActive?: boolean;
 };
 
 const isFutureDate = (iso: string | null): boolean => {
@@ -14,10 +15,19 @@ const isFutureDate = (iso: string | null): boolean => {
   return parsed > Date.now();
 };
 
-export function GoPremiumButton({ profileId, premiumExpiresAt }: GoPremiumButtonProps) {
+export function GoPremiumButton({
+  profileId,
+  premiumExpiresAt,
+  isPremiumActive,
+}: GoPremiumButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasPremium = useMemo(() => isFutureDate(premiumExpiresAt), [premiumExpiresAt]);
+  const hasPremium = useMemo(() => {
+    if (typeof isPremiumActive === "boolean") {
+      return isPremiumActive;
+    }
+    return isFutureDate(premiumExpiresAt);
+  }, [isPremiumActive, premiumExpiresAt]);
 
   const disabled = loading || !profileId;
 
@@ -89,18 +99,15 @@ export function GoPremiumButton({ profileId, premiumExpiresAt }: GoPremiumButton
 
 type ManageSubscriptionButtonProps = {
   stripeCustomerId: string | null;
-  premiumExpiresAt: string | null;
 };
 
 export function ManageSubscriptionButton({
   stripeCustomerId,
-  premiumExpiresAt,
 }: ManageSubscriptionButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasPremium = useMemo(() => isFutureDate(premiumExpiresAt), [premiumExpiresAt]);
 
-  if (!stripeCustomerId || !hasPremium) {
+  if (!stripeCustomerId) {
     return null;
   }
 

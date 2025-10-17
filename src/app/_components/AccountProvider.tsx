@@ -28,6 +28,8 @@ type AccountResponse = {
   appUser: {
     stripe_customer_id: string | null;
     stripe_subscription_id: string | null;
+    stripe_subscription_status: string | null;
+    stripe_subscription_cancel_at_period_end: boolean | null;
     premium_expires_at: string | null;
     primary_profile_id: number | null;
   } | null;

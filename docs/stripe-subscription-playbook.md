@@ -52,6 +52,7 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
      add column stripe_subscription_id text;
    ```
 3. Ensure you can look up a Supabase profile by Stripe customer ID during webhooks.
+4. Track the latest subscription status on the `app_users` table (see migration `0029_app_users_subscription_status.sql`) so the UI can surface renewal vs. expiry messaging.
 
 ---
 
@@ -60,6 +61,7 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
 - Add `POST /api/premium/checkout`:
   - Fetch or create a Stripe Customer for the current profile.
   - Create a subscription Checkout Session (mode: `subscription`, `line_items` with `STRIPE_PRICE_ID`).
+  - Use a `success_url` like `https://app/account?checkout=success&session_id={CHECKOUT_SESSION_ID}` so the app can reconcile state after redirect.
   - Return `session.url` so the client can redirect.
   - Write the Stripe customer ID back to Supabase.
 
@@ -89,7 +91,9 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
 - Handle:
   - `checkout.session.completed` → mark `premium_feature_activations` with `expires_at` = current period end.
   - `customer.subscription.updated` / `deleted` → update or revoke access based on status.
+  - Mirror `subscription.status` and `cancel_at_period_end` back to `app_users` so the dashboard can tell whether access will renew or lapse.
 - Store processed webhook event IDs to guard against retries (idempotency).
+- The account dashboard also calls a `syncStripeSubscription` helper using the `session_id` query parameter, so users see changes immediately even if the webhook is delayed.
 
 ---
 
