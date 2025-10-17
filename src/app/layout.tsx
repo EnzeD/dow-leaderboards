@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { Exo_2 } from "next/font/google";
 import "./globals.css";
+import { AccountProvider } from "./_components/AccountProvider";
+import { auth0 } from "@/lib/auth0";
 
 const exo2 = Exo_2({
   subsets: ["latin"],
@@ -22,11 +25,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth0.getSession();
+
   return (
     <html lang="en">
       <body className={`${exo2.className} bg-neutral-900 min-h-screen`} style={{
@@ -35,7 +40,11 @@ export default function RootLayout({
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}>
-        {children}
+        <Auth0Provider user={session?.user ?? undefined}>
+          <AccountProvider>
+            {children}
+          </AccountProvider>
+        </Auth0Provider>
         <Analytics />
       </body>
     </html>

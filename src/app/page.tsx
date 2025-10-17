@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useRef, Fragment } from "react";
 import Link from "next/link";
+import { useUser } from "@auth0/nextjs-auth0";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
@@ -14,6 +15,7 @@ import { PlayerSearchResult, supabase } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 import { getLevelFromXP } from "@/lib/xp-levels";
 import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
+import { useAccount } from "@/app/_components/AccountProvider";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -468,6 +470,13 @@ export default function Home() {
       combinedViewMode: combined === 'all' ? 'all' : 'best',
     };
   };
+
+  const { user: authUser, isLoading: authLoading } = useUser();
+  const { account, loading: accountLoading } = useAccount();
+  const accountLink = "/account";
+  const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
+  const linkedAlias = account?.profile?.alias ?? null;
+  const accountButtonLabel = linkedAlias ?? "Account";
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
@@ -1882,6 +1891,30 @@ export default function Home() {
                 <span className="ml-2 text-sm font-semibold text-white">
                   {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
                 </span>
+              </div>
+              <div>
+                {authLoading || accountLoading ? (
+                  <span className="inline-flex items-center rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-medium text-neutral-400">
+                    Loading…
+                  </span>
+                ) : authUser ? (
+                  <Link
+                    href={accountLink}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
+                    title={linkedAlias ? `Manage ${linkedAlias}` : "Manage account"}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${linkedAlias ? "bg-emerald-400" : "bg-amber-400"}`} aria-hidden />
+                    <span className="max-w-[10rem] truncate">{accountButtonLabel}</span>
+                  </Link>
+                ) : (
+                  <a
+                    href={loginLink}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
+                  >
+                    <span className="h-2 w-2 rounded-full bg-sky-400" aria-hidden />
+                    Log in
+                  </a>
+                )}
               </div>
             </div>
           </div>
