@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import Link from "next/link";
 import { useUser } from "@auth0/nextjs-auth0";
 import SupportButton from "@/app/_components/SupportButton";
@@ -17,6 +17,7 @@ import { getLevelFromXP } from "@/lib/xp-levels";
 import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
 import { useAccount } from "@/app/_components/AccountProvider";
 import { AccountIcon } from "@/components/icons";
+import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -99,8 +100,6 @@ const FAVORITES_COOKIE = 'dow_favorites';
 const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
 const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
-const ADVANCED_STATS_INTENT_STORAGE_KEY = "dow_last_advanced_stats_intent";
-
 const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
 
 const buildFavoriteKey = (
@@ -510,6 +509,9 @@ export default function Home() {
   const accountLink = "/account";
   const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
   const isAuthenticated = Boolean(authUser);
+  const linkedProfileId = account?.appUser?.primary_profile_id
+    ? String(account.appUser.primary_profile_id)
+    : null;
   const linkedAlias = account?.profile?.alias ?? null;
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
@@ -604,6 +606,19 @@ export default function Home() {
       setHiddenAdvancedStats(initial);
     }
   }, []);
+
+  const getIsAdvancedStatsHidden = useCallback(
+    (profileId?: string | null) => {
+      if (!profileId) return true;
+      const stored = hiddenAdvancedStats[profileId];
+      if (stored !== undefined) {
+        return stored;
+      }
+      const isLinkedProfile = linkedProfileId && linkedProfileId === profileId;
+      return !isLinkedProfile;
+    },
+    [hiddenAdvancedStats, linkedProfileId],
+  );
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
@@ -1288,16 +1303,16 @@ export default function Home() {
     if (!profileId) return;
 
     setHiddenAdvancedStats((previous) => {
-      const currentlyHidden = previous[profileId] ?? false;
+      const stored = previous[profileId];
+      const isLinkedProfile = linkedProfileId && linkedProfileId === profileId;
+      const defaultHidden = !isLinkedProfile;
+      const currentlyHidden = stored === undefined ? defaultHidden : stored;
       const nextHidden = !currentlyHidden;
       const next = { ...previous, [profileId]: nextHidden };
       if (typeof document !== "undefined") {
         const cookieName = `${ADVANCED_STATS_HIDE_COOKIE_PREFIX}${profileId}`;
-        if (nextHidden) {
-          document.cookie = `${cookieName}=1; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
-        } else {
-          document.cookie = `${cookieName}=; path=/; max-age=0; SameSite=Lax`;
-        }
+        const cookieValue = nextHidden ? "1" : "0";
+        document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
       }
       return next;
     });
@@ -1311,7 +1326,6 @@ export default function Home() {
 
     const trimmedProfileId = payload.profileId.trim();
     const fallbackQuery = (payload.alias ?? payload.playerName ?? "").trim();
-    let redirectPath = window.location.pathname;
 
     try {
       const state: AppState = {
@@ -1319,9 +1333,9 @@ export default function Home() {
         searchQuery: searchQuery || fallbackQuery,
         searchProfileId: trimmedProfileId,
       };
-      const path = buildUrl(state);
-      redirectPath = path || window.location.pathname;
-      const redirectUrl = `${window.location.origin}${redirectPath}`;
+      const fullUrl = buildUrl(state);
+      const parsedUrl = new URL(fullUrl);
+      const redirectUrl = parsedUrl.toString();
       window.sessionStorage.setItem(
         ADVANCED_STATS_INTENT_STORAGE_KEY,
         JSON.stringify({
@@ -1335,7 +1349,7 @@ export default function Home() {
       return redirectUrl;
     } catch (error) {
       console.warn("Failed to persist advanced stats intent", error);
-      return `${window.location.origin}${redirectPath}`;
+      return window.location.href;
     }
   };
 
@@ -1349,19 +1363,21 @@ export default function Home() {
     if (!trimmedProfileId) return;
     if (typeof window === "undefined") return;
 
-    const redirectUrl = rememberAdvancedStatsIntent({
+    rememberAdvancedStatsIntent({
       profileId: trimmedProfileId,
       alias,
       playerName,
       source,
     });
 
+    const accountSubscribePath = `/account?subscribe=1&subscribeIntent=1&profileId=${encodeURIComponent(trimmedProfileId)}`;
+
     if (!authUser) {
-      window.location.href = `/login?redirectTo=${encodeURIComponent(redirectUrl)}`;
+      window.location.href = `/login?redirectTo=${encodeURIComponent(accountSubscribePath)}`;
       return;
     }
 
-    window.location.href = `/account?subscribe=1&profileId=${encodeURIComponent(trimmedProfileId)}`;
+    window.location.href = accountSubscribePath;
   };
 
   const activateTabFromFooter = (tab: TabType) => {
@@ -2577,14 +2593,14 @@ export default function Home() {
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
-                        {profileIdStr && (
+                        {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
                           <div className="mt-4">
-                            {hiddenAdvancedStats[profileIdStr]
-                              ? (
-                                <AdvancedStatsCollapsedPreview
-                                  displayName={aliasPrimary || aliasFallback || profileIdStr}
-                                />
-                              ) : (
+                          {getIsAdvancedStatsHidden(profileIdStr)
+                            ? (
+                              <AdvancedStatsCollapsedPreview
+                                displayName={aliasPrimary || aliasFallback || profileIdStr}
+                              />
+                            ) : (
                                 <AdvancedStatsPanel
                                   profileId={profileIdStr}
                                   alias={aliasPrimary || aliasFallback}
@@ -2605,7 +2621,7 @@ export default function Home() {
                             Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
                           </p>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                                {profileIdStr && (
+                                {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenAdvancedStats({
@@ -2615,7 +2631,7 @@ export default function Home() {
                                     })}
                                     className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
                                   >
-                                    {hiddenAdvancedStats[profileIdStr] ? "View advanced statistics" : "Hide advanced statistics"}
+                                    {getIsAdvancedStatsHidden(profileIdStr) ? "View advanced statistics" : "Hide advanced statistics"}
                                   </button>
                                 )}
                           </div>
@@ -3022,7 +3038,7 @@ export default function Home() {
                               })}
                               className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 rounded-md border border-yellow-500/40 transition-colors text-xs font-semibold"
                             >
-                              {hiddenAdvancedStats[String(entry.profileId)] ? "View advanced statistics" : "Hide advanced statistics"}
+                              {getIsAdvancedStatsHidden(String(entry.profileId)) ? "View advanced statistics" : "Hide advanced statistics"}
                             </button>
                           )}
                           </div>
@@ -3050,9 +3066,9 @@ export default function Home() {
 
                       {result && renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 3)}
 
-                      {entry.profileId && (
+                      {entry.profileId && (!linkedProfileId || linkedProfileId === String(entry.profileId)) && (
                         <div className="mt-4">
-                          {hiddenAdvancedStats[String(entry.profileId)]
+                          {getIsAdvancedStatsHidden(String(entry.profileId))
                             ? (
                               <AdvancedStatsCollapsedPreview
                                 displayName={entry.alias || entry.playerName || String(entry.profileId)}

@@ -10,6 +10,8 @@ import {
   ManageSubscriptionButton,
 } from "@/app/_components/premium/GoPremiumButton";
 import { syncStripeSubscription } from "@/lib/premium/stripe-sync";
+import { AdvancedStatsIntentBanner } from "@/app/_components/AdvancedStatsIntentBanner";
+import { ProfileSwitchPrompt } from "@/app/_components/ProfileSwitchPrompt";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -57,6 +59,40 @@ const resolveCheckoutSessionId = (
   return null;
 };
 
+const parseProfileIdParam = (value: string | string[] | undefined): number | null => {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const parsed = parseProfileIdParam(entry);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+};
+
+const parseBooleanParam = (value: string | string[] | undefined): boolean => {
+  if (!value) return false;
+  const evaluate = (token: string) => {
+    const normalized = token.trim().toLowerCase();
+    return ["1", "true", "yes", "on"].includes(normalized);
+  };
+  if (Array.isArray(value)) {
+    return value.some((entry) => evaluate(entry));
+  }
+  return evaluate(value);
+};
+
+const formatProfileLabel = (alias: string | null, profileId: number | null) => {
+  if (alias && alias.trim().length > 0) return alias.trim();
+  if (profileId) return `Profile ${profileId}`;
+  return "this profile";
+};
+
 type PageProps = {
   searchParams?: Record<string, string | string[] | undefined>;
 };
@@ -68,7 +104,77 @@ export default async function AccountPage({ searchParams }: PageProps) {
     redirect(`/login?redirectTo=${encodeURIComponent("/account")}`);
   }
 
+  const subscribeIntentActive = parseBooleanParam(
+    (searchParams?.subscribe ?? searchParams?.subscribeIntent) as string | string[] | undefined,
+  );
+
+  let intentProfileId =
+    parseProfileIdParam(searchParams?.profileId) ??
+    parseProfileIdParam(searchParams?.profile_id) ??
+    parseProfileIdParam(searchParams?.profileID) ??
+    parseProfileIdParam(searchParams?.pid) ??
+    null;
+
+  let intentProfileAlias: string | null = null;
+  let intentProfileCountry: string | null = null;
+  let intentStatusMessage: string | null = null;
+  let intentStatusTone: "info" | "success" | "warning" | "error" = "info";
+  let switchPromptData: { profileId: number; alias: string | null; country: string | null } | null = null;
+
   const supabase = getSupabaseAdmin();
+
+  const attemptLinkProfile = async (profileId: number) => {
+    if (!supabase) {
+      return { success: false as const, reason: "supabase_unavailable" as const };
+    }
+
+    const { data: player, error: playerError } = await supabase
+      .from("players")
+      .select("profile_id, current_alias, country")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    if (playerError) {
+      console.error("[account] failed to fetch player for subscription intent", playerError);
+    }
+
+    if (!player) {
+      return { success: false as const, reason: "player_not_found" as const };
+    }
+
+    const { error: linkError } = await upsertAppUser({
+      supabase,
+      auth0Sub: session.user.sub,
+      email: sanitizeEmail(session.user.email ?? undefined),
+      emailVerified: session.user.email_verified ?? null,
+      additionalFields: {
+        primary_profile_id: player.profile_id,
+      },
+    });
+
+    if (linkError) {
+      console.error("[account] failed to auto-link profile for subscription intent", linkError);
+      return { success: false as const, reason: "link_failed" as const };
+    }
+
+    const { data: activation, error: activationError } = await supabase
+      .from("premium_feature_activations")
+      .select("expires_at")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+
+    if (activationError) {
+      console.error("[account] failed to fetch activation for auto-linked profile", activationError);
+    }
+
+    return {
+      success: true as const,
+      alias: player.current_alias ?? null,
+      country: player.country ?? null,
+      activationExists: Boolean(activation),
+      activationExpiresAt: activation?.expires_at ?? null,
+    };
+  };
 
   let premiumExpiresAt: string | null = null;
   let stripeCustomerId: string | null = null;
@@ -91,6 +197,19 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
     if (upsertError) {
       console.error("[account] failed to sync app_users", upsertError);
+    }
+
+    if (subscribeIntentActive && intentProfileId) {
+      const { data: intentPlayer, error: intentPlayerError } = await supabase
+        .from("players")
+        .select("profile_id, current_alias, country")
+        .eq("profile_id", intentProfileId)
+        .maybeSingle();
+
+      if (!intentPlayerError && intentPlayer) {
+        intentProfileAlias = intentPlayer.current_alias ?? null;
+        intentProfileCountry = intentPlayer.country ?? null;
+      }
     }
 
     const { data, error } = await supabase
@@ -163,6 +282,81 @@ export default async function AccountPage({ searchParams }: PageProps) {
     }
   }
 
+  const existingActivationActive =
+    premiumForced ||
+    (premiumActivationExists &&
+      (!premiumActivationExpiresAt || isFutureDate(premiumActivationExpiresAt)));
+  const existingAppUserPremiumActive = isFutureDate(premiumExpiresAt);
+  const existingPremiumActive = existingActivationActive || existingAppUserPremiumActive;
+
+  if (subscribeIntentActive) {
+    if (!intentProfileId) {
+      intentStatusMessage = "We couldn't determine which profile to link. Please select one below.";
+      intentStatusTone = "error";
+    } else {
+      if (!primaryProfileId) {
+        const linkResult = await attemptLinkProfile(intentProfileId);
+        if (linkResult.success) {
+          primaryProfileId = intentProfileId;
+          profileAlias = linkResult.alias ?? profileAlias;
+          intentProfileAlias = linkResult.alias ?? intentProfileAlias;
+          profileCountry = linkResult.country ?? profileCountry;
+          intentProfileCountry = linkResult.country ?? intentProfileCountry;
+          premiumActivationExists = linkResult.activationExists ?? false;
+          premiumActivationExpiresAt = linkResult.activationExpiresAt ?? null;
+          premiumForced = isEnvForcedProfile(String(intentProfileId));
+          premiumExpiresAt = null;
+          intentStatusMessage = `Linked ${formatProfileLabel(intentProfileAlias, intentProfileId)} to your account. Start your subscription below.`;
+          intentStatusTone = "success";
+        } else if (linkResult.reason === "player_not_found") {
+          intentStatusMessage = "We couldn't find that profile. Please try again from the search results.";
+          intentStatusTone = "error";
+        } else if (linkResult.reason === "supabase_unavailable") {
+          intentStatusMessage = "Linking is currently unavailable. Please try again shortly.";
+          intentStatusTone = "error";
+        } else {
+          intentStatusMessage = "We couldn't link the selected profile automatically. You can link it manually below.";
+          intentStatusTone = "error";
+        }
+      } else if (primaryProfileId === intentProfileId) {
+        intentStatusMessage = `You're ready to subscribe for ${formatProfileLabel(profileAlias, primaryProfileId)}.`;
+        intentStatusTone = "info";
+      } else if (existingPremiumActive) {
+        switchPromptData = {
+          profileId: intentProfileId,
+          alias: intentProfileAlias,
+          country: intentProfileCountry,
+        };
+        intentStatusMessage = `Premium is currently active for ${formatProfileLabel(profileAlias, primaryProfileId)}. Switch to ${formatProfileLabel(intentProfileAlias, intentProfileId)} to move your benefits.`;
+        intentStatusTone = "warning";
+      } else {
+        const linkResult = await attemptLinkProfile(intentProfileId);
+        if (linkResult.success) {
+          primaryProfileId = intentProfileId;
+          profileAlias = linkResult.alias ?? profileAlias;
+          intentProfileAlias = linkResult.alias ?? intentProfileAlias;
+          profileCountry = linkResult.country ?? profileCountry;
+          intentProfileCountry = linkResult.country ?? intentProfileCountry;
+          premiumActivationExists = linkResult.activationExists ?? false;
+          premiumActivationExpiresAt = linkResult.activationExpiresAt ?? null;
+          premiumForced = isEnvForcedProfile(String(intentProfileId));
+          premiumExpiresAt = null;
+          intentStatusMessage = `Linked ${formatProfileLabel(intentProfileAlias, intentProfileId)} to your account. Start your subscription below.`;
+          intentStatusTone = "success";
+        } else if (linkResult.reason === "player_not_found") {
+          intentStatusMessage = "We couldn't find that profile. Please try again from the search results.";
+          intentStatusTone = "error";
+        } else if (linkResult.reason === "supabase_unavailable") {
+          intentStatusMessage = "Linking is currently unavailable. Please try again shortly.";
+          intentStatusTone = "error";
+        } else {
+          intentStatusMessage = "We couldn't link the selected profile automatically. You can link it manually below.";
+          intentStatusTone = "error";
+        }
+      }
+    }
+  }
+
   const resolveBaseUrl = () => {
     const raw =
       process.env.NEXT_PUBLIC_SITE_URL ??
@@ -225,6 +419,17 @@ export default async function AccountPage({ searchParams }: PageProps) {
       ? "Premium benefits remain active until your expiry."
       : null;
   const premiumStatusTone = subscriptionRenewing ? "text-emerald-300" : "text-amber-300";
+  const premiumSectionClassName = [
+    "rounded-2xl border bg-neutral-900/80 p-6 shadow-lg",
+    subscribeIntentActive ? "border-yellow-500/60 shadow-yellow-500/15" : "border-neutral-700/60",
+  ].join(" ");
+  const intentToneStyles = {
+    success: "border-emerald-400/50 bg-emerald-400/15 text-emerald-100",
+    error: "border-red-500/50 bg-red-500/15 text-red-200",
+    warning: "border-amber-500/50 bg-amber-500/15 text-amber-100",
+    info: "border-yellow-500/40 bg-yellow-500/10 text-yellow-100",
+  } as const;
+  const intentMessageClassName = intentToneStyles[intentStatusTone];
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
@@ -241,6 +446,13 @@ export default async function AccountPage({ searchParams }: PageProps) {
           Manage your login, subscription, and premium analytics access.
         </p>
       </header>
+
+      {subscribeIntentActive && (
+        <AdvancedStatsIntentBanner
+          active={subscribeIntentActive}
+          intentAlias={intentProfileAlias ?? profileAlias ?? (intentProfileId ? `Profile ${intentProfileId}` : null)}
+        />
+      )}
 
       {checkoutStatus === "success" && (
         <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/15 px-6 py-4 text-sm text-emerald-100 shadow-lg">
@@ -298,11 +510,26 @@ export default async function AccountPage({ searchParams }: PageProps) {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
+      <section id="premium-billing" className={premiumSectionClassName}>
         <h2 className="text-xl font-semibold text-white">Premium & Billing</h2>
         <p className="mt-2 text-sm text-neutral-400">
           Unlock advanced analytics and premium ladders with a monthly subscription.
         </p>
+        {subscribeIntentActive && intentStatusMessage && !switchPromptData && (
+          <div className={`mt-4 mb-4 rounded-xl border px-4 py-3 text-xs sm:text-sm ${intentMessageClassName}`}>
+            {intentStatusMessage}
+          </div>
+        )}
+        {switchPromptData && (
+          <div className="mt-4">
+            <ProfileSwitchPrompt
+              targetProfileId={switchPromptData.profileId}
+              targetAlias={switchPromptData.alias}
+              targetCountry={switchPromptData.country}
+              currentAlias={profileAlias ?? (primaryProfileId ? `Profile ${primaryProfileId}` : null)}
+            />
+          </div>
+        )}
         <dl className="mt-4 grid gap-3 text-sm text-neutral-300 md:grid-cols-2">
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
