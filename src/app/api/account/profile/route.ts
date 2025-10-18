@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
-import { getSupabaseAdmin } from "@/lib/premium/activation-server";
+import { getSupabaseAdmin } from "@/lib/premium/subscription-server";
 
 export async function POST(request: NextRequest) {
   const session = await auth0.getSession();

@@ -32,6 +32,16 @@ type AccountResponse = {
     premium_expires_at: string | null;
     primary_profile_id: number | null;
   } | null;
+  subscription: {
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    status: string | null;
+    cancelAtPeriodEnd: boolean | null;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    priceId: string | null;
+    active: boolean;
+  } | null;
   profile: AccountProfile | null;
 };
 
@@ -44,7 +54,9 @@ type AccountContextValue = {
 
 const AccountContext = createContext<AccountContextValue | null>(null);
 
-const fetcher = async (url: string) => {
+const fetcher = async (key: string) => {
+  // Remove query params from fetch URL (they're only for SWR cache keying)
+  const url = key.split("?")[0];
   const response = await fetch(url, {
     credentials: "include",
     cache: "no-store",
@@ -86,21 +98,25 @@ export function AccountProvider({ children, initialUser }: AccountProviderProps)
         picture: initialUser.picture ?? null,
       },
       appUser: null,
+      subscription: null,
       profile: null,
     };
   }, [initialUser]);
 
   const shouldFetch = Boolean(initialUser);
+  // Include user ID in cache key to prevent stale data from previous sessions
+  const swrKey = shouldFetch ? `/api/auth/session?sub=${initialUser?.sub}` : null;
   const {
     data,
     error,
     isValidating,
     mutate,
-  } = useSWR<AccountResponse>(shouldFetch ? "/api/auth/session" : null, fetcher, {
+  } = useSWR<AccountResponse>(swrKey, fetcher, {
     fallbackData: fallbackAccount ?? undefined,
-    revalidateOnFocus: false,
-    revalidateIfStale: false,
-    revalidateOnReconnect: false,
+    revalidateOnFocus: true,
+    revalidateIfStale: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 0,
   });
 
   const value = useMemo<AccountContextValue>(() => {

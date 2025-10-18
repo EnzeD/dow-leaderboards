@@ -1,49 +1,115 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
-  resolveActivationStatus,
-} from "@/lib/premium/activation-server";
+  fetchSubscriptionSnapshot,
+  getSupabaseAdmin,
+  isStripeSubscriptionActive,
+} from "@/lib/premium/subscription-server";
 
 type ActivationResponse = {
   activated: boolean;
-  activatedAt?: string;
-  expiresAt?: string | null;
   reason?: string;
-  forced?: boolean;
+  status?: string | null;
+  cancelAtPeriodEnd?: boolean | null;
+  currentPeriodEnd?: string | null;
+  profileId?: number | null;
 };
 
 export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const profileIdRaw = url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
-  const profileId = profileIdRaw?.trim();
+  const session = await auth0.getSession();
 
-  if (!profileId) {
+  if (!session) {
     return attachCacheHeaders(
-      NextResponse.json<ActivationResponse>({
-        activated: false,
-        reason: "missing_profile",
-      }, { status: 400 })
+      NextResponse.json<ActivationResponse>(
+        { activated: false, reason: "not_authenticated" },
+        { status: 401 },
+      ),
     );
   }
 
-  const status = await resolveActivationStatus(profileId);
+  const supabase = getSupabaseAdmin();
 
-  const httpStatus = status.activated
-    ? 200
-    : status.reason === "not_found" || status.reason === "expired"
-      ? 200
-      : status.reason === "supabase_not_configured"
-        ? 503
-        : 200;
+  if (!supabase) {
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        { activated: false, reason: "supabase_unavailable" },
+        { status: 503 },
+      ),
+    );
+  }
+
+  const auth0Sub = session.user.sub;
+  const url = new URL(req.url);
+  const profileIdRaw =
+    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
+  const profileIdParam = profileIdRaw?.trim() ?? null;
+
+  const { data: appUser, error: appUserError } = await supabase
+    .from("app_users")
+    .select("primary_profile_id")
+    .eq("auth0_sub", auth0Sub)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("[premium] activation-status failed to load app_user", appUserError);
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        { activated: false, reason: "lookup_failed" },
+        { status: 500 },
+      ),
+    );
+  }
+
+  const primaryProfileId = appUser?.primary_profile_id
+    ? Number.parseInt(String(appUser.primary_profile_id), 10)
+    : null;
+
+  if (!primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        { activated: false, reason: "profile_not_linked" },
+        { status: 403 },
+      ),
+    );
+  }
+
+  if (profileIdParam && Number.parseInt(profileIdParam, 10) !== primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        { activated: false, reason: "profile_mismatch" },
+        { status: 403 },
+      ),
+    );
+  }
+
+  const snapshot = await fetchSubscriptionSnapshot(supabase, auth0Sub);
+  const active = isStripeSubscriptionActive(snapshot);
+
+  if (!snapshot) {
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        {
+          activated: false,
+          reason: "not_subscribed",
+          profileId: primaryProfileId,
+        },
+        { status: 200 },
+      ),
+    );
+  }
 
   return attachCacheHeaders(
-    NextResponse.json<ActivationResponse>({
-      activated: status.activated,
-      activatedAt: status.activatedAt,
-      expiresAt: status.expiresAt,
-      reason: status.reason,
-      forced: status.forced,
-    }, { status: httpStatus })
+    NextResponse.json<ActivationResponse>(
+      {
+        activated: active,
+        reason: active ? undefined : "not_subscribed",
+        status: snapshot.status,
+        cancelAtPeriodEnd: snapshot.cancel_at_period_end ?? null,
+        currentPeriodEnd: snapshot.current_period_end,
+        profileId: primaryProfileId,
+      },
+      { status: 200 },
+    ),
   );
 }
-

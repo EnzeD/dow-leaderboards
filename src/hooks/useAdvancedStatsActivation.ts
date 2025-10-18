@@ -4,10 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ActivationPayload = {
   activated: boolean;
-  activatedAt?: string;
-  expiresAt?: string | null;
   reason?: string;
-  forced?: boolean;
+  status?: string | null;
+  cancelAtPeriodEnd?: boolean | null;
+  currentPeriodEnd?: string | null;
+  profileId?: number | null;
 };
 
 type ActivationState = ActivationPayload & {
@@ -16,33 +17,7 @@ type ActivationState = ActivationPayload & {
   error?: string | null;
 };
 
-const coerceBoolean = (value: string | undefined): boolean => {
-  if (!value) return false;
-  const normalized = value.trim().toLowerCase();
-  return ["1", "true", "yes", "on"].includes(normalized);
-};
-
-const forcedProfilesEnv = (() => {
-  const raw = process.env.NEXT_PUBLIC_FORCE_ADVANCED_STATS_PROFILE;
-  if (!raw) return new Set<string>();
-  return new Set(
-    raw
-      .split(",")
-      .map((token) => token.trim())
-      .filter((token) => token.length > 0)
-  );
-})();
-
-const forceAllEnv = coerceBoolean(process.env.NEXT_PUBLIC_FORCE_ADVANCED_STATS);
-
 const activationCache = new Map<string, ActivationState>();
-
-const getForcedState = (): ActivationState => ({
-  activated: true,
-  forced: true,
-  loading: false,
-  reason: "env_override",
-});
 
 const getDefaultState = (): ActivationState => ({
   activated: false,
@@ -57,10 +32,6 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
   }, [profileId]);
 
   const [state, setState] = useState<ActivationState>(() => {
-    if (forceAllEnv) return getForcedState();
-    if (normalizedProfileId && forcedProfilesEnv.has(normalizedProfileId)) {
-      return getForcedState();
-    }
     if (normalizedProfileId && activationCache.has(normalizedProfileId)) {
       return activationCache.get(normalizedProfileId)!;
     }
@@ -72,13 +43,6 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
   const fetchStatus = useCallback(async () => {
     if (!normalizedProfileId) {
       setState(getDefaultState());
-      return;
-    }
-
-    if (forceAllEnv || forcedProfilesEnv.has(normalizedProfileId)) {
-      const forcedState = getForcedState();
-      activationCache.set(normalizedProfileId, forcedState);
-      setState(forcedState);
       return;
     }
 
@@ -102,17 +66,23 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
         signal: controller.signal,
       });
 
-      if (!response.ok) {
-        console.warn("[premium] activation API returned non-200", response.status, response.statusText);
+      let payload: ActivationPayload | null = null;
+      try {
+        payload = (await response.json()) as ActivationPayload;
+      } catch {
+        payload = null;
       }
 
-      const payload = (await response.json()) as ActivationPayload;
-
       const nextState: ActivationState = {
-        ...payload,
+        activated: Boolean(payload?.activated),
+        status: payload?.status ?? null,
+        cancelAtPeriodEnd: payload?.cancelAtPeriodEnd ?? null,
+        currentPeriodEnd: payload?.currentPeriodEnd ?? null,
+        profileId: payload?.profileId ?? null,
+        reason: payload?.reason,
         loading: false,
         lastFetchedAt: new Date().toISOString(),
-        error: response.ok ? null : payload.reason ?? `http_${response.status}`,
+        error: response.ok ? null : payload?.reason ?? `http_${response.status}`,
       };
 
       activationCache.set(normalizedProfileId, nextState);
@@ -152,4 +122,3 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
 };
 
 export type UseAdvancedStatsActivationResult = ReturnType<typeof useAdvancedStatsActivation>;
-

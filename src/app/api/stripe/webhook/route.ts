@@ -3,23 +3,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { getSupabaseAdmin } from "@/lib/premium/activation-server";
+import {
+  getSupabaseAdmin,
+  upsertSubscriptionSnapshot,
+} from "@/lib/premium/subscription-server";
 
 const webhookSecret =
   process.env.STRIPE_WEBHOOK_SECRET ??
   process.env.STRIPE_SIGNING_SECRET ??
   null;
-
-const isSubscriptionActive = (status: Stripe.Subscription.Status) => {
-  switch (status) {
-    case "active":
-    case "trialing":
-    case "past_due":
-      return true;
-    default:
-      return false;
-  }
-};
 
 const parseProfileId = (value: unknown): number | null => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -39,9 +31,7 @@ const getCustomerId = (customer: string | Stripe.Customer | Stripe.DeletedCustom
   return customer.id;
 };
 
-const updatePremiumForSubscription = async (
-  subscription: Stripe.Subscription,
-) => {
+const updatePremiumForSubscription = async (subscription: Stripe.Subscription) => {
   const supabase = getSupabaseAdmin();
 
   if (!supabase) {
@@ -51,7 +41,11 @@ const updatePremiumForSubscription = async (
 
   const stripeCustomerId = getCustomerId(subscription.customer);
   const stripeSubscriptionId = subscription.id;
-  const auth0Sub = subscription.metadata?.auth0_sub ?? subscription.metadata?.auth0Sub ?? subscription.metadata?.auth0SubId ?? null;
+  const auth0Sub =
+    subscription.metadata?.auth0_sub ??
+    subscription.metadata?.auth0Sub ??
+    subscription.metadata?.auth0SubId ??
+    null;
   const profileId =
     parseProfileId(subscription.metadata?.profile_id) ??
     parseProfileId(subscription.metadata?.profileId) ??
@@ -125,19 +119,18 @@ const updatePremiumForSubscription = async (
     ? new Date(subscriptionWithPeriods.current_period_start * 1000).toISOString()
     : new Date().toISOString();
 
-  const active = isSubscriptionActive(subscription.status);
-
   const updatePayload: Record<string, unknown> = {
     stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: active ? stripeSubscriptionId : null,
+    stripe_subscription_id: stripeSubscriptionId,
     stripe_subscription_status: subscription.status,
-    stripe_subscription_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    stripe_subscription_cancel_at_period_end: Boolean(
+      subscription.cancel_at_period_end,
+    ),
     premium_expires_at: periodEnd,
   };
 
-  if (resolvedProfileId) {
-    updatePayload.primary_profile_id = resolvedProfileId;
-  }
+  // Don't set primary_profile_id from webhooks - users should link profiles explicitly
+  // Webhooks should only update subscription/billing fields, not profile linkage
 
   if (resolvedAuth0Sub) {
     const { error } = await supabase
@@ -148,56 +141,25 @@ const updatePremiumForSubscription = async (
     if (error) {
       console.error("[stripe/webhook] failed to update app_user by auth0_sub", error);
     }
-  } else if (stripeCustomerId) {
-    const { error } = await supabase
-      .from("app_users")
-      .update(updatePayload)
-      .eq("stripe_customer_id", stripeCustomerId);
 
-    if (error) {
-      console.error("[stripe/webhook] failed to update app_user by customer id", error);
-    }
-  }
-
-  if (!resolvedProfileId) {
-    console.warn("[stripe/webhook] unable to resolve profile_id from subscription", {
-      subscriptionId: subscription.id,
+    await upsertSubscriptionSnapshot(supabase, {
+      auth0Sub: resolvedAuth0Sub,
+      stripeCustomerId: stripeCustomerId ?? null,
+      stripeSubscriptionId: stripeSubscriptionId,
+      status: subscription.status,
+      cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
+      priceId:
+        typeof subscription.items?.data?.[0]?.price?.id === "string"
+          ? subscription.items.data[0].price.id
+          : null,
     });
-    return;
-  }
-
-  if (active) {
-    const { error } = await supabase
-      .from("premium_feature_activations")
-      .upsert(
-        {
-          profile_id: resolvedProfileId,
-          activated_at: periodStart,
-          expires_at: periodEnd,
-          notes: "stripe_auto",
-        },
-        { onConflict: "profile_id" },
-      );
-
-    if (error) {
-      console.error("[stripe/webhook] failed to upsert premium activation", error);
-    }
   } else {
-    const { error } = await supabase
-      .from("premium_feature_activations")
-      .upsert(
-        {
-          profile_id: resolvedProfileId,
-          activated_at: periodStart,
-          expires_at: periodEnd ?? new Date().toISOString(),
-          notes: "stripe_auto",
-        },
-        { onConflict: "profile_id" },
-      );
-
-    if (error) {
-      console.error("[stripe/webhook] failed to expire premium activation", error);
-    }
+    console.warn("[stripe/webhook] unable to associate subscription with app_user", {
+      subscriptionId: subscription.id,
+      stripeCustomerId,
+    });
   }
 };
 

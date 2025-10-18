@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
+  fetchSubscriptionSnapshot,
   getSupabaseAdmin,
-  resolveActivationStatus,
-} from "@/lib/premium/activation-server";
+  isStripeSubscriptionActive,
+} from "@/lib/premium/subscription-server";
 import { fetchLeaderboards, fetchLeaderboardRows, type Leaderboard, parseFactionFromName } from "@/lib/relic";
 
 interface OverviewRow {
@@ -34,27 +36,17 @@ interface OverviewResponse {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const profileIdRaw = url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
-  const profileId = profileIdRaw?.trim();
+  const requestedProfileId =
+    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
 
-  if (!profileId) {
+  const session = await auth0.getSession();
+  if (!session) {
     return attachCacheHeaders(
       NextResponse.json<OverviewResponse>({
         activated: false,
         profileId: "",
-        reason: "missing_profile",
-      }, { status: 400 })
-    );
-  }
-
-  const activation = await resolveActivationStatus(profileId);
-  if (!activation.activated) {
-    return attachCacheHeaders(
-      NextResponse.json<OverviewResponse>({
-        activated: false,
-        profileId,
-        reason: activation.reason,
-      }, { status: 403 })
+        reason: "not_authenticated",
+      }, { status: 401 })
     );
   }
 
@@ -63,11 +55,69 @@ export async function GET(req: NextRequest) {
     return attachCacheHeaders(
       NextResponse.json<OverviewResponse>({
         activated: false,
-        profileId,
-        reason: "supabase_not_configured",
+        profileId: "",
+        reason: "supabase_unavailable",
       }, { status: 503 })
     );
   }
+
+  const auth0Sub = session.user.sub;
+  const { data: appUser, error: appUserError } = await supabase
+    .from("app_users")
+    .select("primary_profile_id")
+    .eq("auth0_sub", auth0Sub)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("[premium] overview failed to load app_user", appUserError);
+    return attachCacheHeaders(
+      NextResponse.json<OverviewResponse>({
+        activated: false,
+        profileId: "",
+        reason: "lookup_failed",
+      }, { status: 500 })
+    );
+  }
+
+  const primaryProfileId = appUser?.primary_profile_id
+    ? Number.parseInt(String(appUser.primary_profile_id), 10)
+    : null;
+
+  if (!primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<OverviewResponse>({
+        activated: false,
+        profileId: "",
+        reason: "profile_not_linked",
+      }, { status: 403 })
+    );
+  }
+
+  if (
+    requestedProfileId &&
+    Number.parseInt(requestedProfileId, 10) !== primaryProfileId
+  ) {
+    return attachCacheHeaders(
+      NextResponse.json<OverviewResponse>({
+        activated: false,
+        profileId: String(primaryProfileId),
+        reason: "profile_mismatch",
+      }, { status: 403 })
+    );
+  }
+
+  const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
+  if (!isStripeSubscriptionActive(subscription)) {
+    return attachCacheHeaders(
+      NextResponse.json<OverviewResponse>({
+        activated: false,
+        profileId: String(primaryProfileId),
+        reason: "not_subscribed",
+      }, { status: 403 })
+    );
+  }
+
+  const profileId = String(primaryProfileId);
 
   try {
     // Fetch all leaderboards to filter out custom
@@ -128,7 +178,7 @@ export async function GET(req: NextRequest) {
     const { data: matchData } = await supabase
       .from('match_participants')
       .select('match_id, matches!inner(completed_at)')
-      .eq('profile_id', profileId)
+      .eq('profile_id', primaryProfileId)
       .eq('is_computer', false);
 
     const totalMatches = matchData?.length || 0;
@@ -141,7 +191,7 @@ export async function GET(req: NextRequest) {
     const { data: playerData } = await supabase
       .from('players')
       .select('last_seen_at, updated_at')
-      .eq('profile_id', profileId)
+      .eq('profile_id', primaryProfileId)
       .maybeSingle();
 
     const lastXpSync = playerData
@@ -177,4 +227,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

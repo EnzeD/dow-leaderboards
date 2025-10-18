@@ -10,19 +10,27 @@ type Props = {
   initialProfileId: number | null;
   initialAlias: string | null;
   initialCountry: string | null;
+  initialAvatarUrl?: string | null;
 };
 
 export function AccountProfileLinker({
   initialProfileId,
   initialAlias,
   initialCountry,
+  initialAvatarUrl,
 }: Props) {
   const router = useRouter();
-  const { refresh } = useAccount();
+  const { account, refresh } = useAccount();
   const [searchValue, setSearchValue] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Use live data from AccountProvider (don't fallback to initial props - they're stale)
+  const profileId = account?.profile?.profileId ?? null;
+  const profileAlias = account?.profile?.alias ?? null;
+  const profileCountry = account?.profile?.country ?? null;
+  const profileAvatarUrl = account?.profile?.avatarUrl ?? null;
 
   const handleSelect = (player: PlayerSearchResult) => {
     setSelectedPlayer(player);
@@ -102,24 +110,33 @@ export function AccountProfileLinker({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/30 p-4 text-sm text-neutral-300">
-        {initialProfileId ? (
-          <div>
-            <p className="text-neutral-100">
-              <span className="font-semibold">Linked profile:</span>{" "}
-              {initialAlias ?? initialProfileId}
-            </p>
-            <p className="mt-1 text-xs text-neutral-400">
-              Profile ID {initialProfileId}
-              {initialCountry ? ` • ${initialCountry}` : ""}
-            </p>
-            <button
-              type="button"
-              onClick={unlinkProfile}
-              disabled={saving}
-              className="mt-3 inline-flex items-center rounded-md border border-red-500/60 bg-red-700/30 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-700/40 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Removing…" : "Unlink profile"}
-            </button>
+        {profileId ? (
+          <div className="flex items-start gap-3">
+            {profileAvatarUrl && (
+              <img
+                src={profileAvatarUrl}
+                alt="Profile avatar"
+                className="h-12 w-12 rounded-full border border-neutral-700/60 object-cover"
+              />
+            )}
+            <div className="flex-1">
+              <p className="text-neutral-100">
+                <span className="font-semibold">Linked profile:</span>{" "}
+                {profileAlias ?? profileId}
+              </p>
+              <p className="mt-1 text-xs text-neutral-400">
+                Profile ID {profileId}
+                {profileCountry ? ` • ${profileCountry}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={unlinkProfile}
+                disabled={saving}
+                className="mt-3 inline-flex items-center rounded-md border border-red-500/60 bg-red-700/30 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-700/40 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Removing…" : "Unlink profile"}
+              </button>
+            </div>
           </div>
         ) : (
           <p>No Dawn of War profile linked yet.</p>

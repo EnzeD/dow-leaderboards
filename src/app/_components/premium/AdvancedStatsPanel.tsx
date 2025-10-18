@@ -210,6 +210,7 @@ export default function AdvancedStatsPanel({
           onActivate={handleActivateClick}
           loading={contextValue.loading}
           displayName={displayName}
+          reason={activation.reason}
           ctaLabel={ctaState?.label}
           ctaDescription={ctaState?.description}
           ctaLoading={ctaState?.loading}
@@ -341,6 +342,7 @@ type LockedAdvancedStatsPreviewProps = {
   onActivate: () => void;
   loading: boolean;
   displayName: string;
+  reason?: string;
   ctaLabel?: string;
   ctaDescription?: string;
   ctaLoading?: boolean;
@@ -350,15 +352,37 @@ function LockedAdvancedStatsPreview({
   onActivate,
   loading,
   displayName,
+  reason,
   ctaLabel,
   ctaDescription,
   ctaLoading,
 }: LockedAdvancedStatsPreviewProps) {
   const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
   const effectiveLoading = loading || Boolean(ctaLoading);
+  const defaultLabel =
+    reason === "not_authenticated"
+      ? "Sign in to continue"
+      : "Activate advanced statistics";
   const buttonLabel = effectiveLoading
     ? "Opening..."
-    : ctaLabel ?? "Activate advanced statistics";
+    : ctaLabel ?? defaultLabel;
+  const reasonMessage = (() => {
+    switch (reason) {
+      case "not_authenticated":
+        return "Sign in to your account to unlock advanced analytics.";
+      case "profile_not_linked":
+        return "Link your Dawn of War profile on the account page to enable premium insights.";
+      case "profile_mismatch":
+        return "You can only view advanced statistics for your own linked profile.";
+      case "not_subscribed":
+        return "Premium analytics require an active subscription.";
+      case "supabase_unavailable":
+        return "Premium analytics are temporarily unavailable. Please try again shortly.";
+      default:
+        return null;
+    }
+  })();
+  const secondaryCopy = ctaDescription ?? null;
 
   return (
     <div className="space-y-6 rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
@@ -387,6 +411,11 @@ function LockedAdvancedStatsPreview({
               <p className="text-xs text-neutral-300">
                 Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
               </p>
+              {reasonMessage && (
+                <p className="text-xs text-amber-300">
+                  {reasonMessage}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
@@ -466,9 +495,9 @@ function LockedAdvancedStatsPreview({
             <p className="text-sm text-neutral-200">
               {LOCKED_SECTION_DESCRIPTIONS[activeSection]}
             </p>
-            {ctaDescription && (
+            {secondaryCopy && (
               <p className="text-xs text-neutral-400">
-                {ctaDescription}
+                {secondaryCopy}
               </p>
             )}
             <button

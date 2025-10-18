@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import { getSupabaseAdmin } from "@/lib/premium/activation-server";
+import { getSupabaseAdmin } from "@/lib/premium/subscription-server";
 
 export async function DELETE() {
   const session = await auth0.getSession();
@@ -15,17 +15,6 @@ export async function DELETE() {
     return NextResponse.json({ error: "supabase_unavailable" }, { status: 500 });
   }
 
-  const { data: appUser, error: lookupError } = await supabase
-    .from("app_users")
-    .select("primary_profile_id")
-    .eq("auth0_sub", session.user.sub)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("[account] lookup failed", lookupError);
-    return NextResponse.json({ error: "lookup_failed" }, { status: 500 });
-  }
-
   const { error: deleteError } = await supabase
     .from("app_users")
     .delete()
@@ -36,15 +25,13 @@ export async function DELETE() {
     return NextResponse.json({ error: "delete_failed" }, { status: 500 });
   }
 
-  if (appUser?.primary_profile_id) {
-    const { error: premiumDeleteError } = await supabase
-      .from("premium_feature_activations")
-      .delete()
-      .eq("profile_id", appUser.primary_profile_id);
+  const { error: subscriptionDeleteError } = await supabase
+    .from("premium_subscriptions")
+    .delete()
+    .eq("auth0_sub", session.user.sub);
 
-    if (premiumDeleteError) {
-      console.error("[account] premium cleanup failed", premiumDeleteError);
-    }
+  if (subscriptionDeleteError) {
+    console.error("[account] subscription cleanup failed", subscriptionDeleteError);
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

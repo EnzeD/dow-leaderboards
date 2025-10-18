@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
-import { getSupabaseAdmin } from "@/lib/premium/activation-server";
+import {
+  fetchSubscriptionSnapshot,
+  getSupabaseAdmin,
+  isStripeSubscriptionActive,
+} from "@/lib/premium/subscription-server";
 import { getLevelFromXP } from "@/lib/xp-levels";
 import { fetchSteamSummaryByProfile } from "@/lib/steam";
 
@@ -21,6 +25,16 @@ export async function GET() {
     stripe_subscription_cancel_at_period_end: boolean | null;
     premium_expires_at: string | null;
     primary_profile_id: number | null;
+  } | null = null;
+  let subscription: {
+    stripeCustomerId: string | null;
+    stripeSubscriptionId: string | null;
+    status: string | null;
+    cancelAtPeriodEnd: boolean | null;
+    currentPeriodStart: string | null;
+    currentPeriodEnd: string | null;
+    priceId: string | null;
+    active: boolean;
   } | null = null;
   let profile:
     | {
@@ -64,6 +78,20 @@ export async function GET() {
           premium_expires_at: data.premium_expires_at ?? null,
           primary_profile_id: data.primary_profile_id ?? null,
         };
+
+        const snapshot = await fetchSubscriptionSnapshot(supabase, session.user.sub);
+        if (snapshot) {
+          subscription = {
+            stripeCustomerId: snapshot.stripe_customer_id,
+            stripeSubscriptionId: snapshot.stripe_subscription_id,
+            status: snapshot.status,
+            cancelAtPeriodEnd: snapshot.cancel_at_period_end ?? null,
+            currentPeriodStart: snapshot.current_period_start,
+            currentPeriodEnd: snapshot.current_period_end,
+            priceId: snapshot.price_id,
+            active: isStripeSubscriptionActive(snapshot),
+          };
+        }
 
         if (appUser.primary_profile_id) {
           const { data: player, error: playerError } = await supabase
@@ -115,6 +143,7 @@ export async function GET() {
       picture: session.user.picture ?? null,
     },
     appUser,
+    subscription,
     profile,
   };
 

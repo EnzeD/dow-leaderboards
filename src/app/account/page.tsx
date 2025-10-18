@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth0 } from "@/lib/auth0";
-import { getSupabaseAdmin, isEnvForcedProfile } from "@/lib/premium/activation-server";
+import {
+  fetchSubscriptionSnapshot,
+  getSupabaseAdmin,
+  isStripeSubscriptionActive as isSubscriptionSnapshotActive,
+} from "@/lib/premium/subscription-server";
 import { DeleteAccountButton } from "@/app/_components/DeleteAccountButton";
 import { AccountProfileLinker } from "@/app/_components/AccountProfileLinker";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
@@ -12,6 +16,7 @@ import {
 import { syncStripeSubscription } from "@/lib/premium/stripe-sync";
 import { AdvancedStatsIntentBanner } from "@/app/_components/AdvancedStatsIntentBanner";
 import { ProfileSwitchPrompt } from "@/app/_components/ProfileSwitchPrompt";
+import { AccountRefresher } from "@/app/_components/AccountRefresher";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -20,23 +25,9 @@ const formatDateTime = (iso: string | null | undefined) => {
   return date.toLocaleString();
 };
 
-const isFutureDate = (iso: string | null | undefined): boolean => {
-  if (!iso) return false;
-  const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) return false;
-  return parsed > Date.now();
-};
-
-const isStripeSubscriptionActive = (status: string | null | undefined): boolean => {
-  if (!status) return false;
-  switch (status) {
-    case "active":
-    case "trialing":
-    case "past_due":
-      return true;
-    default:
-      return false;
-  }
+const isValidCheckoutSessionId = (value: string | null | undefined) => {
+  if (!value) return false;
+  return /^cs_(?:test|live)_[A-Za-z0-9]+$/.test(value);
 };
 
 const resolveCheckoutSessionId = (
@@ -51,10 +42,12 @@ const resolveCheckoutSessionId = (
 
   if (!raw) return null;
   if (Array.isArray(raw)) {
-    return raw.length > 0 ? raw[0] ?? null : null;
+    const candidate = raw.length > 0 ? raw[0] ?? null : null;
+    return isValidCheckoutSessionId(candidate) ? candidate : null;
   }
   if (typeof raw === "string" && raw.trim().length > 0) {
-    return raw.trim();
+    const trimmed = raw.trim();
+    return isValidCheckoutSessionId(trimmed) ? trimmed : null;
   }
   return null;
 };
@@ -157,35 +150,21 @@ export default async function AccountPage({ searchParams }: PageProps) {
       return { success: false as const, reason: "link_failed" as const };
     }
 
-    const { data: activation, error: activationError } = await supabase
-      .from("premium_feature_activations")
-      .select("expires_at")
-      .eq("profile_id", profileId)
-      .maybeSingle();
-
-    if (activationError) {
-      console.error("[account] failed to fetch activation for auto-linked profile", activationError);
-    }
-
     return {
       success: true as const,
       alias: player.current_alias ?? null,
       country: player.country ?? null,
-      activationExists: Boolean(activation),
-      activationExpiresAt: activation?.expires_at ?? null,
     };
   };
 
-  let premiumExpiresAt: string | null = null;
   let stripeCustomerId: string | null = null;
   let stripeSubscriptionStatus: string | null = null;
-  let stripeSubscriptionCancelAtPeriodEnd = false;
+  let stripeSubscriptionCancelAtPeriodEnd: boolean | null = null;
+  let subscriptionCurrentPeriodEnd: string | null = null;
   let primaryProfileId: number | null = null;
   let profileAlias: string | null = null;
   let profileCountry: string | null = null;
-  let premiumActivationExpiresAt: string | null = null;
-  let premiumActivationExists = false;
-  let premiumForced = false;
+  let profileAvatarUrl: string | null = null;
 
   if (supabase) {
     const { error: upsertError } = await upsertAppUser({
@@ -221,47 +200,59 @@ export default async function AccountPage({ searchParams }: PageProps) {
       .maybeSingle();
 
     if (!error && data) {
-      premiumExpiresAt = data.premium_expires_at ?? null;
+      subscriptionCurrentPeriodEnd = data.premium_expires_at ?? null;
       stripeCustomerId = data.stripe_customer_id ?? null;
       stripeSubscriptionStatus = data.stripe_subscription_status ?? null;
-      stripeSubscriptionCancelAtPeriodEnd = Boolean(
-        data.stripe_subscription_cancel_at_period_end,
-      );
+      stripeSubscriptionCancelAtPeriodEnd =
+        data.stripe_subscription_cancel_at_period_end ?? null;
       primaryProfileId = data.primary_profile_id
         ? Number.parseInt(String(data.primary_profile_id), 10)
         : null;
 
       if (primaryProfileId) {
-        premiumForced = isEnvForcedProfile(String(primaryProfileId));
-
         const { data: player, error: playerError } = await supabase
           .from("players")
-          .select("profile_id, current_alias, country")
+          .select("profile_id, current_alias, country, steam_id64")
           .eq("profile_id", primaryProfileId)
           .maybeSingle();
 
         if (!playerError && player) {
           profileAlias = player.current_alias ?? null;
           profileCountry = player.country ?? null;
-        }
 
-        const { data: activation, error: activationError } = await supabase
-          .from("premium_feature_activations")
-          .select("expires_at")
-          .eq("profile_id", primaryProfileId)
-          .maybeSingle();
-
-        if (!activationError && activation) {
-          premiumActivationExists = true;
-          premiumActivationExpiresAt = activation.expires_at ?? null;
+          // Fetch Steam avatar if available
+          if (player.steam_id64) {
+            const { fetchSteamSummaryByProfile } = await import("@/lib/steam");
+            const summary = await fetchSteamSummaryByProfile(
+              player.profile_id,
+              player.steam_id64
+            );
+            if (summary) {
+              profileAvatarUrl =
+                summary.avatarFull ??
+                summary.avatarMedium ??
+                summary.avatar ??
+                null;
+            }
+          }
         }
+      }
+
+      const snapshot = await fetchSubscriptionSnapshot(supabase, session.user.sub);
+      if (snapshot) {
+        stripeCustomerId = snapshot.stripe_customer_id ?? stripeCustomerId;
+        stripeSubscriptionStatus = snapshot.status ?? stripeSubscriptionStatus;
+        stripeSubscriptionCancelAtPeriodEnd =
+          snapshot.cancel_at_period_end ?? stripeSubscriptionCancelAtPeriodEnd;
+        subscriptionCurrentPeriodEnd =
+          snapshot.current_period_end ?? subscriptionCurrentPeriodEnd;
       }
     }
   }
 
   const checkoutSessionId = resolveCheckoutSessionId(searchParams);
 
-  if (supabase && !premiumForced && (stripeCustomerId || checkoutSessionId)) {
+  if (supabase && (stripeCustomerId || checkoutSessionId)) {
     const syncResult = await syncStripeSubscription({
       auth0Sub: session.user.sub,
       checkoutSessionId,
@@ -274,20 +265,27 @@ export default async function AccountPage({ searchParams }: PageProps) {
         syncResult.stripeSubscriptionStatus ?? stripeSubscriptionStatus;
       stripeSubscriptionCancelAtPeriodEnd =
         syncResult.stripeSubscriptionCancelAtPeriodEnd;
-      premiumExpiresAt = syncResult.premiumExpiresAt ?? premiumExpiresAt;
-      premiumActivationExists = syncResult.premiumActivationExists;
-      premiumActivationExpiresAt =
-        syncResult.premiumActivationExpiresAt ?? premiumActivationExpiresAt;
+      subscriptionCurrentPeriodEnd =
+        syncResult.currentPeriodEnd ?? subscriptionCurrentPeriodEnd;
       primaryProfileId = syncResult.primaryProfileId ?? primaryProfileId;
+    }
+
+    const refreshedSnapshot = await fetchSubscriptionSnapshot(supabase, session.user.sub);
+    if (refreshedSnapshot) {
+      stripeCustomerId = refreshedSnapshot.stripe_customer_id ?? stripeCustomerId;
+      stripeSubscriptionStatus = refreshedSnapshot.status ?? stripeSubscriptionStatus;
+      stripeSubscriptionCancelAtPeriodEnd =
+        refreshedSnapshot.cancel_at_period_end ?? stripeSubscriptionCancelAtPeriodEnd;
+      subscriptionCurrentPeriodEnd =
+        refreshedSnapshot.current_period_end ?? subscriptionCurrentPeriodEnd;
     }
   }
 
-  const existingActivationActive =
-    premiumForced ||
-    (premiumActivationExists &&
-      (!premiumActivationExpiresAt || isFutureDate(premiumActivationExpiresAt)));
-  const existingAppUserPremiumActive = isFutureDate(premiumExpiresAt);
-  const existingPremiumActive = existingActivationActive || existingAppUserPremiumActive;
+  let subscriptionActive = isSubscriptionSnapshotActive({
+    status: stripeSubscriptionStatus ?? null,
+    cancel_at_period_end: stripeSubscriptionCancelAtPeriodEnd ?? null,
+    current_period_end: subscriptionCurrentPeriodEnd ?? null,
+  });
 
   if (subscribeIntentActive) {
     if (!intentProfileId) {
@@ -302,10 +300,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
           intentProfileAlias = linkResult.alias ?? intentProfileAlias;
           profileCountry = linkResult.country ?? profileCountry;
           intentProfileCountry = linkResult.country ?? intentProfileCountry;
-          premiumActivationExists = linkResult.activationExists ?? false;
-          premiumActivationExpiresAt = linkResult.activationExpiresAt ?? null;
-          premiumForced = isEnvForcedProfile(String(intentProfileId));
-          premiumExpiresAt = null;
+          subscriptionCurrentPeriodEnd = null;
           intentStatusMessage = `Linked ${formatProfileLabel(intentProfileAlias, intentProfileId)} to your account. Start your subscription below.`;
           intentStatusTone = "success";
         } else if (linkResult.reason === "player_not_found") {
@@ -321,7 +316,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
       } else if (primaryProfileId === intentProfileId) {
         intentStatusMessage = `You're ready to subscribe for ${formatProfileLabel(profileAlias, primaryProfileId)}.`;
         intentStatusTone = "info";
-      } else if (existingPremiumActive) {
+      } else if (subscriptionActive) {
         switchPromptData = {
           profileId: intentProfileId,
           alias: intentProfileAlias,
@@ -337,10 +332,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
           intentProfileAlias = linkResult.alias ?? intentProfileAlias;
           profileCountry = linkResult.country ?? profileCountry;
           intentProfileCountry = linkResult.country ?? intentProfileCountry;
-          premiumActivationExists = linkResult.activationExists ?? false;
-          premiumActivationExpiresAt = linkResult.activationExpiresAt ?? null;
-          premiumForced = isEnvForcedProfile(String(intentProfileId));
-          premiumExpiresAt = null;
+          subscriptionCurrentPeriodEnd = null;
           intentStatusMessage = `Linked ${formatProfileLabel(intentProfileAlias, intentProfileId)} to your account. Start your subscription below.`;
           intentStatusTone = "success";
         } else if (linkResult.reason === "player_not_found") {
@@ -356,6 +348,14 @@ export default async function AccountPage({ searchParams }: PageProps) {
       }
     }
   }
+
+  subscriptionActive = primaryProfileId
+    ? isSubscriptionSnapshotActive({
+        status: stripeSubscriptionStatus ?? null,
+        cancel_at_period_end: stripeSubscriptionCancelAtPeriodEnd ?? null,
+        current_period_end: subscriptionCurrentPeriodEnd ?? null,
+      })
+    : false;
 
   const resolveBaseUrl = () => {
     const raw =
@@ -374,35 +374,29 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
   const baseUrl = resolveBaseUrl();
   const logoutUrl = `/auth/logout?returnTo=${encodeURIComponent(baseUrl)}`;
-  const activationActive =
-    premiumForced ||
-    (premiumActivationExists &&
-      (!premiumActivationExpiresAt || isFutureDate(premiumActivationExpiresAt)));
-  const appUserPremiumActive = isFutureDate(premiumExpiresAt);
-  const premiumActive = activationActive || appUserPremiumActive;
   const hasStripeCustomer = Boolean(stripeCustomerId);
   const checkoutStatusRaw = searchParams?.checkout;
   const checkoutStatus = Array.isArray(checkoutStatusRaw)
     ? checkoutStatusRaw[0]
     : checkoutStatusRaw;
   const pendingActivation =
-    !premiumActive &&
+    !subscriptionActive &&
     hasStripeCustomer &&
-    ((checkoutStatus === "success" && !premiumExpiresAt) ||
+    (checkoutStatus === "success" ||
       stripeSubscriptionStatus === "incomplete" ||
       stripeSubscriptionStatus === "incomplete_expired");
-  const subscriptionRenewing =
-    premiumActive &&
-    !stripeSubscriptionCancelAtPeriodEnd &&
-    isStripeSubscriptionActive(stripeSubscriptionStatus);
-  const accountStatusLabel = premiumActive
-    ? "Premium account"
+  const cancelAtPeriodEnd = Boolean(stripeSubscriptionCancelAtPeriodEnd);
+  const subscriptionRenewing = subscriptionActive && !cancelAtPeriodEnd;
+  const accountStatusLabel = subscriptionActive
+    ? cancelAtPeriodEnd
+      ? "Premium account (will expire)"
+      : "Premium account"
     : pendingActivation
       ? "Premium account (activation pending)"
       : "Free account";
-  const effectivePremiumExpiry = premiumExpiresAt ?? premiumActivationExpiresAt;
+  const effectivePremiumExpiry = subscriptionCurrentPeriodEnd;
   const showManageButton = hasStripeCustomer;
-  const showGoPremium = !premiumActive;
+  const showGoPremium = !subscriptionActive;
   const hasRenewalDate = Boolean(effectivePremiumExpiry);
   const expiryLabel = subscriptionRenewing ? "Subscription renews" : "Premium expires";
   const expiryValueClass = hasRenewalDate
@@ -415,7 +409,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
     : "—";
   const premiumStatusNote = subscriptionRenewing
     ? "Premium benefits renew automatically for your linked profile."
-    : premiumActive
+    : subscriptionActive
       ? "Premium benefits remain active until your expiry."
       : null;
   const premiumStatusTone = subscriptionRenewing ? "text-emerald-300" : "text-amber-300";
@@ -431,8 +425,14 @@ export default async function AccountPage({ searchParams }: PageProps) {
   } as const;
   const intentMessageClassName = intentToneStyles[intentStatusTone];
 
+  const shouldRefreshSession =
+    checkoutStatus === "success" ||
+    (subscribeIntentActive && intentStatusTone === "success") ||
+    Boolean(checkoutSessionId);
+
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
+      <AccountRefresher shouldRefresh={shouldRefreshSession} />
       <header className="flex flex-col gap-4">
         <Link
           href="/"
@@ -506,6 +506,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
             initialProfileId={primaryProfileId}
             initialAlias={profileAlias}
             initialCountry={profileCountry}
+            initialAvatarUrl={profileAvatarUrl}
           />
         </div>
       </section>
@@ -550,11 +551,11 @@ export default async function AccountPage({ searchParams }: PageProps) {
         </dl>
         <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
           {showGoPremium && !pendingActivation && (
-            <GoPremiumButton
-              profileId={primaryProfileId}
-              premiumExpiresAt={effectivePremiumExpiry}
-              isPremiumActive={premiumActive}
-            />
+          <GoPremiumButton
+            profileId={primaryProfileId}
+            premiumExpiresAt={effectivePremiumExpiry}
+            isPremiumActive={subscriptionActive}
+          />
           )}
           {showManageButton && (
             <ManageSubscriptionButton stripeCustomerId={stripeCustomerId} />

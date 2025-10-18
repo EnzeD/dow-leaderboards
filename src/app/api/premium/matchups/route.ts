@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
+  fetchSubscriptionSnapshot,
   getSupabaseAdmin,
-  resolveActivationStatus,
+  isStripeSubscriptionActive,
   resolveSinceDate,
-} from "@/lib/premium/activation-server";
+} from "@/lib/premium/subscription-server";
 
 interface MatchupRow {
   my_race_id: number | null;
@@ -49,10 +51,11 @@ const coerceOptionalInt = (value: string | null): number | undefined => {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const profileIdRaw = url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
-  const profileId = profileIdRaw?.trim();
+  const requestedProfileId =
+    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
 
-  if (!profileId) {
+  const session = await auth0.getSession();
+  if (!session) {
     return attachCacheHeaders(
       NextResponse.json<MatchupsResponse>({
         activated: false,
@@ -60,22 +63,8 @@ export async function GET(req: NextRequest) {
         windowStart: resolveSinceDate(),
         generatedAt: new Date().toISOString(),
         rows: [],
-        reason: "missing_profile",
-      }, { status: 400 })
-    );
-  }
-
-  const activation = await resolveActivationStatus(profileId);
-  if (!activation.activated) {
-    return attachCacheHeaders(
-      NextResponse.json<MatchupsResponse>({
-        activated: false,
-        profileId,
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: activation.reason,
-      }, { status: 403 })
+        reason: "not_authenticated",
+      }, { status: 401 })
     );
   }
 
@@ -84,14 +73,84 @@ export async function GET(req: NextRequest) {
     return attachCacheHeaders(
       NextResponse.json<MatchupsResponse>({
         activated: false,
-        profileId,
+        profileId: "",
         windowStart: resolveSinceDate(),
         generatedAt: new Date().toISOString(),
         rows: [],
-        reason: "supabase_not_configured",
+        reason: "supabase_unavailable",
       }, { status: 503 })
     );
   }
+
+  const auth0Sub = session.user.sub;
+  const { data: appUser, error: appUserError } = await supabase
+    .from("app_users")
+    .select("primary_profile_id")
+    .eq("auth0_sub", auth0Sub)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("[premium] matchups failed to load app_user", appUserError);
+    return attachCacheHeaders(
+      NextResponse.json<MatchupsResponse>({
+        activated: false,
+        profileId: "",
+        windowStart: resolveSinceDate(),
+        generatedAt: new Date().toISOString(),
+        rows: [],
+        reason: "lookup_failed",
+      }, { status: 500 })
+    );
+  }
+
+  const primaryProfileId = appUser?.primary_profile_id
+    ? Number.parseInt(String(appUser.primary_profile_id), 10)
+    : null;
+
+  if (!primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<MatchupsResponse>({
+        activated: false,
+        profileId: "",
+        windowStart: resolveSinceDate(),
+        generatedAt: new Date().toISOString(),
+        rows: [],
+        reason: "profile_not_linked",
+      }, { status: 403 })
+    );
+  }
+
+  if (
+    requestedProfileId &&
+    Number.parseInt(requestedProfileId, 10) !== primaryProfileId
+  ) {
+    return attachCacheHeaders(
+      NextResponse.json<MatchupsResponse>({
+        activated: false,
+        profileId: String(primaryProfileId),
+        windowStart: resolveSinceDate(),
+        generatedAt: new Date().toISOString(),
+        rows: [],
+        reason: "profile_mismatch",
+      }, { status: 403 })
+    );
+  }
+
+  const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
+  if (!isStripeSubscriptionActive(subscription)) {
+    return attachCacheHeaders(
+      NextResponse.json<MatchupsResponse>({
+        activated: false,
+        profileId: String(primaryProfileId),
+        windowStart: resolveSinceDate(),
+        generatedAt: new Date().toISOString(),
+        rows: [],
+        reason: "not_subscribed",
+      }, { status: 403 })
+    );
+  }
+
+  const profileId = String(primaryProfileId);
 
   const windowDays = coerceInt(url.searchParams.get("windowDays") ?? url.searchParams.get("window"), 90);
   const windowStart = resolveSinceDate(windowDays);
@@ -100,7 +159,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { data, error } = await supabase.rpc("premium_get_matchup_stats", {
-      p_profile_id: profileId,
+      p_profile_id: primaryProfileId,
       p_since: windowStart,
       p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
     });

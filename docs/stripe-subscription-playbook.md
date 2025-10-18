@@ -4,7 +4,7 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
 
 > **Terminology**
 > - **Profile ID** — the Supabase `players.profile_id` that should gain access after purchase.
-> - **Premium activation** — a row in `public.premium_feature_activations` that toggles advanced stats on/off.
+> - **Premium subscription** — a snapshot row in `public.premium_subscriptions` (keyed by `auth0_sub`) that records status, renewal dates, and plan metadata.
 
 ---
 
@@ -89,37 +89,39 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
 - Add `/api/stripe/webhook` (Edge or Node runtime).
 - Verify the signature using `stripe.webhooks.constructEvent`.
 - Handle:
-  - `checkout.session.completed` → mark `premium_feature_activations` with `expires_at` = current period end.
-  - `customer.subscription.updated` / `deleted` → update or revoke access based on status.
+  - `checkout.session.completed` → upsert the user's row in `public.premium_subscriptions` with the latest period window.
+  - `customer.subscription.updated` / `deleted` → keep the snapshot in sync so downstream APIs see the current status/cancelation state.
   - Mirror `subscription.status` and `cancel_at_period_end` back to `app_users` so the dashboard can tell whether access will renew or lapse.
 - Store processed webhook event IDs to guard against retries (idempotency).
 - The account dashboard also calls a `syncStripeSubscription` helper using the `session_id` query parameter, so users see changes immediately even if the webhook is delayed.
 
 ---
 
-## Step 7 – Activation Storage
+## Step 7 – Subscription Snapshot Storage
 
-- Use the admin Supabase client to update:
+- Use the admin Supabase client to upsert the canonical snapshot:
   ```ts
   await supabase
-    .from("premium_feature_activations")
+    .from("premium_subscriptions")
     .upsert({
-      profile_id,
-      activated_at: new Date().toISOString(),
-      expires_at: subscription.status === "active"
-        ? new Date(subscription.current_period_end * 1000).toISOString()
-        : new Date().toISOString(),
-      notes: "stripe_auto",
+      auth0_sub,
+      stripe_customer_id,
+      stripe_subscription_id: subscription.id,
+      status: subscription.status,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      price_id: subscription.items?.data?.[0]?.price?.id ?? null,
     });
   ```
-- Ensure the existing activation resolver treats expired rows as inactive (already implemented).
+- API routes verify `premium_subscriptions` plus the linked `app_users.primary_profile_id` to decide whether advanced analytics should load.
 
 ---
 
 ## Step 8 – Customer Portal (Optional but recommended)
 
 - Add `POST /api/premium/portal` to call `stripe.billingPortal.sessions.create({ customer, return_url })`.
-- Show “Manage billing” for active subscribers only (using `stripe_customer_id` and presence in `premium_feature_activations`).
+- Show “Manage billing” for active subscribers only (using `stripe_customer_id` and the active snapshot in `premium_subscriptions`).
 
 ---
 
@@ -128,7 +130,7 @@ This guide captures the end-to-end workflow for wiring Stripe subscriptions into
 - Use Stripe **test mode**.
 - Run through checkout with `4242 4242 4242 4242`.
 - Confirm:
-  - Webhook marks the profile activated.
+  - Webhook upserts the subscription snapshot (`premium_subscriptions`).
   - Hidden advanced stats become visible.
   - Cancellation via dashboard or portal deactivates after the paid period.
 

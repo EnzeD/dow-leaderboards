@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
+  fetchSubscriptionSnapshot,
   getSupabaseAdmin,
-  resolveActivationStatus,
+  isStripeSubscriptionActive,
   resolveSinceDate,
-} from "@/lib/premium/activation-server";
+} from "@/lib/premium/subscription-server";
 
 interface EloHistoryRow {
   snapshot_at: string;
@@ -41,49 +43,124 @@ const coerceInt = (value: string | null, fallback: number) => {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const profileIdRaw = url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
-  const profileId = profileIdRaw?.trim();
+  const requestedProfileId =
+    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
 
-  if (!profileId) {
+  const session = await auth0.getSession();
+  if (!session) {
     return attachCacheHeaders(
-      NextResponse.json({
-        activated: false,
-        profileId: "",
-        samples: [],
-        reason: "missing_profile",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-      }, { status: 400 })
-    );
-  }
-
-  const activation = await resolveActivationStatus(profileId);
-  if (!activation.activated) {
-    return attachCacheHeaders(
-      NextResponse.json<EloHistoryResponse>({
-        activated: false,
-        profileId,
-        samples: [],
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        reason: activation.reason,
-      }, { status: 403 })
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: "",
+          samples: [],
+          reason: "not_authenticated",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 401 },
+      ),
     );
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return attachCacheHeaders(
-      NextResponse.json<EloHistoryResponse>({
-        activated: false,
-        profileId,
-        samples: [],
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        reason: "supabase_not_configured",
-      }, { status: 503 })
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: "",
+          samples: [],
+          reason: "supabase_unavailable",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 503 },
+      ),
     );
   }
+
+  const auth0Sub = session.user.sub;
+  const { data: appUser, error: appUserError } = await supabase
+    .from("app_users")
+    .select("primary_profile_id")
+    .eq("auth0_sub", auth0Sub)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("[premium] elo-history failed to load app_user", appUserError);
+    return attachCacheHeaders(
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: "",
+          samples: [],
+          reason: "lookup_failed",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 500 },
+      ),
+    );
+  }
+
+  const primaryProfileId = appUser?.primary_profile_id
+    ? Number.parseInt(String(appUser.primary_profile_id), 10)
+    : null;
+
+  if (!primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: "",
+          samples: [],
+          reason: "profile_not_linked",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  if (
+    requestedProfileId &&
+    Number.parseInt(requestedProfileId, 10) !== primaryProfileId
+  ) {
+    return attachCacheHeaders(
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
+          samples: [],
+          reason: "profile_mismatch",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
+  if (!isStripeSubscriptionActive(subscription)) {
+    return attachCacheHeaders(
+      NextResponse.json<EloHistoryResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
+          samples: [],
+          reason: "not_subscribed",
+          windowStart: resolveSinceDate(),
+          generatedAt: new Date().toISOString(),
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  const profileId = String(primaryProfileId);
 
   const leaderboardParam = url.searchParams.get("leaderboardId") ?? url.searchParams.get("leaderboard_id");
   const leaderboardParsed = leaderboardParam ? Number.parseInt(leaderboardParam, 10) : undefined;
@@ -94,7 +171,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const { data, error } = await supabase.rpc("premium_get_elo_history", {
-      p_profile_id: profileId,
+      p_profile_id: primaryProfileId,
       p_leaderboard_id: typeof leaderboardId === "number" ? leaderboardId : null,
       p_since: windowStart,
       p_limit: limit,

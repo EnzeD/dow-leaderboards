@@ -17,6 +17,7 @@ import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
 import { useAccount } from "@/app/_components/AccountProvider";
 import { AccountIcon } from "@/components/icons";
 import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
+import { AccountDropdown } from "@/app/_components/AccountDropdown";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -528,6 +529,7 @@ export default function Home() {
   const linkedProfileId = account?.appUser?.primary_profile_id
     ? String(account.appUser.primary_profile_id)
     : null;
+  const subscriptionActive = account?.subscription?.active ?? false;
   const linkedAlias = account?.profile?.alias ?? null;
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
@@ -535,6 +537,13 @@ export default function Home() {
     label: "Activate advanced statistics",
     description: "Unlock Elo trends, matchup intel, and more.",
     loading: accountLoading,
+  };
+  const canAccessAdvancedStats = (profileId?: string | null) => {
+    if (!profileId) return false;
+    if (subscriptionActive) {
+      return linkedProfileId === profileId;
+    }
+    return !linkedProfileId || linkedProfileId === profileId;
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -2140,14 +2149,11 @@ export default function Home() {
                     Loading…
                   </span>
                 ) : authUser ? (
-                  <Link
-                    href={accountLink}
-                    className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
-                    title={linkedAlias ? `Manage ${linkedAlias}` : "Manage account"}
-                  >
-                    <AccountBadge avatarUrl={linkedAvatarUrl} />
-                    <span className="max-w-[8rem] truncate">{accountButtonLabel}</span>
-                  </Link>
+                  <AccountDropdown
+                    avatarUrl={linkedAvatarUrl}
+                    displayName={accountButtonLabel}
+                    profileId={linkedProfileId}
+                  />
                 ) : (
                   <a
                     href={loginLink}
@@ -2848,7 +2854,7 @@ export default function Home() {
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
-                        {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
+                        {canAccessAdvancedStats(profileIdStr) && (
                           <div className="mt-4">
                           {getIsAdvancedStatsHidden(profileIdStr)
                             ? (
@@ -2876,7 +2882,7 @@ export default function Home() {
                             Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
                           </p>
                           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                                {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
+                                {canAccessAdvancedStats(profileIdStr) && (
                                   <button
                                     type="button"
                                     onClick={() => handleOpenAdvancedStats({
