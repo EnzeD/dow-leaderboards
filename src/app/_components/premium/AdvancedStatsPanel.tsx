@@ -321,7 +321,7 @@ const buildLeaderboardOptions = (leaderboards: Leaderboard[]): Array<{ value: nu
 export const useAdvancedStats = () => useAdvancedStatsContext();
 
 const VALUE_POINTS = [
-  "A dedicated bot keeps your stats fresh every day",
+  "A dedicated bot to crawl your matches every day",
   "Elo ratings tracked over time",
   "Win rate broken down by faction match-up",
   "Map-by-map performance with recent form",
@@ -398,7 +398,7 @@ function LockedAdvancedStatsPreview({
       <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
         <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why upgrade</h3>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {VALUE_POINTS.map((point) => (
+          {VALUE_POINTS.map((point, index) => (
             <li key={point} className="flex items-start gap-3 text-sm text-neutral-200">
               <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
                 <svg
@@ -414,7 +414,15 @@ function LockedAdvancedStatsPreview({
                   <path d="M3.5 8.5l2.5 2.5 6-6" />
                 </svg>
               </span>
-              <span>{point}</span>
+              <span>
+                {index === 0 ? (
+                  <>
+                    <span className="underline decoration-yellow-400/50">A dedicated bot</span> to crawl your matches every day
+                  </>
+                ) : (
+                  point
+                )}
+              </span>
             </li>
           ))}
         </ul>

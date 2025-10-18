@@ -101,7 +101,7 @@ const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
 const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
 const UPGRADE_POINTS = [
-  "A dedicated bot keeps your stats fresh every day",
+  "A dedicated bot to crawl your matches every day",
   "Elo ratings tracked over time",
   "Win rate broken down by faction match-up",
   "Map-by-map performance with recent form",
@@ -3676,14 +3676,22 @@ export default function Home() {
             <div>
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-3">What&apos;s included</h4>
               <ul className="space-y-2 text-sm sm:space-y-2.5">
-                {UPGRADE_POINTS.map((point) => (
+                {UPGRADE_POINTS.map((point, index) => (
                   <li key={point} className="flex items-start gap-2">
                     <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-400">
                       <svg className="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M3.5 8.5l2.5 2.5 6-6" />
                       </svg>
                     </span>
-                    <span className="text-neutral-200">{point}</span>
+                    <span className="text-neutral-200">
+                      {index === 0 ? (
+                        <>
+                          <span className="underline decoration-yellow-400/50">A dedicated bot</span> to crawl your matches every day
+                        </>
+                      ) : (
+                        point
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -3705,7 +3713,7 @@ export default function Home() {
             {/* Community message */}
             <div className="rounded-lg border border-neutral-800/50 bg-neutral-900/30 px-3 py-2">
               <p className="text-xs leading-relaxed text-neutral-400">
-                This helps keep the servers running and the stats fresh for everyone in the Dawn of War community.
+                This helps keep the servers running and provide leaderboards for free to everyone in the Dawn of War community. Thank you! The Emperor notices.
               </p>
             </div>
           </div>
