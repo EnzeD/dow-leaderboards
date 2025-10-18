@@ -768,10 +768,10 @@ export default function Home() {
       if (stored !== undefined) {
         return stored;
       }
-      const isLinkedProfile = linkedProfileId && linkedProfileId === profileId;
-      return !isLinkedProfile;
+      // Default to visible for all users
+      return false;
     },
-    [hiddenAdvancedStats, linkedProfileId],
+    [hiddenAdvancedStats],
   );
 
   // Filter states
@@ -1458,8 +1458,7 @@ export default function Home() {
 
     setHiddenAdvancedStats((previous) => {
       const stored = previous[profileId];
-      const isLinkedProfile = linkedProfileId && linkedProfileId === profileId;
-      const defaultHidden = !isLinkedProfile;
+      const defaultHidden = false; // Default to visible for all users
       const currentlyHidden = stored === undefined ? defaultHidden : stored;
       const nextHidden = !currentlyHidden;
       const next = { ...previous, [profileId]: nextHidden };
