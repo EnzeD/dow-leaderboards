@@ -4,7 +4,6 @@
 
 import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import Link from "next/link";
-import { useUser } from "@auth0/nextjs-auth0";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
@@ -521,8 +520,8 @@ export default function Home() {
     };
   };
 
-  const { user: authUser, isLoading: authLoading } = useUser();
   const { account, loading: accountLoading, refresh: refreshAccount } = useAccount();
+  const authUser = account?.user ?? null;
   const accountLink = "/account";
   const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
   const isAuthenticated = Boolean(authUser);
@@ -535,7 +534,7 @@ export default function Home() {
   const advancedStatsCta = {
     label: "Activate advanced statistics",
     description: "Unlock Elo trends, matchup intel, and more.",
-    loading: authLoading || accountLoading,
+    loading: accountLoading,
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -2136,7 +2135,7 @@ export default function Home() {
                 </span>
               </div>
               <div>
-                {authLoading || accountLoading ? (
+                {accountLoading ? (
                   <span className="inline-flex items-center rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-medium text-neutral-400">
                     Loading…
                   </span>

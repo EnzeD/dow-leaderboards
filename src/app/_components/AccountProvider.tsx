@@ -6,7 +6,6 @@ import {
   useMemo,
 } from "react";
 import useSWR from "swr";
-import { useUser } from "@auth0/nextjs-auth0";
 
 type AccountProfile = {
   profileId: number;
@@ -59,33 +58,66 @@ const fetcher = async (url: string) => {
   return response.json();
 };
 
-export function AccountProvider({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useUser();
+type InitialUser = {
+  sub: string;
+  email?: string | null;
+  email_verified?: boolean | null;
+  name?: string | null;
+  picture?: string | null;
+};
+
+type AccountProviderProps = {
+  children: React.ReactNode;
+  initialUser: InitialUser | null;
+};
+
+export function AccountProvider({ children, initialUser }: AccountProviderProps) {
+  const fallbackAccount = useMemo<AccountResponse | null>(() => {
+    if (!initialUser) return null;
+    return {
+      user: {
+        sub: initialUser.sub,
+        email: initialUser.email ?? null,
+        emailVerified:
+          typeof initialUser.email_verified === "boolean"
+            ? initialUser.email_verified
+            : initialUser.email_verified ?? null,
+        name: initialUser.name ?? null,
+        picture: initialUser.picture ?? null,
+      },
+      appUser: null,
+      profile: null,
+    };
+  }, [initialUser]);
+
+  const shouldFetch = Boolean(initialUser);
   const {
     data,
     error,
     isValidating,
     mutate,
-  } = useSWR<AccountResponse>(user ? "/api/auth/session" : null, fetcher, {
+  } = useSWR<AccountResponse>(shouldFetch ? "/api/auth/session" : null, fetcher, {
+    fallbackData: fallbackAccount ?? undefined,
     revalidateOnFocus: false,
     revalidateIfStale: false,
     revalidateOnReconnect: false,
   });
 
   const value = useMemo<AccountContextValue>(() => {
-    const loading = isLoading || (user ? (!data && !error) : false) || isValidating;
+    const loading = shouldFetch ? (isValidating && !error) : false;
     const wrappedRefresh = async () => {
+      if (!shouldFetch) return undefined;
       const result = await mutate();
       return result ?? undefined;
     };
 
     return {
-      account: data ?? null,
+      account: data ?? fallbackAccount ?? null,
       loading,
       error,
       refresh: wrappedRefresh,
     };
-  }, [data, error, isLoading, isValidating, mutate, user]);
+  }, [data, error, fallbackAccount, isValidating, mutate, shouldFetch]);
 
   return (
     <AccountContext.Provider value={value}>

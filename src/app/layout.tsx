@@ -41,7 +41,7 @@ export default async function RootLayout({
         backgroundAttachment: 'fixed'
       }}>
         <Auth0Provider user={session?.user ?? undefined}>
-          <AccountProvider>
+          <AccountProvider initialUser={session?.user ?? null}>
             {children}
           </AccountProvider>
         </Auth0Provider>
