@@ -3621,7 +3621,7 @@ export default function Home() {
   )}
   {upgradeIntent && (
     <div
-      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 py-8"
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-sm p-1.5 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="upgrade-modal-title"
@@ -3631,47 +3631,93 @@ export default function Home() {
         }
       }}
     >
-      <div className="relative w-full max-w-lg rounded-2xl border border-yellow-500/30 bg-neutral-950/95 p-6 shadow-2xl">
+      <div className="relative w-full h-full sm:h-auto sm:max-w-lg overflow-hidden rounded-xl sm:rounded-2xl border border-neutral-700/40 bg-gradient-to-b from-neutral-900 to-neutral-950 shadow-2xl overflow-y-auto">
+        {/* Close button */}
         <button
           type="button"
           onClick={closeUpgradeModal}
-          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/80 text-neutral-400 transition hover:border-neutral-500 hover:text-white"
+          className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/90 text-neutral-400 transition hover:border-neutral-500 hover:bg-neutral-800 hover:text-white"
           aria-label="Close upgrade dialog"
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 6l12 12" />
             <path d="M18 6L6 18" />
           </svg>
         </button>
-        <div className="space-y-5 pr-2">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-yellow-200">
-              Premium Upgrade
+
+        {/* Header section */}
+        <div className="relative border-b border-neutral-800/50 bg-gradient-to-br from-yellow-500/5 via-transparent to-transparent px-4 pb-4 pt-12 sm:px-6 sm:pb-6 sm:pt-8">
+          <div className="space-y-2.5 sm:space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-yellow-300">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16" />
+                <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
+              </svg>
+              Advanced Analytics
             </div>
-            <h3 id="upgrade-modal-title" className="text-xl font-semibold text-white">
-              Unlock advanced analytics for {upgradeIntent.alias?.trim() || upgradeIntent.playerName?.trim() || upgradeIntent.profileId}
-            </h3>
-            <p className="text-sm text-neutral-300">
-              $4.99/month • Detailed Elo history, matchup insights, map performance, and more—updated daily for your linked profile.
-            </p>
+            <div>
+              <h3 id="upgrade-modal-title" className="text-lg font-bold leading-tight text-white sm:text-2xl">
+                Unlock deeper insights for{' '}
+                <span className="text-yellow-400">{upgradeIntent.alias?.trim() || upgradeIntent.playerName?.trim() || upgradeIntent.profileId}</span>
+              </h3>
+              <p className="mt-1.5 text-xs text-neutral-400 sm:mt-2 sm:text-sm">
+                Detailed match analytics updated daily for your linked profile
+              </p>
+            </div>
           </div>
-          <ul className="grid gap-3 text-sm text-neutral-100 sm:grid-cols-2">
-            {UPGRADE_POINTS.map((point) => (
-              <li key={point} className="flex items-start gap-3 rounded-lg border border-neutral-700/50 bg-neutral-900/70 px-3 py-2">
-                <span className="mt-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
-                  <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3.5 8.5l2.5 2.5 6-6" />
-                  </svg>
-                </span>
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        </div>
+
+        {/* Content section */}
+        <div className="px-4 py-4 sm:px-6 sm:py-6">
+          <div className="space-y-4 sm:space-y-5">
+            {/* What's included */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-3">What&apos;s included</h4>
+              <ul className="space-y-2 text-sm sm:space-y-2.5">
+                {UPGRADE_POINTS.map((point) => (
+                  <li key={point} className="flex items-start gap-2">
+                    <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-400">
+                      <svg className="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3.5 8.5l2.5 2.5 6-6" />
+                      </svg>
+                    </span>
+                    <span className="text-neutral-200">{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pricing */}
+            <div className="rounded-xl border border-neutral-700/50 bg-neutral-900/50 p-3.5 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-white sm:text-4xl">$4.99</span>
+                    <span className="text-sm text-neutral-400 sm:text-lg">/month</span>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-400 sm:mt-1.5 sm:text-sm">Cancel anytime • No commitment</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Community message */}
+            <div className="rounded-lg border border-neutral-800/50 bg-neutral-900/30 px-3 py-2">
+              <p className="text-xs leading-relaxed text-neutral-400">
+                This helps keep the servers running and the stats fresh for everyone in the Dawn of War community.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer with CTA */}
+        <div className="border-t border-neutral-800/50 bg-neutral-950/50 px-4 py-4 pb-6 sm:px-6 sm:py-5 sm:pb-5">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={closeUpgradeModal}
-              className="inline-flex items-center justify-center rounded-md border border-neutral-700/70 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:border-neutral-500 hover:text-white"
+              className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-400 transition hover:text-neutral-200"
             >
               Maybe later
             </button>
@@ -3679,17 +3725,30 @@ export default function Home() {
               type="button"
               onClick={handleUpgradeConfirm}
               disabled={upgradeLoading}
-              className="inline-flex items-center justify-center rounded-md border border-yellow-400/60 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-400/60 bg-yellow-400 px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-lg shadow-yellow-500/20 transition hover:bg-yellow-300 hover:shadow-yellow-500/30 disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
             >
-              {upgradeLoading
-                ? "Opening checkout…"
-                : isAuthenticated
-                  ? "Subscribe"
-                  : "Sign in to subscribe"}
+              {upgradeLoading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Opening…
+                </>
+              ) : isAuthenticated ? (
+                <>
+                  Continue to checkout
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </>
+              ) : (
+                "Sign in to subscribe"
+              )}
             </button>
           </div>
           {upgradeError && (
-            <p className="text-xs font-semibold text-red-300">{upgradeError}</p>
+            <p className="mt-2 text-xs font-medium text-red-400 sm:text-sm">{upgradeError}</p>
           )}
         </div>
       </div>
