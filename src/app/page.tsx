@@ -534,7 +534,7 @@ export default function Home() {
   const accountButtonLabel = linkedAlias ?? "Account";
   const advancedStatsCta = {
     label: "Activate advanced statistics",
-    description: "$4.99/month • Unlock Elo trends, matchup intel, and more.",
+    description: "Unlock Elo trends, matchup intel, and more.",
     loading: authLoading || accountLoading,
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
@@ -2885,7 +2885,7 @@ export default function Home() {
                                       profileId: profileIdStr,
                                       playerName: result.playerName,
                                     })}
-                                    className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
+                                    className="inline-flex items-center justify-center rounded-md border border-neutral-600/40 bg-neutral-800/30 px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-700/40 hover:text-neutral-200"
                                   >
                                     {getIsAdvancedStatsHidden(profileIdStr) ? "View advanced statistics" : "Hide advanced statistics"}
                                   </button>
@@ -3292,7 +3292,7 @@ export default function Home() {
                                 profileId: String(entry.profileId),
                                 playerName: entry.playerName,
                               })}
-                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 rounded-md border border-yellow-500/40 transition-colors text-xs font-semibold"
+                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/30 hover:bg-neutral-700/40 text-neutral-300 hover:text-neutral-200 rounded-md border border-neutral-600/40 transition-colors text-xs font-medium"
                             >
                               {getIsAdvancedStatsHidden(String(entry.profileId)) ? "View advanced statistics" : "Hide advanced statistics"}
                             </button>
