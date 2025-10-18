@@ -2,17 +2,22 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import Link from "next/link";
+import { useUser } from "@auth0/nextjs-auth0";
 import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
+import AdvancedStatsPanel, { AdvancedStatsCollapsedPreview } from "@/app/_components/premium/AdvancedStatsPanel";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 import { getLevelFromXP } from "@/lib/xp-levels";
 import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
+import { useAccount } from "@/app/_components/AccountProvider";
+import { AccountIcon } from "@/components/icons";
+import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -25,6 +30,41 @@ import sistersIcon from "../../assets/factions/sister.png";
 import spaceMarineIcon from "../../assets/factions/spacemarine.png";
 import tauIcon from "../../assets/factions/tau.png";
 import type { StaticImageData } from 'next/image';
+
+function AccountBadge({ avatarUrl }: { avatarUrl?: string | null }) {
+  const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    setErrored(false);
+  }, [avatarUrl]);
+
+  const showAvatar = Boolean(avatarUrl && !errored);
+
+  if (showAvatar) {
+    return (
+      <span
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-800/80 text-white shadow-sm"
+        aria-hidden
+      >
+        <img
+          src={avatarUrl ?? undefined}
+          alt=""
+          className="h-[18px] w-[18px] rounded-full object-cover"
+          onError={() => setErrored(true)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-800/80 text-white shadow-sm"
+      aria-hidden
+    >
+      <AccountIcon className="h-3.5 w-3.5" />
+    </span>
+  );
+}
 
 type LadderData = {
   leaderboardId: number;
@@ -57,18 +97,26 @@ type FavoriteDataEntry = {
 
 const DEFAULT_RECENT_MATCH_LIMIT = 10;
 const FAVORITES_COOKIE = 'dow_favorites';
+const ADVANCED_STATS_HIDE_COOKIE_PREFIX = 'dow_adv_hidden_';
+const ADVANCED_STATS_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 const FAVORITES_COOKIE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days
-const premiumTeaserEnabled = ['1', 'true', 'on', 'yes'].includes(
-  (process.env.NEXT_PUBLIC_ENABLE_PREMIUM_TEASER ?? '').toLowerCase()
-);
-const PREMIUM_PRICE_OPTIONS = ['No', '$2.99/month', '$4.99/month'] as const;
-type PremiumSurveyChoice = (typeof PREMIUM_PRICE_OPTIONS)[number];
-const PREMIUM_PRICE_DETAIL: Record<PremiumSurveyChoice, string | null> = {
-  'No': null,
-  '$2.99/month': 'Support your crawling jobs and bots.',
-  '$4.99/month': 'Support the website as well.',
-};
+const UPGRADE_POINTS = [
+  "A dedicated bot to crawl your matches every day",
+  "Elo ratings tracked over time",
+  "Win rate broken down by faction match-up",
+  "Map-by-map performance with recent form",
+  "Head-to-head records against frequent opponents",
+  "Unlimited match history (from activation onward)",
+  "Most importantly: support this website for the long term <3",
+];
 
+type UpgradeIntent = {
+  profileId: string;
+  alias?: string | null;
+  playerName?: string | null;
+  source: "search" | "favorites";
+  redirectUrl?: string;
+};
 const normalizeAlias = (alias?: string | null): string => (alias ?? '').trim();
 
 const buildFavoriteKey = (
@@ -360,11 +408,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'stats' | 'replays' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
     searchQuery?: string;
     searchProfileId?: string;
     selectedFaction?: string;
@@ -372,6 +420,13 @@ export default function Home() {
     selectedCountry?: string;
     selectedId?: number;
     combinedViewMode?: 'best' | 'all';
+  };
+
+  type AdvancedStatsIntentPayload = {
+    profileId: string;
+    alias?: string | null;
+    playerName?: string | null;
+    source: "search" | "favorites";
   };
   
   // Build a URL string that reflects the given state via query params
@@ -410,8 +465,6 @@ export default function Home() {
       if (state.searchProfileId) p.set('pid', state.searchProfileId);
     } else if (state.view === 'favorites') {
       p.set('tab', 'favorites');
-    } else if (state.view === 'stats') {
-      p.set('tab', 'stats');
     } else if (state.view === 'replays') {
       p.set('tab', 'replays');
     } else if (state.view === 'support') {
@@ -449,9 +502,6 @@ export default function Home() {
     if (tab === 'favorites') {
       return { view: 'favorites' };
     }
-    if (tab === 'stats') {
-      return { view: 'stats' };
-    }
     if (tab === 'replays') {
       return { view: 'replays' };
     }
@@ -469,6 +519,23 @@ export default function Home() {
       selectedCountry: country,
       combinedViewMode: combined === 'all' ? 'all' : 'best',
     };
+  };
+
+  const { user: authUser, isLoading: authLoading } = useUser();
+  const { account, loading: accountLoading, refresh: refreshAccount } = useAccount();
+  const accountLink = "/account";
+  const loginLink = `/login?redirectTo=${encodeURIComponent(accountLink)}`;
+  const isAuthenticated = Boolean(authUser);
+  const linkedProfileId = account?.appUser?.primary_profile_id
+    ? String(account.appUser.primary_profile_id)
+    : null;
+  const linkedAlias = account?.profile?.alias ?? null;
+  const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
+  const accountButtonLabel = linkedAlias ?? "Account";
+  const advancedStatsCta = {
+    label: "Activate advanced statistics",
+    description: "Unlock Elo trends, matchup intel, and more.",
+    loading: authLoading || accountLoading,
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -498,18 +565,59 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Record<string, FavoriteEntry>>({});
   const [favoriteData, setFavoriteData] = useState<Record<string, FavoriteDataEntry>>({});
   const [favoritesLoading, setFavoritesLoading] = useState(false);
-  const [premiumPromptContext, setPremiumPromptContext] = useState<{
-    alias: string;
-    profileId?: string;
-    playerName?: string;
-  } | null>(null);
-  const [premiumPromptChoice, setPremiumPromptChoice] = useState<PremiumSurveyChoice | null>(null);
-  const [premiumPromptLoading, setPremiumPromptLoading] = useState(false);
-  const [premiumPromptError, setPremiumPromptError] = useState<string | null>(null);
-  const [premiumPromptResponseId, setPremiumPromptResponseId] = useState<string | null>(null);
-  const [premiumEmailValue, setPremiumEmailValue] = useState('');
-  const [premiumEmailStatus, setPremiumEmailStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [premiumEmailError, setPremiumEmailError] = useState<string | null>(null);
+  const [hiddenAdvancedStats, setHiddenAdvancedStats] = useState<Record<string, boolean>>({});
+  const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
+  const persistStoredUpgradeIntent = useCallback((payload: UpgradeIntent & { redirectUrl: string }) => {
+    if (typeof window === "undefined") return;
+    const serialized = JSON.stringify(payload);
+    try {
+      window.sessionStorage.setItem(ADVANCED_STATS_INTENT_STORAGE_KEY, serialized);
+    } catch {}
+    try {
+      window.localStorage.setItem(ADVANCED_STATS_INTENT_STORAGE_KEY, serialized);
+    } catch {}
+  }, []);
+
+  const readStoredUpgradeIntent = useCallback((): (UpgradeIntent & { redirectUrl?: string }) | null => {
+    if (typeof window === "undefined") return null;
+    const read = (storage: Storage) => {
+      try {
+        const raw = storage.getItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as UpgradeIntent & { redirectUrl?: string };
+      } catch {
+        return null;
+      }
+    };
+    const sessionValue = read(window.sessionStorage);
+    if (sessionValue) return sessionValue;
+    return read(window.localStorage);
+  }, []);
+
+  const clearStoredUpgradeIntent = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.removeItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+    } catch {}
+    try {
+      window.localStorage.removeItem(ADVANCED_STATS_INTENT_STORAGE_KEY);
+    } catch {}
+  }, []);
+
+  const openUpgradeModal = useCallback((payload: UpgradeIntent) => {
+    setUpgradeError(null);
+    setUpgradeLoading(false);
+    setUpgradeIntent(payload);
+  }, []);
+
+  const closeUpgradeModal = useCallback(() => {
+    setUpgradeIntent(null);
+    setUpgradeLoading(false);
+    setUpgradeError(null);
+  }, []);
 
   // Live Steam player count (DoW:DE) - Cached via Supabase
   const [playerCount, setPlayerCount] = useState<number | null>(null);
@@ -549,6 +657,122 @@ export default function Home() {
       console.warn('Failed to load favourites from cookie', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const initial: Record<string, boolean> = {};
+    for (const cookie of document.cookie.split("; ")) {
+      if (!cookie.startsWith(ADVANCED_STATS_HIDE_COOKIE_PREFIX)) continue;
+      const [key, value] = cookie.split("=");
+      if (!key) continue;
+      const profileId = key.slice(ADVANCED_STATS_HIDE_COOKIE_PREFIX.length);
+      if (!profileId) continue;
+      initial[profileId] = value === "1";
+    }
+    if (Object.keys(initial).length > 0) {
+      setHiddenAdvancedStats(initial);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has("subscribePrompt")) return;
+
+      const stored = readStoredUpgradeIntent();
+      if (stored && stored.profileId) {
+        openUpgradeModal({
+          profileId: String(stored.profileId),
+          alias: stored.alias ?? null,
+          playerName: stored.playerName ?? null,
+          source: stored.source ?? "search",
+          redirectUrl: stored.redirectUrl,
+        });
+      }
+
+      params.delete("subscribePrompt");
+      const newSearch = params.toString();
+      const nextUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", nextUrl);
+    } catch (error) {
+      console.warn("[premium] failed to restore upgrade prompt", error);
+    }
+  }, [openUpgradeModal, readStoredUpgradeIntent]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const hasSuccess = params.has("subscribeSuccess");
+    const hasCancelled = params.has("subscribeCancelled");
+    const sessionId = params.get("session_id")?.trim() ?? null;
+    if (!hasSuccess && !hasCancelled && !sessionId) return;
+
+    const handleReturn = async () => {
+      try {
+        const stored = readStoredUpgradeIntent();
+
+        if (hasSuccess && stored?.profileId) {
+          setHiddenAdvancedStats((previous) => ({
+            ...previous,
+            [stored.profileId]: false,
+          }));
+          try {
+            const cookieName = `${ADVANCED_STATS_HIDE_COOKIE_PREFIX}${stored.profileId}`;
+            document.cookie = `${cookieName}=0; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
+          } catch {}
+        }
+
+        closeUpgradeModal();
+        setUpgradeLoading(false);
+        setUpgradeError(null);
+
+        if (sessionId) {
+          try {
+            await fetch("/api/premium/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId }),
+            });
+            if (typeof refreshAccount === "function") {
+              await refreshAccount();
+            }
+          } catch (error) {
+            console.warn("[premium] sync after checkout failed", error);
+          }
+        }
+
+        clearStoredUpgradeIntent();
+        if (params.has("session_id")) params.delete("session_id");
+        params.delete("subscribeSuccess");
+        params.delete("subscribeCancelled");
+        const newSearch = params.toString();
+        const nextUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}${window.location.hash}`;
+
+        setTimeout(() => {
+          window.location.replace(nextUrl);
+        }, 50);
+      } catch (error) {
+        console.warn("[premium] failed to finalise subscription redirect", error);
+      }
+    };
+
+    handleReturn();
+  }, [clearStoredUpgradeIntent, closeUpgradeModal, readStoredUpgradeIntent, refreshAccount, setHiddenAdvancedStats]);
+
+  const getIsAdvancedStatsHidden = useCallback(
+    (profileId?: string | null) => {
+      if (!profileId) return true;
+      const stored = hiddenAdvancedStats[profileId];
+      if (stored !== undefined) {
+        return stored;
+      }
+      // Default to visible for all users
+      return false;
+    },
+    [hiddenAdvancedStats],
+  );
 
   // Filter states
   const [selectedFaction, setSelectedFaction] = useState<string>("All factions");
@@ -698,8 +922,6 @@ export default function Home() {
       }
     } else if (initialFromUrl.view === 'favorites') {
       setActiveTab('favorites');
-    } else if (initialFromUrl.view === 'stats') {
-      setActiveTab('stats');
     } else if (initialFromUrl.view === 'replays') {
       setActiveTab('replays');
     } else if (initialFromUrl.view === 'support') {
@@ -1230,125 +1452,188 @@ export default function Home() {
 
   const favoriteEntries = Object.values(favorites);
 
-  const resetPremiumPromptState = () => {
-    setPremiumPromptChoice(null);
-    setPremiumPromptError(null);
-    setPremiumPromptResponseId(null);
-    setPremiumEmailValue('');
-    setPremiumEmailStatus('idle');
-    setPremiumEmailError(null);
-    setPremiumPromptLoading(false);
-  };
+  const handleOpenAdvancedStats = (details: { profileId?: string; alias?: string | null; playerName?: string | null }) => {
+    const profileId = (details.profileId || '').trim();
+    if (!profileId) return;
 
-  const handleOpenPremiumPrompt = (details: { alias?: string | null; profileId?: string; playerName?: string | null }) => {
-    if (!premiumTeaserEnabled) return;
-    const alias = (details.alias ?? '').trim() || 'Unknown player';
-    setPremiumPromptContext({
-      alias,
-      profileId: details.profileId,
-      playerName: details.playerName ?? alias,
+    setHiddenAdvancedStats((previous) => {
+      const stored = previous[profileId];
+      const defaultHidden = false; // Default to visible for all users
+      const currentlyHidden = stored === undefined ? defaultHidden : stored;
+      const nextHidden = !currentlyHidden;
+      const next = { ...previous, [profileId]: nextHidden };
+      if (typeof document !== "undefined") {
+        const cookieName = `${ADVANCED_STATS_HIDE_COOKIE_PREFIX}${profileId}`;
+        const cookieValue = nextHidden ? "1" : "0";
+        document.cookie = `${cookieName}=${cookieValue}; path=/; max-age=${ADVANCED_STATS_COOKIE_MAX_AGE}; SameSite=Lax`;
+      }
+      return next;
     });
-    resetPremiumPromptState();
+    setMobileNavOpen(false);
   };
 
-  const handleClosePremiumPrompt = () => {
-    setPremiumPromptContext(null);
-    resetPremiumPromptState();
+  const handleUpgradeRequest = (details: { profileId?: string; alias?: string | null; playerName?: string | null; source: "search" | "favorites" }) => {
+    const profileId = (details.profileId || "").trim();
+    if (!profileId) return;
+    const redirectUrl = rememberAdvancedStatsIntent({
+      profileId,
+      alias: details.alias ?? null,
+      playerName: details.playerName ?? null,
+      source: details.source,
+    });
+    openUpgradeModal({
+      profileId,
+      alias: details.alias ?? null,
+      playerName: details.playerName ?? null,
+      source: details.source,
+      redirectUrl,
+    });
   };
 
-  const handlePremiumSurveySelection = async (choice: PremiumSurveyChoice) => {
-    if (!premiumTeaserEnabled || !premiumPromptContext) return;
-    setPremiumPromptLoading(true);
-    setPremiumPromptError(null);
+  const rememberAdvancedStatsIntent = (payload: AdvancedStatsIntentPayload): string => {
+    if (typeof window === "undefined") {
+      return "/";
+    }
+
+    const trimmedProfileId = payload.profileId.trim();
+    const fallbackQuery = (payload.alias ?? payload.playerName ?? "").trim();
+
     try {
-      const response = await fetch('/api/premium-interest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          alias: premiumPromptContext.alias,
-          profileId: premiumPromptContext.profileId,
-          playerName: premiumPromptContext.playerName,
-          choice,
-          responseId: premiumPromptResponseId ?? undefined,
-          source: 'search_teaser',
-        }),
+      const state: AppState = {
+        view: "search",
+        searchQuery: searchQuery || fallbackQuery,
+        searchProfileId: trimmedProfileId,
+      };
+      const fullUrl = buildUrl(state);
+      const parsedUrl = new URL(fullUrl);
+      const redirectUrl = parsedUrl.toString();
+      persistStoredUpgradeIntent({
+        profileId: trimmedProfileId,
+        alias: fallbackQuery || `Profile ${trimmedProfileId}`,
+        playerName: payload.playerName ?? null,
+        source: payload.source,
+        redirectUrl,
       });
-
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to record preference');
-      }
-
-      const payload = await response.json().catch(() => ({}));
-      if (payload && typeof payload.id === 'string') {
-        setPremiumPromptResponseId(payload.id);
-      }
-      setPremiumPromptChoice(choice);
-      setPremiumEmailStatus('idle');
-      setPremiumEmailError(null);
+      return redirectUrl;
     } catch (error) {
-      console.error('Failed to record premium interest', error);
-      setPremiumPromptError('We could not save your choice. Please try again.');
-    } finally {
-      setPremiumPromptLoading(false);
+      console.warn("Failed to persist advanced stats intent", error);
+      return window.location.href;
     }
   };
 
-  const handlePremiumEmailSubmit = async () => {
-    if (!premiumTeaserEnabled || !premiumPromptContext) return;
-    const email = premiumEmailValue.trim();
-    if (!email) {
-      setPremiumEmailError('Please enter an email address.');
-      setPremiumEmailStatus('error');
+  const handleUpgradeConfirm = async () => {
+    if (!upgradeIntent) return;
+    const intent = upgradeIntent;
+
+    const baseRedirect = intent.redirectUrl || rememberAdvancedStatsIntent(intent);
+
+    const normalizeRedirectPath = (path: string): string => {
+      if (!path) return "/";
+      if (path.startsWith("http://") || path.startsWith("https://")) {
+        try {
+          const parsed = new URL(path);
+          const relative = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+          return relative || "/";
+        } catch {
+          return "/";
+        }
+      }
+      return path.startsWith("/") ? path : `/${path}`;
+    };
+
+    const normalizedRedirect = normalizeRedirectPath(baseRedirect);
+
+    const buildRelativeWithParam = (path: string, key: string) => {
+      const url = new URL(path, window.location.origin);
+      url.searchParams.set(key, "1");
+      return `${url.pathname}${url.search}${url.hash}`;
+    };
+
+    const loginRedirect = buildRelativeWithParam(normalizedRedirect, "subscribePrompt");
+
+    persistStoredUpgradeIntent({
+      profileId: intent.profileId,
+      alias: intent.alias ?? null,
+      playerName: intent.playerName ?? null,
+      source: intent.source,
+      redirectUrl: normalizedRedirect,
+    });
+
+    if (!isAuthenticated) {
+      window.location.href = `/login?redirectTo=${encodeURIComponent(loginRedirect)}`;
       return;
     }
-    setPremiumEmailStatus('loading');
-    setPremiumEmailError(null);
+
+    const buildAbsoluteReturnUrl = (path: string, params: Record<string, string>): string => {
+      const url = new URL(path, window.location.origin);
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.set(key, value);
+      });
+      return url.toString();
+    };
+
+    const successUrl = buildAbsoluteReturnUrl(normalizedRedirect, {
+      subscribeSuccess: "1",
+      session_id: "{CHECKOUT_SESSION_ID}",
+    });
+
+    const cancelUrl = buildAbsoluteReturnUrl(normalizedRedirect, {
+      subscribeCancelled: "1",
+    });
+
+    setUpgradeLoading(true);
+    setUpgradeError(null);
+
     try {
-      const response = await fetch('/api/premium-interest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const profileNumeric = Number.parseInt(intent.profileId, 10);
+      if (!Number.isFinite(profileNumeric) || profileNumeric <= 0) {
+        throw new Error("invalid_profile_id");
+      }
+
+      const linkResponse = await fetch("/api/account/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: profileNumeric }),
+      });
+
+      if (!linkResponse.ok) {
+        const payload = await linkResponse.json().catch(() => null);
+        const message = payload?.error ?? "Unable to link profile. Please try again.";
+        throw new Error(message);
+      }
+
+      const checkoutResponse = await fetch("/api/premium/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          alias: premiumPromptContext.alias,
-          profileId: premiumPromptContext.profileId,
-          playerName: premiumPromptContext.playerName,
-          choice: premiumPromptChoice,
-          email,
-          responseId: premiumPromptResponseId ?? undefined,
-          source: 'search_teaser',
+          profileId: profileNumeric,
+          successUrl,
+          cancelUrl,
         }),
       });
 
-      if (!response.ok) {
-        const message = await response.text();
-        throw new Error(message || 'Failed to save email');
+      if (!checkoutResponse.ok) {
+        const payload = await checkoutResponse.json().catch(() => null);
+        const message = payload?.error ?? "Unable to start checkout. Please try again.";
+        throw new Error(message);
       }
 
-      const payload = await response.json().catch(() => ({}));
-      if (payload && typeof payload.id === 'string') {
-        setPremiumPromptResponseId(payload.id);
+      const payload = await checkoutResponse.json().catch(() => null);
+      const url = payload?.url;
+      if (typeof url === "string" && url.length > 0) {
+        closeUpgradeModal();
+        window.location.href = url;
+        return;
       }
-      setPremiumEmailStatus('success');
+
+      throw new Error("checkout_missing_url");
     } catch (error) {
-      console.error('Failed to save premium interest email', error);
-      setPremiumEmailStatus('error');
-      setPremiumEmailError('We could not save your email. Please try again.');
+      console.error("[premium] upgrade flow failed", error);
+      const message = error instanceof Error && error.message ? error.message : "Unexpected error starting subscription.";
+      setUpgradeError(message);
+      setUpgradeLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!premiumPromptContext) return;
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        handleClosePremiumPrompt();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [premiumPromptContext]);
 
   const activateTabFromFooter = (tab: TabType) => {
     setActiveTab(tab);
@@ -1529,20 +1814,6 @@ export default function Home() {
     );
   };
 
-  const renderComingSoonSection = (title: string, description: string) => (
-    <div className="space-y-6">
-      <div className="bg-neutral-900 border border-neutral-600/40 rounded-lg p-6 sm:p-8 shadow-2xl">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-2xl font-bold text-white">{title}</h2>
-          <span className="px-2.5 py-1 bg-neutral-700/70 text-neutral-200 text-xs font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-            Soon
-          </span>
-        </div>
-        <p className="text-neutral-300 leading-relaxed">{description}</p>
-      </div>
-    </div>
-  );
-
   const mobileNavButtonClass = (tab: TabType) => `w-full flex items-center justify-between gap-3 px-4 py-3 font-medium rounded-md border transition-colors duration-300 ${
     activeTab === tab
       ? 'text-white bg-neutral-800/70 border-neutral-500/60 shadow-lg'
@@ -1689,6 +1960,7 @@ export default function Home() {
   }, []);
 
   return (
+    <>
     <div className="min-h-screen text-white">
       <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
         {/* Header */}
@@ -1787,18 +2059,6 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleMobileNavSelect('stats')}
-                    className={mobileNavButtonClass('stats')}
-                  >
-                    <span className="flex items-center gap-2">
-                      Stats
-                      <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                        Soon
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
@@ -1875,6 +2135,30 @@ export default function Home() {
                   {playerCount !== null ? playerCount.toLocaleString() : (playerCountLoading ? '…' : '—')}
                 </span>
               </div>
+              <div>
+                {authLoading || accountLoading ? (
+                  <span className="inline-flex items-center rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-medium text-neutral-400">
+                    Loading…
+                  </span>
+                ) : authUser ? (
+                  <Link
+                    href={accountLink}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
+                    title={linkedAlias ? `Manage ${linkedAlias}` : "Manage account"}
+                  >
+                    <AccountBadge avatarUrl={linkedAvatarUrl} />
+                    <span className="max-w-[8rem] truncate">{accountButtonLabel}</span>
+                  </Link>
+                ) : (
+                  <a
+                    href={loginLink}
+                    className="inline-flex items-center gap-2 rounded-md border border-neutral-700/50 bg-neutral-900/60 px-3 py-1.5 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-800/70"
+                  >
+                    <AccountBadge avatarUrl={null} />
+                    Log in
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1925,21 +2209,6 @@ export default function Home() {
                 Replays
                 <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
                   NEW
-                </span>
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
-                activeTab === 'stats'
-                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
-              }`}
-            >
-              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                Stats
-                <span className="px-2 py-0.5 bg-neutral-700/70 text-neutral-200 text-[0.65rem] font-semibold uppercase tracking-wide rounded-md border border-neutral-500/40">
-                  Soon
                 </span>
               </span>
             </button>
@@ -2580,101 +2849,49 @@ export default function Home() {
 
                         {renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 6)}
 
-                        {premiumTeaserEnabled && (
-                          <div className="mt-4 rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex flex-1 items-start gap-3">
-                                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
-                                  <svg
-                                    className="h-5 w-5"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M4 20h16" />
-                                    <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
-                                    <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
-                                    <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
-                                  </svg>
-                                </span>
-                                <div className="space-y-1">
-                                  <p className="text-sm font-semibold text-white">Advanced statistics</p>
-                                  <p className="text-xs text-neutral-300">
-                                    Get access to maximum stats while supporting the website.
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
-                                <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
-                                <span>Everything you need to climb.</span>
-                              </div>
-                            </div>
-                            <div className="mt-3 rounded-lg border border-yellow-500/20 bg-neutral-950/70 p-4">
-                              <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-yellow-300">
-                                <span>Matchup intelligence</span>
-                                <span className="text-neutral-500">Advanced view</span>
-                              </div>
-                              <div className="mt-3 grid h-14 w-full grid-cols-6 gap-1" aria-hidden="true">
-                                {['a', 'b', 'c', 'd', 'e', 'f'].map((token) => (
-                                  <div
-                                    key={token}
-                                    className="rounded-md bg-gradient-to-b from-yellow-500/25 via-yellow-500/10 to-yellow-500/5 blur-sm"
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <ul className="mt-4 space-y-1.5 text-xs text-neutral-200">
-                              {[ 
-                                'A dedicated bot that will build your data every day',
-                                'ELO ratings over time',
-                                'Win rate per match-up',
-                                'Win rate per maps',
-                                'Win rate against frequent opponents',
-                                'Unlimited match history (starting after activation)'
-                              ].map((benefit) => (
-                                <li key={benefit} className="flex items-start gap-2">
-                                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300">
-                                    <svg
-                                      className="h-3 w-3"
-                                      viewBox="0 0 16 16"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden="true"
-                                    >
-                                      <path d="M3.5 8.5l2.5 2.5 6-6" />
-                                    </svg>
-                                  </span>
-                                  <span>{benefit}</span>
-                                </li>
-                              ))}
-                            </ul>
-                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="text-xs text-neutral-300 sm:max-w-md">
-                                Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
-                              </p>
-                              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenPremiumPrompt({
-                                    alias: aliasPrimary || aliasFallback,
+                        {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
+                          <div className="mt-4">
+                          {getIsAdvancedStatsHidden(profileIdStr)
+                            ? (
+                              <AdvancedStatsCollapsedPreview
+                                displayName={aliasPrimary || aliasFallback || profileIdStr}
+                              />
+                            ) : (
+                                <AdvancedStatsPanel
+                                  profileId={profileIdStr}
+                                  alias={aliasPrimary || aliasFallback}
+                                  onRequestAccess={() => handleUpgradeRequest({
                                     profileId: profileIdStr,
+                                    alias: aliasPrimary || aliasFallback,
                                     playerName: result.playerName,
+                                    source: "search",
                                   })}
-                                  className="inline-flex items-center justify-center rounded-md border border-yellow-400/30 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
-                                >
-                                  Activate advanced statistics
-                                </button>
-                              </div>
-                            </div>
+                                  ctaState={advancedStatsCta}
+                                  variant="embedded"
+                                />
+                              )}
                           </div>
                         )}
+                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-xs text-neutral-300 sm:max-w-md">
+                            Climb the Dawn of War ladders and have fun doing it. The Emperor demands.
+                          </p>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                                {profileIdStr && (!linkedProfileId || linkedProfileId === profileIdStr) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAdvancedStats({
+                                      alias: aliasPrimary || aliasFallback,
+                                      profileId: profileIdStr,
+                                      playerName: result.playerName,
+                                    })}
+                                    className="inline-flex items-center justify-center rounded-md border border-neutral-600/40 bg-neutral-800/30 px-3 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-700/40 hover:text-neutral-200"
+                                  >
+                                    {getIsAdvancedStatsHidden(profileIdStr) ? "View advanced statistics" : "Hide advanced statistics"}
+                                  </button>
+                                )}
+                          </div>
+                        </div>
 
                         {/* Recent Match History */}
                         {result.recentMatches && result.recentMatches.length > 0 && (
@@ -3060,13 +3277,26 @@ export default function Home() {
                                 {isFavorite ? 'Remove favourite' : 'Add to favourite'}
                               </span>
                             </button>
+                          <button
+                            type="button"
+                            onClick={() => runSearchByName(entry.alias, entry.profileId)}
+                            className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors text-xs font-semibold"
+                          >
+                            View in Search
+                          </button>
+                          {entry.profileId && (
                             <button
                               type="button"
-                              onClick={() => runSearchByName(entry.alias, entry.profileId)}
-                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/70 hover:bg-neutral-700/70 text-white rounded-md border border-neutral-600/40 transition-colors text-xs font-semibold"
+                              onClick={() => handleOpenAdvancedStats({
+                                alias: entry.alias,
+                                profileId: String(entry.profileId),
+                                playerName: entry.playerName,
+                              })}
+                              className="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-neutral-800/30 hover:bg-neutral-700/40 text-neutral-300 hover:text-neutral-200 rounded-md border border-neutral-600/40 transition-colors text-xs font-medium"
                             >
-                              View in Search
+                              {getIsAdvancedStatsHidden(String(entry.profileId)) ? "View advanced statistics" : "Hide advanced statistics"}
                             </button>
+                          )}
                           </div>
                         </div>
                       </div>
@@ -3091,17 +3321,36 @@ export default function Home() {
                       )}
 
                       {result && renderLeaderboardStatsBlock(result.personalStats?.leaderboardStats, 3)}
+
+                      {entry.profileId && (!linkedProfileId || linkedProfileId === String(entry.profileId)) && (
+                        <div className="mt-4">
+                          {getIsAdvancedStatsHidden(String(entry.profileId))
+                            ? (
+                              <AdvancedStatsCollapsedPreview
+                                displayName={entry.alias || entry.playerName || String(entry.profileId)}
+                              />
+                            ) : (
+                              <AdvancedStatsPanel
+                                profileId={String(entry.profileId)}
+                                alias={entry.alias}
+                                onRequestAccess={() => handleUpgradeRequest({
+                                  profileId: String(entry.profileId),
+                                  alias: entry.alias,
+                                  playerName: entry.playerName,
+                                  source: "favorites",
+                                })}
+                                ctaState={advancedStatsCta}
+                                variant="embedded"
+                              />
+                            )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
-        )}
-
-        {activeTab === 'stats' && renderComingSoonSection(
-          'Stats',
-          'We will have maps, matchup stats, and other insights so you can study every battlefield at a glance.'
         )}
 
         {activeTab === 'replays' && (
@@ -3262,132 +3511,6 @@ export default function Home() {
       </div>
     </div>
   </footer>
-  {premiumTeaserEnabled && premiumPromptContext && (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4 py-8"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="premium-survey-title"
-    >
-      <div className="relative w-full max-w-lg rounded-2xl border border-yellow-500/30 bg-neutral-950/95 p-6 shadow-2xl">
-        <button
-          type="button"
-          onClick={handleClosePremiumPrompt}
-          className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/80 text-neutral-400 transition hover:border-neutral-500 hover:text-white"
-          aria-label="Close advanced statistics notice"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 6l12 12" />
-            <path d="M18 6L6 18" />
-          </svg>
-        </button>
-        <div className="space-y-4 pr-2">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-yellow-500/40 bg-yellow-500/15 text-yellow-300">
-              <svg
-                className="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M4 20h16" />
-                <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
-                <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
-                <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
-              </svg>
-            </span>
-            <div>
-              <h3 id="premium-survey-title" className="text-lg font-semibold text-white">Advanced statistics</h3>
-              <p className="text-xs text-neutral-400">{premiumPromptContext.playerName ?? premiumPromptContext.alias}</p>
-            </div>
-          </div>
-          <div className="space-y-3 text-sm text-neutral-200">
-            <p>Advanced statistics is not available yet.</p>
-            <p>Today it&apos;s not possible to display them with the Relic API alone, we need to set up bots, background jobs, and functions that cost some money.</p>
-            <p>This website stays free for everyone, so any participation would also help keep the hosting running, which is greatly appreciated!</p>
-            <p>Would you be interested in unlocking the advanced stats against a small price?</p>
-          </div>
-          <div className="flex flex-col gap-2">
-            {PREMIUM_PRICE_OPTIONS.map((option) => {
-              const isSelected = premiumPromptChoice === option;
-              const detail = PREMIUM_PRICE_DETAIL[option];
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => handlePremiumSurveySelection(option)}
-                  disabled={premiumPromptLoading}
-                  className={`flex flex-col items-start gap-1 rounded-lg border px-4 py-2 text-left text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
-                    isSelected
-                      ? 'border-yellow-400 bg-yellow-400 text-neutral-900'
-                      : 'border-neutral-700/60 bg-neutral-900/70 text-neutral-100 hover:border-yellow-400/70 hover:text-white'
-                  } ${premiumPromptLoading ? 'opacity-70' : ''}`}
-                  aria-pressed={isSelected}
-                >
-                  <span className="flex w-full items-center justify-between">
-                    <span>{option}</span>
-                    {isSelected && (
-                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M3.5 8.5l2.5 2.5 6-6" />
-                      </svg>
-                    )}
-                  </span>
-                  {detail && (
-                    <span className={`text-xs font-normal ${isSelected ? 'text-neutral-900/80' : 'text-neutral-400'}`}>
-                      {detail}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {premiumPromptError && (
-            <p className="text-xs font-semibold text-red-400">{premiumPromptError}</p>
-          )}
-          {premiumPromptChoice && (
-            <div className="rounded-lg border border-neutral-700/60 bg-neutral-900/60 p-4">
-              <p className="text-xs text-neutral-300">Drop your email and we&apos;ll notify you the moment advanced statistics go live.</p>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <input
-                  type="email"
-                  value={premiumEmailValue}
-                  onChange={(event) => {
-                    setPremiumEmailValue(event.target.value);
-                    if (premiumEmailStatus === 'error') {
-                      setPremiumEmailStatus('idle');
-                      setPremiumEmailError(null);
-                    }
-                  }}
-                  placeholder="you@example.com"
-                  className="w-full rounded-md border border-neutral-700/60 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-yellow-400 focus:outline-none focus:ring-1 focus:ring-yellow-400"
-                  disabled={premiumEmailStatus === 'loading' || premiumEmailStatus === 'success'}
-                  aria-label="Email address"
-                />
-                <button
-                  type="button"
-                  onClick={handlePremiumEmailSubmit}
-                  disabled={premiumEmailStatus === 'loading' || premiumEmailStatus === 'success'}
-                  className="inline-flex items-center justify-center rounded-md border border-yellow-400/40 bg-yellow-400 px-3 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {premiumEmailStatus === 'loading' ? 'Saving...' : premiumEmailStatus === 'success' ? 'Saved' : 'Notify me'}
-                </button>
-              </div>
-              {premiumEmailError && (
-                <p className="mt-2 text-xs font-semibold text-red-400">{premiumEmailError}</p>
-              )}
-              {premiumEmailStatus === 'success' && !premiumEmailError && (
-                <p className="mt-2 text-xs text-green-400">Thanks! We&apos;ll keep you posted.</p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )}
   {/* Feedback Modal */}
   {showFeedbackModal && (
     <div
@@ -3496,6 +3619,150 @@ export default function Home() {
       </div>
     </div>
   )}
+  {upgradeIntent && (
+    <div
+      className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-sm p-1.5 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="upgrade-modal-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          closeUpgradeModal();
+        }
+      }}
+    >
+      <div className="relative w-full h-full sm:h-auto sm:max-w-lg overflow-hidden rounded-xl sm:rounded-2xl border border-neutral-700/40 bg-gradient-to-b from-neutral-900 to-neutral-950 shadow-2xl overflow-y-auto">
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={closeUpgradeModal}
+          className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-900/90 text-neutral-400 transition hover:border-neutral-500 hover:bg-neutral-800 hover:text-white"
+          aria-label="Close upgrade dialog"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+
+        {/* Header section */}
+        <div className="relative border-b border-neutral-800/50 bg-gradient-to-br from-yellow-500/5 via-transparent to-transparent px-4 pb-4 pt-12 sm:px-6 sm:pb-6 sm:pt-8">
+          <div className="space-y-2.5 sm:space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/30 bg-yellow-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-yellow-300">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16" />
+                <rect x="6" y="12" width="2.5" height="8" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="11" y="8" width="2.5" height="12" rx="0.6" fill="currentColor" stroke="none" />
+                <rect x="16" y="4" width="2.5" height="16" rx="0.6" fill="currentColor" stroke="none" />
+              </svg>
+              Advanced Analytics
+            </div>
+            <div>
+              <h3 id="upgrade-modal-title" className="text-lg font-bold leading-tight text-white sm:text-2xl">
+                Unlock deeper insights for{' '}
+                <span className="text-yellow-400">{upgradeIntent.alias?.trim() || upgradeIntent.playerName?.trim() || upgradeIntent.profileId}</span>
+              </h3>
+              <p className="mt-1.5 text-xs text-neutral-400 sm:mt-2 sm:text-sm">
+                Detailed match analytics updated daily for your linked profile
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content section */}
+        <div className="px-4 py-4 sm:px-6 sm:py-6">
+          <div className="space-y-4 sm:space-y-5">
+            {/* What's included */}
+            <div>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 sm:mb-3">What&apos;s included</h4>
+              <ul className="space-y-2 text-sm sm:space-y-2.5">
+                {UPGRADE_POINTS.map((point, index) => (
+                  <li key={point} className="flex items-start gap-2">
+                    <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-400">
+                      <svg className="h-2.5 w-2.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M3.5 8.5l2.5 2.5 6-6" />
+                      </svg>
+                    </span>
+                    <span className="text-neutral-200">
+                      {index === 0 ? (
+                        <>
+                          <span className="underline decoration-yellow-400/50">A dedicated bot</span> to crawl your matches every day
+                        </>
+                      ) : (
+                        point
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pricing */}
+            <div className="rounded-xl border border-neutral-700/50 bg-neutral-900/50 p-3.5 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-white sm:text-4xl">$4.99</span>
+                    <span className="text-sm text-neutral-400 sm:text-lg">/month</span>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-400 sm:mt-1.5 sm:text-sm">Cancel anytime • No commitment</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Community message */}
+            <div className="rounded-lg border border-neutral-800/50 bg-neutral-900/30 px-3 py-2">
+              <p className="text-xs leading-relaxed text-neutral-400">
+                This helps keep the servers running and provide leaderboards for free to everyone in the Dawn of War community. Thank you! The Emperor notices.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer with CTA */}
+        <div className="border-t border-neutral-800/50 bg-neutral-950/50 px-4 py-4 pb-6 sm:px-6 sm:py-5 sm:pb-5">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={closeUpgradeModal}
+              className="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-400 transition hover:text-neutral-200"
+            >
+              Maybe later
+            </button>
+            <button
+              type="button"
+              onClick={handleUpgradeConfirm}
+              disabled={upgradeLoading}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-400/60 bg-yellow-400 px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-lg shadow-yellow-500/20 transition hover:bg-yellow-300 hover:shadow-yellow-500/30 disabled:cursor-not-allowed disabled:opacity-70 sm:text-base"
+            >
+              {upgradeLoading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Opening…
+                </>
+              ) : isAuthenticated ? (
+                <>
+                  Continue to checkout
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </>
+              ) : (
+                "Sign in to subscribe"
+              )}
+            </button>
+          </div>
+          {upgradeError && (
+            <p className="mt-2 text-xs font-medium text-red-400 sm:text-sm">{upgradeError}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
 </div>
+</>
 );
 }
