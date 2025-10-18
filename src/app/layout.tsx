@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { UserProvider } from "@auth0/nextjs-auth0/client";
+import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { Exo_2 } from "next/font/google";
 import "./globals.css";
 import { AccountProvider } from "./_components/AccountProvider";
@@ -40,11 +40,11 @@ export default async function RootLayout({
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
       }}>
-        <UserProvider user={session?.user ?? undefined}>
+        <Auth0Provider user={session?.user ?? undefined}>
           <AccountProvider>
             {children}
           </AccountProvider>
-        </UserProvider>
+        </Auth0Provider>
         <Analytics />
       </body>
     </html>

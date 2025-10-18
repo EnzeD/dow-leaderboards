@@ -6,7 +6,7 @@ import {
   useMemo,
 } from "react";
 import useSWR from "swr";
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { useUser } from "@auth0/nextjs-auth0";
 
 type AccountProfile = {
   profileId: number;
