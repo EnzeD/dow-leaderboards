@@ -153,6 +153,7 @@ export async function POST(request: Request) {
     const sessionResult = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId ?? undefined,
+      allow_promotion_codes: true,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata,
