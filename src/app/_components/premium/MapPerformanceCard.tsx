@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useAdvancedStats } from "./AdvancedStatsPanel";
 import { getMapName, getMapImage } from "@/lib/mapMetadata";
 
@@ -150,11 +151,12 @@ export default function MapPerformanceCard({ profileId, windowDays, matchTypeId 
                     <td className="py-3">
                       <div className="flex items-center gap-3">
                         {mapImage && (
-                          <img
+                          <Image
                             src={mapImage}
                             alt={mapName}
+                            width={64}
+                            height={40}
                             className="h-10 w-16 rounded-md object-cover"
-                            loading="lazy"
                           />
                         )}
                         <div>
@@ -178,4 +180,3 @@ export default function MapPerformanceCard({ profileId, windowDays, matchTypeId 
     </section>
   );
 }
-
