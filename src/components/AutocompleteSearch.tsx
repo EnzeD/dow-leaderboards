@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { PlayerSearchResult, supabase } from '@/lib/supabase';
 import { getLevelFromXP } from '@/lib/xp-levels';
+import { passthroughImageLoader } from '@/lib/image-loader';
 
 type AutocompleteSearchProps = {
   value: string;
@@ -23,14 +25,18 @@ const FlagIcon = ({ countryCode }: { countryCode: string }) => {
   const flagWidth = `calc(${flagHeight} * 4 / 3)`;
 
   return (
-    <img
+    <Image
+      loader={passthroughImageLoader}
       src={`https://flagcdn.com/w40/${normalized}.png`}
       alt={`${isoCode} flag`}
+      width={40}
+      height={30}
       className="inline-block"
       style={{ height: flagHeight, width: flagWidth }}
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.display = 'none';
+      onError={(event) => {
+        event.currentTarget.style.display = 'none';
       }}
+      unoptimized
     />
   );
 };

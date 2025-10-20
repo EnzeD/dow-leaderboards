@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import Image from "next/image";
 import { EnrichedReplayProfile, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
 import { getMapName, getMapImage } from '@/lib/mapMetadata';
@@ -1328,12 +1329,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     {/* Map in the middle */}
                     <div className="shrink-0 flex flex-col items-center justify-start px-3">
                       {mapImagePath ? (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
-                          <img
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
+                          <Image
                             src={mapImagePath}
                             alt={`${mapDisplayName} mini-map`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
+                            fill
+                            sizes="(min-width: 640px) 6rem, 5rem"
+                            className="object-cover"
                           />
                         </div>
                       ) : (

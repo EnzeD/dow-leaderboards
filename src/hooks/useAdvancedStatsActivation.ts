@@ -7,6 +7,7 @@ type ActivationPayload = {
   reason?: string;
   status?: string | null;
   cancelAtPeriodEnd?: boolean | null;
+  currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   profileId?: number | null;
 };
@@ -77,6 +78,7 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
         activated: Boolean(payload?.activated),
         status: payload?.status ?? null,
         cancelAtPeriodEnd: payload?.cancelAtPeriodEnd ?? null,
+        currentPeriodStart: payload?.currentPeriodStart ?? null,
         currentPeriodEnd: payload?.currentPeriodEnd ?? null,
         profileId: payload?.profileId ?? null,
         reason: payload?.reason,
@@ -97,6 +99,8 @@ export const useAdvancedStatsActivation = (profileId?: string | number | null) =
         loading: false,
         reason: "fetch_error",
         error: (error as Error)?.message ?? "unknown",
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
       };
       setState(fallback);
     }

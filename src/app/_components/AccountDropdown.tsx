@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { passthroughImageLoader } from "@/lib/image-loader";
 
 type AccountDropdownProps = {
   avatarUrl?: string | null;
@@ -45,10 +47,14 @@ export function AccountDropdown({ avatarUrl, displayName, profileId }: AccountDr
       >
         {avatarUrl ? (
           <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-neutral-700/60 bg-neutral-800/80 text-white shadow-sm">
-            <img
+            <Image
+              loader={passthroughImageLoader}
               src={avatarUrl}
-              alt=""
+              alt={`${displayName} avatar`}
+              width={18}
+              height={18}
               className="h-[18px] w-[18px] rounded-full object-cover"
+              unoptimized
             />
           </span>
         ) : (

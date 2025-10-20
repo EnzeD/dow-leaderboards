@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import type { PlayerSearchResult } from "@/lib/supabase";
 import { useAccount } from "@/app/_components/AccountProvider";
+import { passthroughImageLoader } from "@/lib/image-loader";
 
 type Props = {
   initialProfileId: number | null;
@@ -113,10 +115,14 @@ export function AccountProfileLinker({
         {profileId ? (
           <div className="flex items-start gap-3">
             {profileAvatarUrl && (
-              <img
+              <Image
+                loader={passthroughImageLoader}
                 src={profileAvatarUrl}
                 alt="Profile avatar"
+                width={48}
+                height={48}
                 className="h-12 w-12 rounded-full border border-neutral-700/60 object-cover"
+                unoptimized
               />
             )}
             <div className="flex-1">

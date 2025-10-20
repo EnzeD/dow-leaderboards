@@ -12,6 +12,7 @@ type ActivationResponse = {
   reason?: string;
   status?: string | null;
   cancelAtPeriodEnd?: boolean | null;
+  currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   profileId?: number | null;
 };
@@ -106,6 +107,7 @@ export async function GET(req: NextRequest) {
         reason: active ? undefined : "not_subscribed",
         status: snapshot.status,
         cancelAtPeriodEnd: snapshot.cancel_at_period_end ?? null,
+        currentPeriodStart: snapshot.current_period_start ?? null,
         currentPeriodEnd: snapshot.current_period_end,
         profileId: primaryProfileId,
       },
