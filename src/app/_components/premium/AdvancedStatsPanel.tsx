@@ -35,6 +35,8 @@ const SECTIONS: Array<{ id: AdvancedStatsSection; label: string }> = [
   { id: "opponents", label: "Opponents" },
 ];
 
+const NEW_SUBSCRIBER_WINDOW_MS = 21 * 24 * 60 * 60 * 1000;
+
 type OverviewApiResponse = {
   activated: boolean;
   profileId: string;
@@ -63,6 +65,13 @@ export default function AdvancedStatsPanel({
   const leaderboards = useCombinedLeaderboards();
 
   const activated = activation.activated || Boolean(activatedOverride);
+
+  const isNewSubscriber = useMemo(() => {
+    if (!activation.currentPeriodStart) return false;
+    const parsed = Date.parse(activation.currentPeriodStart);
+    if (Number.isNaN(parsed)) return false;
+    return Date.now() - parsed < NEW_SUBSCRIBER_WINDOW_MS;
+  }, [activation.currentPeriodStart]);
 
   const contextValue = useMemo(() => ({
     ...activation,
@@ -294,6 +303,12 @@ export default function AdvancedStatsPanel({
               {controls}
             </div>
           </header>
+        )}
+
+        {activated && isNewSubscriber && (
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+            Our daily match bot is now active for your account. Give it a few weeks to crawl fresh games and these advanced statistics will improve drastically.
+          </div>
         )}
 
         <ProfileOverviewCard overview={overview} loading={overviewLoading} error={overviewError} />
