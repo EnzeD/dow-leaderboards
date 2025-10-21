@@ -58,6 +58,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - `premium_get_elo_history(p_profile_id bigint, p_leaderboard_id integer, p_since timestamptz, p_limit integer)` – reads `leaderboard_rank_history`.
 - `premium_get_matchup_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer)` – aggregates faction matchups from `match_participants`/`matches`.
 - `premium_get_map_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns per-map statistics with bounded result sizes.
+- `premium_get_map_match_history(p_profile_id bigint, p_map_identifier text, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent matches played on a specific map (with roster metadata).
 - `premium_get_opponent_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns most frequent human opponents (filters out computers, spectators, and same-team results).
 - `premium_get_opponent_match_history(p_profile_id bigint, p_opponent_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent head-to-head matches (including roster JSON) for a specific opponent while excluding spectators and same-team appearances.
 - `premium_get_profile_overview(p_profile_id bigint)` – available PL/pgSQL helper (see `supabase/migrations/0027_fix_overview_wins_losses.sql`), currently unused because the API recomputes the overview to incorporate live Relic data.
@@ -77,6 +78,8 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
   Returns `rows[]` with faction ids, win rates, and last-played timestamps.
 - `GET /api/premium/maps?profileId=123&matchTypeId=1&windowDays=90&limit=25`  
   Returns `rows[]` with map identifiers, names, win/loss splits, and recency.
+- `GET /api/premium/maps/matches?profileId=123&mapIdentifier=blood_river&matchTypeId=1&windowDays=90&limit=20`  
+  Returns detailed match history for the specified map, matching the recent match card UI.
 - `GET /api/premium/opponents?profileId=123&matchTypeId=1&matchScope=automatch&windowDays=90&limit=10`  
   Returns `rows[]` with opponent metadata (alias, country, primary race), records, win rates, and last-played timestamps.
 - `GET /api/premium/opponents/matches?profileId=123&opponentProfileId=456&matchTypeId=1&matchScope=automatch&windowDays=90&limit=20`  
