@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     return attachCacheHeaders(
       NextResponse.json<ActivationResponse>(
         { activated: false, reason: "not_authenticated" },
-        { status: 401 },
+        { status: 200 },
       ),
     );
   }

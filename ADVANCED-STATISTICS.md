@@ -11,13 +11,13 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 
 ## Activation & Access Control
 - Activation is evaluated per Auth0 user:
-  1. `auth0.getSession()` must resolve (anonymous visitors receive `401 not_authenticated`).
+1. `auth0.getSession()` must resolve (anonymous visitors receive `200 not_authenticated`).
   2. The account must have `app_users.primary_profile_id` populated.
   3. The requested `profileId` must match that primary profile (`403 profile_mismatch` otherwise).
   4. `public.premium_subscriptions` must contain an active Stripe snapshot (statuses `active`, `trialing`, or `past_due`) whose `current_period_end` is in the future.
 - `useAdvancedStatsActivation` (`src/hooks/useAdvancedStatsActivation.ts`) calls `GET /api/premium/activation-status?profileId=…`, caches the payload per profile id, and exposes `refresh()` so the locked preview and account page can retry.
 - Response reasons surfaced to the UI:
-  - `not_authenticated` → sign-in required (401).
+- `not_authenticated` → sign-in required (200).
   - `profile_not_linked` → no `primary_profile_id` (403).
   - `profile_mismatch` → viewing another player (403).
   - `not_subscribed` → subscription required (403 for data routes, **200** with `activated: false` for `/activation-status` to allow upgrade copy).
