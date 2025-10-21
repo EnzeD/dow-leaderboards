@@ -245,6 +245,12 @@ const normalizePlayerId = (value?: string | null): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const normalizeIdentifier = (value?: string | null): string => {
+  if (!value) return "unknown";
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : "unknown";
+};
+
 const transformMatchRow = (row: MapMatchHistoryApiResponse["rows"][number]): MapMatch => {
   const startTime = row.startedAt ? new Date(row.startedAt).getTime() : undefined;
   const completedTime = row.completedAt ? new Date(row.completedAt).getTime() : undefined;
@@ -676,9 +682,10 @@ export default function MapPerformanceCard({
             </thead>
             <tbody className="divide-y divide-neutral-800/60">
               {rows.map((row) => {
+                const mapIdentifier = normalizeIdentifier(row.mapIdentifier);
                 const expanded = Boolean(expandedRows[mapIdentifier]);
                 const mapName = getMapName(mapIdentifier) || row.mapName;
-                const mapImage = getMapImage(row.mapIdentifier);
+                const mapImage = getMapImage(mapIdentifier);
                 return (
                   <Fragment key={mapIdentifier}>
                     <tr
