@@ -72,6 +72,7 @@ type MatchupMatchHistoryApiResponse = {
   matchTypeId?: number;
   rows: Array<{
     matchId: number;
+    mapIdentifier: string | null;
     mapName: string | null;
     matchTypeId: number | null;
     startedAt: string | null;
