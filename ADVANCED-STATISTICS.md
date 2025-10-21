@@ -59,6 +59,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - `premium_get_matchup_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer)` – aggregates faction matchups from `match_participants`/`matches`.
 - `premium_get_map_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns per-map statistics with bounded result sizes.
 - `premium_get_opponent_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns most frequent human opponents.
+- `premium_get_opponent_match_history(p_profile_id bigint, p_opponent_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent head-to-head matches (including roster JSON) for a specific opponent.
 - `premium_get_profile_overview(p_profile_id bigint)` – available PL/pgSQL helper (see `supabase/migrations/0027_fix_overview_wins_losses.sql`), currently unused because the API recomputes the overview to incorporate live Relic data.
 - Schema prerequisites:
   - `public.premium_subscriptions` (`0030_premium_subscriptions.sql`) with policies in `0031_enable_rls_on_premium_subscriptions.sql`.
@@ -78,6 +79,8 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
   Returns `rows[]` with map identifiers, names, win/loss splits, and recency.
 - `GET /api/premium/opponents?profileId=123&matchTypeId=1&matchScope=automatch&windowDays=90&limit=10`  
   Returns `rows[]` with opponent metadata, records, win rates, and last-played timestamps.
+- `GET /api/premium/opponents/matches?profileId=123&opponentProfileId=456&matchTypeId=1&matchScope=automatch&windowDays=90&limit=20`  
+  Returns detailed match history between the authenticated profile and the specified opponent, reusing the recent match card UI.
 - All handlers instantiate the Supabase service client via `getSupabaseAdmin()`, set cache headers, and log unexpected failures with a `[premium]` prefix for easier filtering in Vercel logs.
 
 ## Frontend Modules

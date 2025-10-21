@@ -57,3 +57,95 @@ $$;
 
 comment on function public.premium_get_opponent_stats is
   'Returns the most frequent opponents for a player with win/loss records. Filters support match_type_id = -1 (automatch) and -2 (custom).';
+
+create or replace function public.premium_get_opponent_match_history(
+  p_profile_id bigint,
+  p_opponent_profile_id bigint,
+  p_since timestamptz default (now() - interval '90 days'),
+  p_match_type_id integer default null,
+  p_limit integer default 20
+)
+returns table (
+  match_id bigint,
+  map_name text,
+  match_type_id integer,
+  started_at timestamptz,
+  completed_at timestamptz,
+  duration_seconds integer,
+  outcome text,
+  old_rating integer,
+  new_rating integer,
+  rating_delta integer,
+  team_id smallint,
+  race_id smallint,
+  players jsonb
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with base as (
+    select
+      m.match_id,
+      m.map_name,
+      m.match_type_id,
+      m.started_at,
+      m.completed_at,
+      m.duration_seconds,
+      my.outcome,
+      my.old_rating,
+      my.new_rating,
+      my.rating_delta,
+      my.team_id,
+      my.race_id
+    from public.match_participants my
+    join public.match_participants opp
+      on opp.match_id = my.match_id
+     and opp.profile_id = p_opponent_profile_id
+    join public.matches m
+      on m.match_id = my.match_id
+    where my.profile_id = p_profile_id
+      and my.is_computer = false
+      and opp.is_computer = false
+      and (p_since is null or m.completed_at >= p_since)
+      and (
+        p_match_type_id is null
+        or (p_match_type_id >= 0 and m.match_type_id = p_match_type_id)
+        or (p_match_type_id = -1 and m.match_type_id in (1, 2, 3, 4))
+        or (p_match_type_id = -2 and (m.match_type_id is null or m.match_type_id not in (1, 2, 3, 4)))
+      )
+  )
+  select
+    b.match_id,
+    b.map_name,
+    b.match_type_id,
+    b.started_at,
+    b.completed_at,
+    b.duration_seconds,
+    coalesce(nullif(b.outcome::text, ''), 'unknown') as outcome,
+    b.old_rating,
+    b.new_rating,
+    b.rating_delta,
+    b.team_id,
+    b.race_id,
+    (
+      select jsonb_agg(jsonb_build_object(
+        'profileId', mp.profile_id::text,
+        'alias', coalesce(player.current_alias, nullif(mp.alias_at_match, ''), mp.profile_id::text),
+        'teamId', mp.team_id,
+        'raceId', mp.race_id,
+        'oldRating', mp.old_rating,
+        'newRating', mp.new_rating
+      ) order by mp.team_id, mp.profile_id)
+      from public.match_participants mp
+      left join public.players player on player.profile_id = mp.profile_id
+      where mp.match_id = b.match_id
+        and mp.is_computer = false
+    ) as players
+  from base b
+  order by b.completed_at desc nulls last
+  limit greatest(5, least(coalesce(p_limit, 50), 100));
+$$;
+
+comment on function public.premium_get_opponent_match_history is
+  'Returns recent matches between a player and a specific opponent, including roster details.';
