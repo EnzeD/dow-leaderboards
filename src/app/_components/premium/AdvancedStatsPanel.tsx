@@ -270,6 +270,7 @@ export default function AdvancedStatsPanel({
             profileId={profileIdStr}
             windowDays={windowDays}
             matchTypeId={null}
+            onPlayerNavigate={onPlayerNavigate}
           />
         );
       case "maps":

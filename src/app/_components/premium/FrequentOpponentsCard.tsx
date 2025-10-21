@@ -59,6 +59,7 @@ type OpponentMatchPlayer = {
 
 type OpponentMatch = {
   matchId: number;
+  mapIdentifier?: string;
   mapName?: string;
   matchTypeId?: number;
   startTime?: number;
@@ -83,6 +84,7 @@ type OpponentMatchHistoryApiResponse = {
   matchScope?: MatchScope;
   rows: Array<{
     matchId: number;
+    mapIdentifier: string | null;
     mapName: string | null;
     matchTypeId: number | null;
     startedAt: string | null;
@@ -301,6 +303,12 @@ const normalizePlayerId = (value?: string | null): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
+const normalizeIdentifier = (value?: string | null): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
 const transformMatchRow = (row: OpponentMatchHistoryApiResponse["rows"][number]): OpponentMatch => {
   const startTime = row.startedAt ? new Date(row.startedAt).getTime() : undefined;
   const completedTime = row.completedAt ? new Date(row.completedAt).getTime() : undefined;
@@ -325,6 +333,7 @@ const transformMatchRow = (row: OpponentMatchHistoryApiResponse["rows"][number])
 
   return {
     matchId: row.matchId,
+    mapIdentifier: normalizeIdentifier(row.mapIdentifier) ?? normalizeIdentifier(row.mapName),
     mapName: row.mapName ?? undefined,
     matchTypeId: row.matchTypeId ?? undefined,
     startTime: typeof startTime === "number" && !Number.isNaN(startTime) ? Math.floor(startTime / 1000) : undefined,
@@ -551,19 +560,8 @@ export default function FrequentOpponentsCard({
       : "";
     const myFaction = raceIdToFaction(match.raceId ?? myPlayer?.raceId);
 
-    const mapIdentifier = [match.mapName]
-      .find((value) => {
-        if (typeof value === "string") {
-          return value.trim().length > 0;
-        }
-        if (typeof value === "number") {
-          return Number.isFinite(value);
-        }
-        return false;
-      });
-
-    const normalizedMapId = typeof mapIdentifier === "number" ? String(mapIdentifier) : mapIdentifier?.trim();
-    const mapDisplayName = getMapName(normalizedMapId);
+    const normalizedMapId = normalizeIdentifier(match.mapIdentifier) ?? normalizeIdentifier(match.mapName);
+    const mapDisplayName = getMapName(normalizedMapId) || match.mapName || "Unknown Map";
     const mapImagePath = getMapImage(normalizedMapId);
     const hasRoster = allies.length > 0 || opponents.length > 0;
     const displaySelfAlias = myPlayer?.alias || profileIdStr;
