@@ -24,6 +24,7 @@ interface MatchupsResponse {
   windowStart: string;
   generatedAt: string;
   matchTypeId?: number;
+  matchScope?: "all" | "automatch" | "custom";
   rows: Array<{
     myRaceId: number | null;
     opponentRaceId: number | null;
