@@ -143,12 +143,39 @@ const coerceProfileId = (value: string | number): string => {
   return typeof value === "string" ? value : value.toString();
 };
 
-const buildParams = (profileId: string, windowDays: number, matchTypeId: number | null) => {
+type MatchScopeFilter = "all" | "automatch" | "custom";
+type MatchFilterOption = "all" | "automatch1v1" | "automatch2v2" | "custom";
+
+const MATCH_FILTERS: Array<{ label: string; value: MatchFilterOption }> = [
+  { label: "All matches", value: "all" },
+  { label: "1v1 Automatch", value: "automatch1v1" },
+  { label: "2v2 Automatch", value: "automatch2v2" },
+  { label: "Custom", value: "custom" },
+];
+
+const resolveFilter = (filter: MatchFilterOption): { matchTypeId: number | null; matchScope: MatchScopeFilter } => {
+  switch (filter) {
+    case "automatch1v1":
+      return { matchTypeId: 1, matchScope: "automatch" };
+    case "automatch2v2":
+      return { matchTypeId: 2, matchScope: "automatch" };
+    case "custom":
+      return { matchTypeId: null, matchScope: "custom" };
+    case "all":
+    default:
+      return { matchTypeId: null, matchScope: "all" };
+  }
+};
+
+const buildParams = (profileId: string, windowDays: number, matchTypeId: number | null, matchScope: MatchScopeFilter) => {
   const params = new URLSearchParams();
   params.set("profileId", profileId);
   params.set("windowDays", String(windowDays));
   if (matchTypeId !== null && Number.isFinite(matchTypeId)) {
     params.set("matchTypeId", String(matchTypeId));
+  }
+  if (matchScope !== "all") {
+    params.set("matchScope", matchScope);
   }
   return params.toString();
 };
@@ -157,6 +184,7 @@ const buildMatchParams = (
   profileId: string,
   windowDays: number,
   matchTypeId: number | null,
+  matchScope: MatchScopeFilter,
   myRaceId: number,
   opponentRaceId: number,
 ) => {
@@ -167,6 +195,9 @@ const buildMatchParams = (
   params.set("opponentRaceId", String(opponentRaceId));
   if (matchTypeId !== null && Number.isFinite(matchTypeId)) {
     params.set("matchTypeId", String(matchTypeId));
+  }
+  if (matchScope !== "all") {
+    params.set("matchScope", matchScope);
   }
   params.set("limit", "25");
   return params.toString();
@@ -310,8 +341,15 @@ export default function MatchupMatrixCard({
   const [rows, setRows] = useState<MatchupRow[]>([]);
   const [selectedPair, setSelectedPair] = useState<{ myRaceId: number; opponentRaceId: number } | null>(null);
   const [matchHistory, setMatchHistory] = useState<Record<string, MatchHistoryState>>({});
+  const [selectedFilter, setSelectedFilter] = useState<MatchFilterOption>(matchTypeId === 1 ? "automatch1v1" : matchTypeId === 2 ? "automatch2v2" : "all");
 
   const profileIdStr = useMemo(() => coerceProfileId(profileId), [profileId]);
+
+  useEffect(() => {
+    setSelectedFilter(matchTypeId === 1 ? "automatch1v1" : matchTypeId === 2 ? "automatch2v2" : "all");
+  }, [matchTypeId]);
+
+  const { matchTypeId: filterMatchTypeId, matchScope } = useMemo(() => resolveFilter(selectedFilter), [selectedFilter]);
 
   const getPlayerClickHandler = useCallback((alias?: string | null, playerId?: string | null) => {
     if (!onPlayerNavigate) return undefined;
@@ -328,7 +366,7 @@ export default function MatchupMatrixCard({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/premium/matchups?${buildParams(profileIdStr, windowDays, matchTypeId)}`, {
+        const response = await fetch(`/api/premium/matchups?${buildParams(profileIdStr, windowDays, filterMatchTypeId, matchScope)}`, {
           method: "GET",
           headers: { Accept: "application/json" },
           signal: controller.signal,
@@ -359,12 +397,12 @@ export default function MatchupMatrixCard({
       cancelled = true;
       controller.abort();
     };
-  }, [profileIdStr, windowDays, matchTypeId, refresh]);
+  }, [profileIdStr, windowDays, filterMatchTypeId, matchScope, refresh]);
 
   useEffect(() => {
     setSelectedPair(null);
     setMatchHistory({});
-  }, [profileIdStr, windowDays, matchTypeId]);
+  }, [profileIdStr, windowDays, filterMatchTypeId, matchScope]);
 
   const getCellData = (myRaceId: number, opponentRaceId: number) => {
     return rows.find((row) => row.myRaceId === myRaceId && row.opponentRaceId === opponentRaceId);
@@ -383,7 +421,7 @@ export default function MatchupMatrixCard({
     }));
 
     try {
-      const response = await fetch(`/api/premium/matchups/matches?${buildMatchParams(profileIdStr, windowDays, matchTypeId, myRaceId, opponentRaceId)}`, {
+      const response = await fetch(`/api/premium/matchups/matches?${buildMatchParams(profileIdStr, windowDays, filterMatchTypeId, matchScope, myRaceId, opponentRaceId)}`, {
         method: "GET",
         headers: { Accept: "application/json" },
       });
@@ -415,7 +453,7 @@ export default function MatchupMatrixCard({
         },
       }));
     }
-  }, [profileIdStr, windowDays, matchTypeId]);
+  }, [profileIdStr, windowDays, filterMatchTypeId, matchScope]);
 
   const handleCellClick = (myRaceId: number, opponentRaceId: number, hasData: boolean) => {
     if (!hasData) return;
@@ -665,6 +703,27 @@ export default function MatchupMatrixCard({
           <p className="text-xs text-neutral-400">Heatmap of faction performance against opponents. Click a cell to view match history.</p>
         </div>
       </header>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        {MATCH_FILTERS.map(({ label, value }) => {
+          const active = selectedFilter === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setSelectedFilter(value)}
+              className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition ${
+                active
+                  ? "border-yellow-500/50 bg-yellow-500/20 text-yellow-200 shadow"
+                  : "border-neutral-700/60 bg-neutral-900/60 text-neutral-300 hover:border-neutral-600 hover:bg-neutral-800/60 hover:text-white"
+              }`}
+              aria-pressed={active}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
       {loading && (
         <div className="mt-6 h-60 w-full animate-pulse rounded-xl bg-neutral-800/60" aria-hidden />

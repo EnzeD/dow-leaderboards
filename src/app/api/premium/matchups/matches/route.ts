@@ -232,6 +232,23 @@ export async function GET(req: NextRequest) {
   const windowStart = resolveSinceDate(windowDays);
   const matchTypeParsed = coerceOptionalInt(url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"));
   const matchTypeId = typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed) ? matchTypeParsed : undefined;
+  const matchScopeRaw =
+    url.searchParams.get("matchScope")
+    ?? url.searchParams.get("match_scope")
+    ?? url.searchParams.get("matchTypeScope")
+    ?? url.searchParams.get("match_type_scope")
+    ?? "";
+  const matchScope = ((): "all" | "automatch" | "custom" => {
+    const normalized = matchScopeRaw.toLowerCase();
+    if (normalized === "automatch" || normalized === "custom") return normalized;
+    return "all";
+  })();
+  const rpcMatchTypeId = ((): number | null => {
+    if (typeof matchTypeId === "number") return matchTypeId;
+    if (matchScope === "automatch") return -1;
+    if (matchScope === "custom") return -2;
+    return null;
+  })();
   const limit = coerceInt(url.searchParams.get("limit"), 25);
 
   try {
@@ -240,7 +257,7 @@ export async function GET(req: NextRequest) {
       p_my_race_id: myRaceId,
       p_opponent_race_id: opponentRaceId,
       p_since: windowStart,
-      p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
+      p_match_type_id: rpcMatchTypeId,
       p_limit: limit,
     });
 

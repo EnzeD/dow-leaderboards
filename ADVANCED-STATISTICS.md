@@ -75,14 +75,14 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
   Requires an active subscription; responds with the overview totals or `403 not_subscribed`. Other failures mirror the activation route.
 - `GET /api/premium/elo-history?profileId=123&leaderboardId=1&windowDays=90&limit=200`  
   Returns `samples[]`, `windowStart`, and `generatedAt` when activated.
-- `GET /api/premium/matchups?profileId=123&matchTypeId=1&windowDays=90`  
-  Returns `rows[]` with faction ids, win rates, and last-played timestamps.
+- `GET /api/premium/matchups?profileId=123&matchTypeId=1&matchScope=automatch&windowDays=90`  
+  Returns `rows[]` with faction ids, win rates, and last-played timestamps (`matchScope=automatch|custom|all`).
 - `GET /api/premium/maps?profileId=123&matchTypeId=1&windowDays=90&limit=25`  
   Returns `rows[]` with map identifiers, names, win/loss splits, and recency.
 - `GET /api/premium/maps/matches?profileId=123&mapIdentifier=blood_river&matchTypeId=1&windowDays=90&limit=20`  
   Returns detailed match history for the specified map, matching the recent match card UI.
-- `GET /api/premium/matchups/matches?profileId=123&myRaceId=1&opponentRaceId=7&matchTypeId=1&windowDays=90&limit=20`  
-  Returns detailed match history for the selected faction pairing using the recent match card UI.
+- `GET /api/premium/matchups/matches?profileId=123&myRaceId=1&opponentRaceId=7&matchTypeId=1&matchScope=automatch&windowDays=90&limit=20`  
+  Returns detailed match history for the selected faction pairing using the recent match card UI (`matchScope` mirrors the automatch/custom toggle).
 - `GET /api/premium/opponents?profileId=123&matchTypeId=1&matchScope=automatch&windowDays=90&limit=10`  
   Returns `rows[]` with opponent metadata (alias, country, primary race), records, win rates, and last-played timestamps.
 - `GET /api/premium/opponents/matches?profileId=123&opponentProfileId=456&matchTypeId=1&matchScope=automatch&windowDays=90&limit=20`  

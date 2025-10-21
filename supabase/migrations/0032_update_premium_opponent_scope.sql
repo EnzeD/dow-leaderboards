@@ -404,3 +404,65 @@ $$;
 
 comment on function public.premium_get_map_match_history is
   'Returns recent matches for a given map, including roster metadata and player outcomes.';
+drop function if exists public.premium_get_matchup_stats(
+  p_profile_id bigint,
+  p_since timestamptz,
+  p_match_type_id integer
+);
+
+create or replace function public.premium_get_matchup_stats(
+  p_profile_id bigint,
+  p_since timestamptz default (now() - interval '90 days'),
+  p_match_type_id integer default null
+)
+returns table (
+  my_race_id smallint,
+  opponent_race_id smallint,
+  matches integer,
+  wins integer,
+  losses integer,
+  winrate numeric,
+  last_played timestamptz
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with base as (
+    select
+      my.race_id as my_race_id,
+      opp.race_id as opponent_race_id,
+      my.outcome,
+      m.completed_at
+    from public.match_participants my
+    join public.match_participants opp
+      on opp.match_id = my.match_id
+     and opp.team_id <> my.team_id
+    join public.matches m
+      on m.match_id = my.match_id
+    where my.profile_id = p_profile_id
+      and my.is_computer = false
+      and opp.is_computer = false
+      and (p_since is null or m.completed_at >= p_since)
+      and (
+        p_match_type_id is null
+        or (p_match_type_id >= 0 and m.match_type_id = p_match_type_id)
+        or (p_match_type_id = -1 and m.match_type_id in (1, 2, 3, 4))
+        or (p_match_type_id = -2 and (m.match_type_id is null or m.match_type_id not in (1, 2, 3, 4)))
+      )
+  )
+  select
+    b.my_race_id,
+    b.opponent_race_id,
+    count(*) as matches,
+    count(*) filter (where b.outcome = 'win') as wins,
+    count(*) filter (where b.outcome = 'loss') as losses,
+    case when count(*) > 0 then (count(*) filter (where b.outcome = 'win')::numeric / count(*)::numeric) else null end as winrate,
+    max(b.completed_at) as last_played
+  from base b
+  group by 1,2
+  order by matches desc, last_played desc nulls last;
+$$;
+
+comment on function public.premium_get_matchup_stats is
+  'Aggregates wins and losses by faction matchup for a player; accepts sentinel match_type (-1 automatch, -2 custom).';

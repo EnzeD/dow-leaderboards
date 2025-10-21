@@ -156,12 +156,30 @@ export async function GET(req: NextRequest) {
   const windowStart = resolveSinceDate(windowDays);
   const matchTypeParsed = coerceOptionalInt(url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"));
   const matchTypeId = typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed) ? matchTypeParsed : undefined;
+  const matchScopeRaw =
+    url.searchParams.get("matchScope")
+    ?? url.searchParams.get("match_scope")
+    ?? url.searchParams.get("matchTypeScope")
+    ?? url.searchParams.get("match_type_scope")
+    ?? "";
+  const matchScope = ((): "all" | "automatch" | "custom" => {
+    const normalized = matchScopeRaw.toLowerCase();
+    if (normalized === "automatch" || normalized === "custom") return normalized;
+    return "all";
+  })();
+
+  const rpcMatchTypeId = ((): number | null => {
+    if (typeof matchTypeId === "number") return matchTypeId;
+    if (matchScope === "automatch") return -1;
+    if (matchScope === "custom") return -2;
+    return null;
+  })();
 
   try {
     const { data, error } = await supabase.rpc("premium_get_matchup_stats", {
       p_profile_id: primaryProfileId,
       p_since: windowStart,
-      p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
+      p_match_type_id: rpcMatchTypeId,
     });
 
     if (error) {
@@ -172,6 +190,7 @@ export async function GET(req: NextRequest) {
           profileId,
           windowStart,
           matchTypeId,
+          matchScope,
           generatedAt: new Date().toISOString(),
           rows: [],
           reason: "rpc_failed",
@@ -195,6 +214,7 @@ export async function GET(req: NextRequest) {
         profileId,
         windowStart,
         matchTypeId,
+        matchScope,
         generatedAt: new Date().toISOString(),
         rows,
       })
@@ -207,6 +227,7 @@ export async function GET(req: NextRequest) {
         profileId,
         windowStart,
         matchTypeId,
+        matchScope,
         generatedAt: new Date().toISOString(),
         rows: [],
         reason: "unexpected_error",
