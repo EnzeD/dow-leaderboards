@@ -8,7 +8,7 @@ import { useCombinedLeaderboards } from "../useCombinedLeaderboards";
 import EloHistoryCard from "./EloHistoryCard";
 import MatchupMatrixCard from "./MatchupMatrixCard";
 import MapPerformanceCard from "./MapPerformanceCard";
-import FrequentOpponentsCard from "./FrequentOpponentsCard";
+import FrequentOpponentsCard, { MatchScope } from "./FrequentOpponentsCard";
 import ProfileOverviewCard, { ProfileOverview } from "./ProfileOverviewCard";
 
 type LockedCtaState = {
@@ -89,9 +89,11 @@ export default function AdvancedStatsPanel({
   const [overview, setOverview] = useState<ProfileOverview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [opponentsMatchScope, setOpponentsMatchScope] = useState<MatchScope>("all");
 
   useEffect(() => {
     setActiveSection("elo");
+    setOpponentsMatchScope("all");
   }, [profileIdStr]);
 
 
@@ -282,7 +284,8 @@ export default function AdvancedStatsPanel({
           <FrequentOpponentsCard
             profileId={profileIdStr}
             windowDays={windowDays}
-            matchTypeId={null}
+            matchScope={opponentsMatchScope}
+            onMatchScopeChange={setOpponentsMatchScope}
           />
         );
     }

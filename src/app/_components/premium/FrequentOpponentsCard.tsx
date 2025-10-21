@@ -6,8 +6,11 @@ import { useAdvancedStats } from "./AdvancedStatsPanel";
 export type FrequentOpponentsCardProps = {
   profileId: string | number;
   windowDays: number;
-  matchTypeId: number | null;
+  matchScope: MatchScope;
+  onMatchScopeChange: (scope: MatchScope) => void;
 };
+
+export type MatchScope = "automatch" | "custom" | "all";
 
 type OpponentRow = {
   opponentProfileId: string | null;
@@ -25,6 +28,7 @@ type OpponentsApiResponse = {
   windowStart: string;
   generatedAt: string;
   matchTypeId?: number;
+  matchScope?: MatchScope;
   rows: OpponentRow[];
   reason?: string;
 };
@@ -33,12 +37,12 @@ const coerceProfileId = (value: string | number): string => {
   return typeof value === "string" ? value : value.toString();
 };
 
-const buildParams = (profileId: string, windowDays: number, matchTypeId: number | null) => {
+const buildParams = (profileId: string, windowDays: number, matchScope: MatchScope) => {
   const params = new URLSearchParams();
   params.set("profileId", profileId);
   params.set("windowDays", String(windowDays));
-  if (matchTypeId !== null && Number.isFinite(matchTypeId)) {
-    params.set("matchTypeId", String(matchTypeId));
+  if (matchScope !== "all") {
+    params.set("matchScope", matchScope);
   }
   return params.toString();
 };
@@ -48,7 +52,12 @@ const formatPercent = (value: number | null | undefined) => {
   return `${Math.round(value * 100)}%`;
 };
 
-export default function FrequentOpponentsCard({ profileId, windowDays, matchTypeId }: FrequentOpponentsCardProps) {
+export default function FrequentOpponentsCard({
+  profileId,
+  windowDays,
+  matchScope,
+  onMatchScopeChange,
+}: FrequentOpponentsCardProps) {
   const { refresh } = useAdvancedStats();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +73,7 @@ export default function FrequentOpponentsCard({ profileId, windowDays, matchType
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/premium/opponents?${buildParams(profileIdStr, windowDays, matchTypeId)}`, {
+        const response = await fetch(`/api/premium/opponents?${buildParams(profileIdStr, windowDays, matchScope)}`, {
           method: "GET",
           headers: { Accept: "application/json" },
           signal: controller.signal,
@@ -78,6 +87,9 @@ export default function FrequentOpponentsCard({ profileId, windowDays, matchType
         const payload = (await response.json()) as OpponentsApiResponse;
         if (cancelled) return;
         setRows(payload.rows || []);
+        if (payload.matchScope && payload.matchScope !== matchScope) {
+          onMatchScopeChange(payload.matchScope);
+        }
       } catch (error) {
         if (cancelled) return;
         if ((error as Error).name === "AbortError") return;
@@ -95,14 +107,45 @@ export default function FrequentOpponentsCard({ profileId, windowDays, matchType
       cancelled = true;
       controller.abort();
     };
-  }, [profileIdStr, windowDays, matchTypeId, refresh]);
+  }, [profileIdStr, windowDays, matchScope, refresh, onMatchScopeChange]);
+
+  const matchScopeOptions: Array<{ value: MatchScope; label: string }> = useMemo(() => ([
+    { value: "automatch", label: "Automatch" },
+    { value: "custom", label: "Custom" },
+    { value: "all", label: "All" },
+  ]), []);
+
+  const handleMatchScopeChange = (value: MatchScope) => {
+    if (value === matchScope) return;
+    onMatchScopeChange(value);
+  };
 
   return (
     <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-xl">
-      <header className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
           <h4 className="text-lg font-semibold text-white">Frequent opponents</h4>
           <p className="text-xs text-neutral-400">Your most common opponents and head-to-head record.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {matchScopeOptions.map((option) => {
+            const active = matchScope === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleMatchScopeChange(option.value)}
+                className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? "border-yellow-500/50 bg-yellow-500/20 text-yellow-200 shadow"
+                    : "border-neutral-700/60 bg-neutral-900/60 text-neutral-300 hover:border-neutral-600 hover:bg-neutral-800/60 hover:text-white"
+                }`}
+                aria-pressed={active}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </header>
 
@@ -162,4 +205,3 @@ export default function FrequentOpponentsCard({ profileId, windowDays, matchType
     </section>
   );
 }
-
