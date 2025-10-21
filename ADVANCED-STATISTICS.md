@@ -78,7 +78,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - `GET /api/premium/maps?profileId=123&matchTypeId=1&windowDays=90&limit=25`  
   Returns `rows[]` with map identifiers, names, win/loss splits, and recency.
 - `GET /api/premium/opponents?profileId=123&matchTypeId=1&matchScope=automatch&windowDays=90&limit=10`  
-  Returns `rows[]` with opponent metadata, records, win rates, and last-played timestamps.
+  Returns `rows[]` with opponent metadata (alias, country, primary race), records, win rates, and last-played timestamps.
 - `GET /api/premium/opponents/matches?profileId=123&opponentProfileId=456&matchTypeId=1&matchScope=automatch&windowDays=90&limit=20`  
   Returns detailed match history between the authenticated profile and the specified opponent, reusing the recent match card UI.
 - All handlers instantiate the Supabase service client via `getSupabaseAdmin()`, set cache headers, and log unexpected failures with a `[premium]` prefix for easier filtering in Vercel logs.

@@ -22,11 +22,14 @@ export type FrequentOpponentsCardProps = {
   windowDays: number;
   matchScope: MatchScope;
   onMatchScopeChange: (scope: MatchScope) => void;
+  onPlayerNavigate?: (alias: string, profileId?: string) => void;
 };
 
 type OpponentRow = {
   opponentProfileId: string | null;
   opponentAlias: string;
+  opponentCountry: string | null;
+  opponentMainRaceId: number | null;
   matches: number;
   wins: number;
   losses: number;
@@ -179,7 +182,6 @@ const formatMatchTypeLabel = (matchTypeId?: number | null): string => {
 
 const formatLastMatch = (dateInput?: Date | string): string => {
   if (!dateInput) return "Never";
-
   const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "Never";
 
@@ -195,6 +197,21 @@ const formatLastMatch = (dateInput?: Date | string): string => {
   return "Just now";
 };
 
+const getTierIndicator = (rank: number): string => {
+  if (rank <= 5) return "🏆";
+  if (rank <= 10) return "🥇";
+  if (rank <= 25) return "🥈";
+  if (rank <= 50) return "🥉";
+  return "⚡";
+};
+
+const getRankColor = (rank: number): string => {
+  if (rank <= 5) return "text-yellow-400";
+  if (rank <= 10) return "text-yellow-300";
+  if (rank <= 25) return "text-orange-400";
+  return "text-neutral-100";
+};
+
 const getFactionColor = (faction: string): string => {
   const factionColors: Record<string, string> = {
     Chaos: "text-red-400",
@@ -208,6 +225,44 @@ const getFactionColor = (faction: string): string => {
     Tau: "text-cyan-400",
   };
   return factionColors[faction] || "text-orange-300";
+};
+
+const normalizeCountryCode = (countryCode?: string | null): string | undefined => {
+  if (!countryCode) return undefined;
+  const trimmed = countryCode.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  if (trimmed === "uk") return "gb";
+  return trimmed;
+};
+
+const FlagIcon = ({ countryCode }: { countryCode: string }) => {
+  const normalized = normalizeCountryCode(countryCode);
+  if (!normalized) return null;
+  const isoCode = normalized.toUpperCase();
+  const flagHeight = "0.7rem";
+  const flagWidth = `calc(${flagHeight} * 4 / 3)`;
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-neutral-700/80 rounded-md border border-neutral-600/50 shadow-sm backdrop-blur-sm"
+      title={isoCode}
+    >
+      <span
+        className={`fi fi-${normalized}`}
+        aria-hidden="true"
+        style={{
+          width: flagWidth,
+          minWidth: flagWidth,
+          height: flagHeight,
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.35)",
+          borderRadius: "0.25rem",
+        }}
+      />
+      <span className="uppercase tracking-wide font-mono font-semibold text-neutral-200 text-[0.6rem]">
+        {isoCode}
+      </span>
+    </span>
+  );
 };
 
 const FactionLogo = ({ faction, size = 16, className = "", yOffset = 1 }: { faction?: string; size?: number; className?: string; yOffset?: number }) => {
@@ -249,22 +304,24 @@ const normalizePlayerId = (value?: string | null): string | undefined => {
 const transformMatchRow = (row: OpponentMatchHistoryApiResponse["rows"][number]): OpponentMatch => {
   const startTime = row.startedAt ? new Date(row.startedAt).getTime() : undefined;
   const completedTime = row.completedAt ? new Date(row.completedAt).getTime() : undefined;
-  const players: OpponentMatchPlayer[] = Array.isArray(row.players) ? row.players.map((player) => ({
-    profileId: normalizePlayerId(player?.profileId),
-    alias: player?.alias ?? undefined,
-    teamId: typeof player?.teamId === "number" ? player.teamId : undefined,
-    raceId: typeof player?.raceId === "number" ? player.raceId : undefined,
-    oldRating: typeof player?.oldRating === "number" ? player.oldRating : undefined,
-    newRating: typeof player?.newRating === "number" ? player.newRating : undefined,
-  })) : [];
+  const players: OpponentMatchPlayer[] = Array.isArray(row.players)
+    ? row.players.map((player) => ({
+        profileId: normalizePlayerId(player?.profileId),
+        alias: player?.alias ?? undefined,
+        teamId: typeof player?.teamId === "number" ? player.teamId : undefined,
+        raceId: typeof player?.raceId === "number" ? player.raceId : undefined,
+        oldRating: typeof player?.oldRating === "number" ? player.oldRating : undefined,
+        newRating: typeof player?.newRating === "number" ? player.newRating : undefined,
+      }))
+    : [];
 
   const oldRating = typeof row.oldRating === "number" ? row.oldRating : undefined;
   const newRating = typeof row.newRating === "number" ? row.newRating : undefined;
   const ratingDelta = typeof row.ratingDelta === "number"
     ? row.ratingDelta
     : (typeof newRating === "number" && typeof oldRating === "number"
-      ? newRating - oldRating
-      : undefined);
+        ? newRating - oldRating
+        : undefined);
 
   return {
     matchId: row.matchId,
@@ -288,6 +345,7 @@ export default function FrequentOpponentsCard({
   windowDays,
   matchScope,
   onMatchScopeChange,
+  onPlayerNavigate,
 }: FrequentOpponentsCardProps) {
   const { refresh } = useAdvancedStats();
   const [loading, setLoading] = useState(false);
@@ -297,6 +355,13 @@ export default function FrequentOpponentsCard({
   const [matchHistory, setMatchHistory] = useState<Record<string, MatchHistoryState>>({});
 
   const profileIdStr = useMemo(() => coerceProfileId(profileId), [profileId]);
+
+  const getPlayerClickHandler = useCallback((alias?: string | null, playerId?: string | null) => {
+    if (!onPlayerNavigate) return undefined;
+    const trimmedAlias = (alias ?? "").trim();
+    if (!trimmedAlias) return undefined;
+    return () => onPlayerNavigate(trimmedAlias, playerId ?? undefined);
+  }, [onPlayerNavigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -407,17 +472,16 @@ export default function FrequentOpponentsCard({
   const handleRowToggle = (row: OpponentRow) => {
     const key = row.opponentProfileId ?? row.opponentAlias;
     if (!key) return;
-    const isExpanded = Boolean(expandedRows[key]);
-    const nextExpanded = !isExpanded;
+    if (!row.opponentProfileId) return; // cannot expand without profile id
+    const nextExpanded = !expandedRows[key];
     setExpandedRows((prev) => ({
       ...prev,
       [key]: nextExpanded,
     }));
 
     if (nextExpanded && row.opponentProfileId) {
-      const profileKey = row.opponentProfileId;
-      if (!matchHistory[profileKey]) {
-        void fetchMatchHistory(profileKey);
+      if (!matchHistory[row.opponentProfileId]) {
+        void fetchMatchHistory(row.opponentProfileId);
       }
     }
   };
@@ -431,7 +495,11 @@ export default function FrequentOpponentsCard({
           {index > 0 && <span className="text-neutral-500 select-none">•</span>}
           <button
             type="button"
-            onClick={entry.onClick}
+            onClick={(event) => {
+              if (!entry.onClick) return;
+              event.stopPropagation();
+              entry.onClick();
+            }}
             className={`hover:underline ${entry.onClick ? "text-blue-300" : "text-neutral-400 cursor-default"}`}
             title={typeof entry.rating === "number" ? `${entry.label} (${entry.rating})` : entry.label}
             disabled={!entry.onClick}
@@ -461,6 +529,7 @@ export default function FrequentOpponentsCard({
   );
 
   const renderMatchCard = (match: OpponentMatch) => {
+    const matchKey = match.matchId || `${match.startTime ?? "unknown"}-${match.outcome}`;
     const myPlayer = match.players.find((player) => player.profileId === profileIdStr);
     const myTeam = typeof match.teamId === "number" ? match.teamId : myPlayer?.teamId;
     const allies = (match.players || []).filter((player) => typeof player.teamId === "number" && player.teamId === myTeam && player.profileId !== profileIdStr);
@@ -510,6 +579,7 @@ export default function FrequentOpponentsCard({
         label: displaySelfAlias,
         faction: myFaction,
         rating: isAutomatch ? selfRating : undefined,
+        onClick: getPlayerClickHandler(displaySelfAlias, profileIdStr),
       },
       ...allies.slice(0, 2).map((player, index) => {
         const label = player.alias || player.profileId || `Ally ${index + 1}`;
@@ -522,6 +592,7 @@ export default function FrequentOpponentsCard({
           label,
           faction,
           rating: isAutomatch ? playerRating : undefined,
+          onClick: getPlayerClickHandler(player.alias, player.profileId),
         };
       }),
     ];
@@ -537,10 +608,10 @@ export default function FrequentOpponentsCard({
         label,
         faction,
         rating: isAutomatch ? playerRating : undefined,
+        onClick: getPlayerClickHandler(player.alias, player.profileId),
       };
     });
 
-    const matchKey = match.matchId || `${match.startTime ?? "unknown"}-${match.outcome}`;
     return (
       <div key={matchKey} className="text-xs bg-neutral-900 border border-neutral-600/25 p-2 rounded shadow-md">
         <div className="flex items-stretch gap-3">
@@ -709,47 +780,105 @@ export default function FrequentOpponentsCard({
           <table className="min-w-full text-left text-sm text-neutral-200">
             <thead className="text-xs uppercase tracking-wide text-neutral-400">
               <tr>
-                <th className="py-2">Opponent</th>
-                <th className="py-2">Matches</th>
-                <th className="py-2">Record</th>
-                <th className="py-2">Win rate</th>
-                <th className="py-2">Last played</th>
+                <th className="px-3 py-2 w-16 text-center">Rank</th>
+                <th className="px-4 py-2">Opponent</th>
+                <th className="px-4 py-2">Matches</th>
+                <th className="px-4 py-2">Record</th>
+                <th className="px-4 py-2">Win rate</th>
+                <th className="px-4 py-2">Last played</th>
+                <th className="px-3 py-2 text-right w-12" aria-hidden />
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800/60">
-              {rows.map((row) => {
+              {rows.map((row, index) => {
                 const key = row.opponentProfileId ?? row.opponentAlias;
                 const expanded = Boolean(expandedRows[key]);
-                const canToggle = Boolean(row.opponentProfileId);
-                const expansionLabel = expanded ? "Collapse match history" : (canToggle ? "Expand match history" : "Match history unavailable");
+                const rank = index + 1;
+                const faction = raceIdToFaction(row.opponentMainRaceId ?? undefined);
+                const aliasClick = getPlayerClickHandler(row.opponentAlias, row.opponentProfileId);
                 return (
                   <Fragment key={key}>
                     <tr
-                      className={`transition ${expanded ? "bg-neutral-800/40" : "hover:bg-neutral-800/30"} ${canToggle ? "cursor-pointer" : "cursor-default"}`}
-                      onClick={() => handleRowToggle(row)}
+                      className={`group transition ${expanded ? "bg-neutral-800/40" : "hover:bg-neutral-800/30"} ${row.opponentProfileId ? "cursor-pointer" : "cursor-default"}`}
+                      onClick={() => row.opponentProfileId ? handleRowToggle(row) : undefined}
                       aria-expanded={expanded}
-                      aria-label={expansionLabel}
+                      aria-label={row.opponentProfileId ? `${expanded ? "Collapse" : "Expand"} match history with ${row.opponentAlias}` : undefined}
                     >
-                      <td className="py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-neutral-100">{row.opponentAlias}</span>
-                          {row.opponentProfileId && (
-                            <span className="rounded-full border border-neutral-700/60 bg-neutral-900/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400">
-                              #{row.opponentProfileId}
+                      <td className="px-3 py-3 text-center font-semibold text-white">
+                        <span className={`flex items-center justify-center gap-1 ${getRankColor(rank)}`}>
+                          <span>{getTierIndicator(rank)}</span>
+                          <span>{rank}</span>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {row.opponentCountry && <FlagIcon countryCode={row.opponentCountry} />}
+                          {aliasClick ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                aliasClick();
+                              }}
+                              className="group inline-flex items-center gap-1 rounded-md border border-transparent px-1.5 py-0.5 text-white font-semibold transition hover:border-neutral-600 hover:bg-neutral-800/70 hover:underline"
+                              aria-label={`View profile search for ${row.opponentAlias}`}
+                            >
+                              {row.opponentAlias}
+                              <svg
+                                className="h-3.5 w-3.5 text-neutral-400 transition group-hover:text-neutral-200"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <circle cx="11" cy="11" r="6" />
+                                <line x1="20" y1="20" x2="16.65" y2="16.65" />
+                              </svg>
+                            </button>
+                          ) : (
+                            <span className="text-white font-semibold">{row.opponentAlias}</span>
+                          )}
+                          {faction !== "Unknown" && (
+                            <span className={`text-xs font-semibold ${getFactionColor(faction)} inline-flex items-center gap-1`}>
+                              <FactionLogo faction={faction} size={14} />
+                              {faction}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3">{row.matches}</td>
-                      <td className="py-3 text-neutral-300">{row.wins}-{row.losses}</td>
-                      <td className="py-3">{formatPercent(row.winrate)}</td>
-                      <td className="py-3 text-neutral-400">
-                        {row.lastPlayed ? new Date(row.lastPlayed).toLocaleString() : "—"}
+                      <td className="px-4 py-3 font-semibold text-white">{row.matches}</td>
+                      <td className="px-4 py-3 text-neutral-300">{row.wins}-{row.losses}</td>
+                      <td className="px-4 py-3">{formatPercent(row.winrate)}</td>
+                      <td className="px-4 py-3 text-neutral-400">{row.lastPlayed ? formatLastMatch(row.lastPlayed) : "—"}</td>
+                      <td className="px-3 py-3 text-right">
+                        {row.opponentProfileId ? (
+                          <span
+                            aria-hidden="true"
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border border-neutral-700/50 bg-neutral-900/60 text-neutral-400 transition group-hover:text-neutral-200 group-hover:border-neutral-500/60 ${expanded ? "rotate-90 text-yellow-300 border-yellow-500/40" : ""}`}
+                          >
+                            <svg
+                              className="h-3.5 w-3.5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <span className="text-neutral-600 text-xs">—</span>
+                        )}
                       </td>
                     </tr>
-                    {expanded && (
+                    {expanded && row.opponentProfileId && (
                       <tr>
-                        <td className="py-0" colSpan={5}>
+                        <td className="py-0" colSpan={7}>
                           {renderMatchHistory(row)}
                         </td>
                       </tr>

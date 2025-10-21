@@ -24,6 +24,7 @@ export type AdvancedStatsPanelProps = {
   onRequestAccess?: () => void;
   ctaState?: LockedCtaState;
   variant?: "standalone" | "embedded";
+  onPlayerNavigate?: (alias: string, profileId?: string) => void;
 };
 
 type AdvancedStatsSection = "elo" | "matchups" | "maps" | "opponents";
@@ -60,6 +61,7 @@ export default function AdvancedStatsPanel({
   onRequestAccess,
   ctaState,
   variant = "standalone",
+  onPlayerNavigate,
 }: AdvancedStatsPanelProps) {
   const activation = useAdvancedStatsActivation(profileId);
   const leaderboards = useCombinedLeaderboards();
@@ -286,6 +288,7 @@ export default function AdvancedStatsPanel({
             windowDays={windowDays}
             matchScope={opponentsMatchScope}
             onMatchScopeChange={setOpponentsMatchScope}
+            onPlayerNavigate={onPlayerNavigate}
           />
         );
     }

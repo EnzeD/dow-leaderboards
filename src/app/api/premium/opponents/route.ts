@@ -11,6 +11,8 @@ import {
 interface OpponentRow {
   opponent_profile_id: string | number | null;
   opponent_alias: string | null;
+  opponent_country?: string | null;
+  opponent_main_race_id?: number | null;
   matches: number;
   wins: number;
   losses: number;
@@ -28,6 +30,8 @@ interface OpponentsResponse {
   rows: Array<{
     opponentProfileId: string | null;
     opponentAlias: string;
+    opponentCountry: string | null;
+    opponentMainRaceId: number | null;
     matches: number;
     wins: number;
     losses: number;
@@ -225,9 +229,17 @@ export async function GET(req: NextRequest) {
 
     const rows = ((data as OpponentRow[]) ?? []).map((row: OpponentRow) => {
       const opponentProfile = normalizeProfileId(row.opponent_profile_id ?? null);
+      const opponentCountry = typeof (row as any)?.opponent_country === "string"
+        ? ((row as any).opponent_country as string)
+        : null;
+      const opponentMainRaceId = typeof (row as any)?.opponent_main_race_id === "number"
+        ? ((row as any).opponent_main_race_id as number)
+        : null;
       return {
         opponentProfileId: opponentProfile,
         opponentAlias: normalizeOpponentAlias(row.opponent_alias, opponentProfile),
+        opponentCountry,
+        opponentMainRaceId,
         matches: row.matches ?? 0,
         wins: row.wins ?? 0,
         losses: row.losses ?? 0,

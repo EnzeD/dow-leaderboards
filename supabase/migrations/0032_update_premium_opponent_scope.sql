@@ -1,3 +1,10 @@
+drop function if exists public.premium_get_opponent_stats(
+  p_profile_id bigint,
+  p_since timestamptz,
+  p_match_type_id integer,
+  p_limit integer
+);
+
 create or replace function public.premium_get_opponent_stats(
   p_profile_id bigint,
   p_since timestamptz default (now() - interval '90 days'),
@@ -7,6 +14,8 @@ create or replace function public.premium_get_opponent_stats(
 returns table (
   opponent_profile_id bigint,
   opponent_alias text,
+  opponent_country text,
+  opponent_main_race_id smallint,
   matches integer,
   wins integer,
   losses integer,
@@ -22,6 +31,8 @@ as $$
       opp.profile_id as opponent_profile_id,
       coalesce(opp_player.current_alias, nullif(opp.alias_at_match, ''), opp.profile_id::text) as opponent_alias,
       my.outcome,
+      opp_player.country as opponent_country,
+      opp.race_id as opponent_race_id,
       m.completed_at
     from public.match_participants my
     join public.match_participants opp
@@ -48,6 +59,8 @@ as $$
   select
     b.opponent_profile_id,
     b.opponent_alias,
+    max(b.opponent_country) as opponent_country,
+    mode() within group (order by b.opponent_race_id) as opponent_main_race_id,
     count(*) as matches,
     count(*) filter (where b.outcome = 'win') as wins,
     count(*) filter (where b.outcome = 'loss') as losses,
@@ -60,7 +73,15 @@ as $$
 $$;
 
 comment on function public.premium_get_opponent_stats is
-  'Returns the most frequent opponents for a player with win/loss records. Filters support match_type_id = -1 (automatch) and -2 (custom).';
+  'Returns the most frequent opponents for a player with win/loss records plus country/race metadata. Filters support match_type_id = -1 (automatch) and -2 (custom).';
+
+drop function if exists public.premium_get_opponent_match_history(
+  p_profile_id bigint,
+  p_opponent_profile_id bigint,
+  p_since timestamptz,
+  p_match_type_id integer,
+  p_limit integer
+);
 
 create or replace function public.premium_get_opponent_match_history(
   p_profile_id bigint,

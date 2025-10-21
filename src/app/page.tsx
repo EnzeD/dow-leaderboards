@@ -2873,6 +2873,7 @@ export default function Home() {
                                   })}
                                   ctaState={advancedStatsCta}
                                   variant="embedded"
+                                  onPlayerNavigate={runSearchByName}
                                 />
                               )}
                           </div>
@@ -3346,6 +3347,7 @@ export default function Home() {
                                 })}
                                 ctaState={advancedStatsCta}
                                 variant="embedded"
+                                onPlayerNavigate={runSearchByName}
                               />
                             )}
                         </div>
