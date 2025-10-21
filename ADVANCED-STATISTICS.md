@@ -58,8 +58,8 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - `premium_get_elo_history(p_profile_id bigint, p_leaderboard_id integer, p_since timestamptz, p_limit integer)` – reads `leaderboard_rank_history`.
 - `premium_get_matchup_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer)` – aggregates faction matchups from `match_participants`/`matches`.
 - `premium_get_map_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns per-map statistics with bounded result sizes.
-- `premium_get_opponent_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns most frequent human opponents.
-- `premium_get_opponent_match_history(p_profile_id bigint, p_opponent_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent head-to-head matches (including roster JSON) for a specific opponent.
+- `premium_get_opponent_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns most frequent human opponents (filters out computers, spectators, and same-team results).
+- `premium_get_opponent_match_history(p_profile_id bigint, p_opponent_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent head-to-head matches (including roster JSON) for a specific opponent while excluding spectators and same-team appearances.
 - `premium_get_profile_overview(p_profile_id bigint)` – available PL/pgSQL helper (see `supabase/migrations/0027_fix_overview_wins_losses.sql`), currently unused because the API recomputes the overview to incorporate live Relic data.
 - Schema prerequisites:
   - `public.premium_subscriptions` (`0030_premium_subscriptions.sql`) with policies in `0031_enable_rls_on_premium_subscriptions.sql`.

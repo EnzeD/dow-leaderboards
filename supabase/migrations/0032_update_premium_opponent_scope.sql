@@ -31,7 +31,11 @@ as $$
     left join public.players opp_player on opp_player.profile_id = opp.profile_id
     where my.profile_id = p_profile_id
       and my.is_computer = false
+      and my.team_id is not null
+      and my.outcome in ('win', 'loss')
       and opp.is_computer = false
+      and opp.team_id is not null
+      and opp.outcome in ('win', 'loss')
       and opp.profile_id is not null
       and (p_since is null or m.completed_at >= p_since)
       and (
@@ -102,11 +106,18 @@ as $$
     join public.match_participants opp
       on opp.match_id = my.match_id
      and opp.profile_id = p_opponent_profile_id
+     and opp.team_id is not null
+     and my.team_id is not null
+     and opp.team_id <> my.team_id
     join public.matches m
       on m.match_id = my.match_id
     where my.profile_id = p_profile_id
       and my.is_computer = false
+      and my.team_id is not null
+      and my.outcome in ('win', 'loss')
       and opp.is_computer = false
+      and opp.team_id is not null
+      and opp.outcome in ('win', 'loss')
       and (p_since is null or m.completed_at >= p_since)
       and (
         p_match_type_id is null
@@ -141,6 +152,7 @@ as $$
       left join public.players player on player.profile_id = mp.profile_id
       where mp.match_id = b.match_id
         and mp.is_computer = false
+        and mp.team_id is not null
     ) as players
   from base b
   order by b.completed_at desc nulls last
