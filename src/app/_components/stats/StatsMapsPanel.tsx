@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { StatsCard } from "@/app/_components/stats/StatsCard";
 import { getMapImage, getMapName } from "@/lib/mapMetadata";
@@ -75,6 +75,9 @@ const buildMapImage = (mapIdentifier: string) => {
   if (!mapImage) return null;
   return mapImage;
 };
+
+const sanitizeMapIdentifier = (value: string) =>
+  value.replace(/[^a-zA-Z0-9_-]/g, "-");
 
 const ChevronIcon = ({ open }: { open: boolean }) => (
   <svg
@@ -176,6 +179,38 @@ export default function StatsMapsPanel() {
   const maps = useMemo(() => mapsState.data?.rows ?? [], [mapsState.data]);
   const effectiveWindow = mapsState.data?.windowDays ?? windowDays;
 
+  const [columns, setColumns] = useState<number>(() => {
+    if (typeof window === "undefined") return 1;
+    if (window.innerWidth >= 1280) return 3;
+    if (window.innerWidth >= 640) return 2;
+    return 1;
+  });
+
+  useEffect(() => {
+    const updateColumns = () => {
+      if (window.innerWidth >= 1280) {
+        setColumns(3);
+      } else if (window.innerWidth >= 640) {
+        setColumns(2);
+      } else {
+        setColumns(1);
+      }
+    };
+
+    updateColumns();
+    window.addEventListener("resize", updateColumns);
+    return () => window.removeEventListener("resize", updateColumns);
+  }, []);
+
+  const rows = useMemo(() => {
+    if (!maps.length) return [] as MapOverviewRow[][];
+    const size = Math.max(1, columns);
+    const chunks: MapOverviewRow[][] = [];
+    for (let index = 0; index < maps.length; index += size) {
+      chunks.push(maps.slice(index, index + size));
+    }
+    return chunks;
+  }, [maps, columns]);
   const handleToggleMap = (mapIdentifier: string) => {
     setExpandedMap(prev => {
       const next = prev === mapIdentifier ? null : mapIdentifier;
@@ -372,70 +407,136 @@ export default function StatsMapsPanel() {
           No ranked matches recorded in this window. Try a wider range.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {maps.map(map => {
-            const mapIdentifier = map.mapIdentifier || "unknown";
-            const normalizedName =
-              getMapName(mapIdentifier) ?? map.mapName ?? mapIdentifier;
-            const mapImage = buildMapImage(mapIdentifier);
-            const isExpanded = expandedMap === mapIdentifier;
-            const breakdownId = `map-breakdown-${mapIdentifier.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+        <div className="space-y-6">
+          {rows.map((row, rowIndex) => {
+            const rowClass =
+              columns >= 3
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+                : columns === 2
+                  ? "grid-cols-1 sm:grid-cols-2"
+                  : "grid-cols-1";
+
+            const expandedDetails = row.find(
+              item => (item.mapIdentifier || "unknown") === expandedMap,
+            );
+            const expandedIdentifier = expandedDetails
+              ? expandedDetails.mapIdentifier || "unknown"
+              : null;
+            const expandedSanitized = expandedIdentifier
+              ? sanitizeMapIdentifier(expandedIdentifier)
+              : null;
+            const expandedImage = expandedIdentifier
+              ? buildMapImage(expandedIdentifier)
+              : null;
+            const expandedName = expandedIdentifier
+              ? getMapName(expandedIdentifier) ??
+                expandedDetails?.mapName ??
+                expandedIdentifier
+              : null;
 
             return (
-              <div
-                key={mapIdentifier}
-                className="flex flex-col rounded-2xl border border-neutral-800/70 bg-neutral-950/40 p-4 transition-colors hover:border-neutral-700/70"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToggleMap(mapIdentifier)}
-                  aria-expanded={isExpanded}
-                  aria-controls={breakdownId}
-                  className="w-full text-left"
-                >
-                  <div className="flex flex-col gap-4">
-                    <div className="relative h-36 w-full overflow-hidden rounded-xl border border-neutral-800/70 bg-neutral-900/40">
-                      {mapImage ? (
-                        <Image
-                          src={mapImage}
-                          alt=""
-                          fill
-                          sizes="(min-width: 1280px) 320px, (min-width: 768px) 45vw, 90vw"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-xs uppercase tracking-wide text-neutral-400">
-                          No preview
+              <Fragment key={`row-${rowIndex}`}>
+                <div className={`grid gap-4 ${rowClass}`}>
+                  {row.map(map => {
+                    const mapIdentifier = map.mapIdentifier || "unknown";
+                    const normalizedName =
+                      getMapName(mapIdentifier) ?? map.mapName ?? mapIdentifier;
+                    const mapImage = buildMapImage(mapIdentifier);
+                    const isExpanded = expandedMap === mapIdentifier;
+                    const sanitizedId = sanitizeMapIdentifier(mapIdentifier);
+                    const breakdownId = `map-breakdown-${sanitizedId}`;
+
+                    return (
+                      <div
+                        key={mapIdentifier}
+                        className={`flex flex-col rounded-2xl border p-4 transition-colors hover:border-neutral-700/70 ${
+                          isExpanded
+                            ? "border-neutral-600 bg-neutral-900/60"
+                            : "border-neutral-800/70 bg-neutral-950/40"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMap(mapIdentifier)}
+                          aria-expanded={isExpanded}
+                          aria-controls={breakdownId}
+                          className="w-full text-left"
+                        >
+                          <div className="flex flex-col gap-4">
+                            <div className="relative h-36 w-full overflow-hidden rounded-xl border border-neutral-800/70 bg-neutral-900/40">
+                              {mapImage ? (
+                                <Image
+                                  src={mapImage}
+                                  alt=""
+                                  fill
+                                  sizes="(min-width: 1280px) 320px, (min-width: 768px) 45vw, 90vw"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-xs uppercase tracking-wide text-neutral-400">
+                                  No preview
+                                </div>
+                              )}
+                              <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
+                                {formatCount(map.matches)} games
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between">
+                            <p className="text-sm font-semibold text-white">
+                              {normalizedName}
+                            </p>
+                            <ChevronIcon open={isExpanded} />
+                          </div>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {expandedDetails && expandedIdentifier && expandedSanitized ? (
+                  <div
+                    id={`map-breakdown-${expandedSanitized}`}
+                    className="mt-4 rounded-2xl border border-neutral-800/70 bg-neutral-950/60 p-6"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative h-16 w-28 overflow-hidden rounded-xl border border-neutral-800/70 bg-neutral-900/40">
+                          {expandedImage ? (
+                            <Image
+                              src={expandedImage}
+                              alt=""
+                              fill
+                              sizes="128px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-xs uppercase tracking-wide text-neutral-400">
+                              No preview
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
-                        {formatCount(map.matches)} games
+                        <div>
+                          <p className="text-lg font-semibold text-white">
+                            {expandedName}
+                          </p>
+                          <p className="text-sm text-neutral-400">
+                            {formatCount(expandedDetails.matches)} total games
+                          </p>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedMap(null)}
+                        className="rounded-full border border-neutral-700/70 px-4 py-2 text-sm font-semibold text-neutral-200 transition hover:border-neutral-500 hover:text-white"
+                      >
+                        Collapse
+                      </button>
                     </div>
-
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {normalizedName}
-                        </p>
-                        <p className="text-xs text-neutral-400">
-                          Last played {formatLastPlayed(map.lastPlayed)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-neutral-300">
-                        <span>{formatWinrate(map.winrate)}</span>
-                        <ChevronIcon open={isExpanded} />
-                      </div>
-                    </div>
-                  </div>
-                </button>
-
-                {isExpanded ? (
-                  <div id={breakdownId} className="mt-4">
-                    {renderBreakdown(mapIdentifier)}
+                    {renderBreakdown(expandedIdentifier)}
                   </div>
                 ) : null}
-              </div>
+              </Fragment>
             );
           })}
         </div>

@@ -38,7 +38,8 @@ type ChartDatum = {
   weekStart: string;
   weekLabel: string;
   totalMatches: number;
-  [key: `race_${number}` | "weekStart" | "weekLabel" | "totalMatches"]: string | number;
+} & {
+  [key in `race_${number}`]?: number;
 };
 
 const WEEKS_OPTIONS = [6, 12, 24] as const;

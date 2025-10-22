@@ -206,6 +206,12 @@ export const getFactionColor = (
     if (variant === "border") return "border-neutral-700/70";
     return "bg-neutral-800/60";
   }
+  if (info.slug === "unknown") {
+    if (variant === "text") return "text-neutral-300";
+    if (variant === "border") return "border-neutral-700/70";
+    return "bg-neutral-800/60";
+  }
+
   const palette = FACTION_COLORS[info.slug];
   if (!palette) {
     if (variant === "text") return "text-neutral-300";
@@ -221,6 +227,7 @@ export const getFactionHexColor = (
 ): string => {
   const info = getFactionByRaceId(raceId);
   if (!info) return fallback;
-  const value = FACTION_HEX[info.slug as Exclude<FactionSlug, "unknown">];
+  if (info.slug === "unknown") return fallback;
+  const value = FACTION_HEX[info.slug];
   return value ?? fallback;
 };
