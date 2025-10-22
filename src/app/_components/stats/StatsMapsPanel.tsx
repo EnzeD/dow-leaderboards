@@ -497,7 +497,7 @@ export default function StatsMapsPanel() {
                 {expandedDetails && expandedIdentifier && expandedSanitized ? (
                   <div
                     id={`map-breakdown-${expandedSanitized}`}
-                    className="mt-4 rounded-2xl border border-neutral-800/70 bg-neutral-950/60 p-6"
+                    className="mt-4 flex flex-col gap-3 rounded-2xl border border-neutral-800/70 bg-neutral-950/60 p-6"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
