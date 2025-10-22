@@ -528,17 +528,17 @@ export default function StatsMapsPanel() {
                               )}
                               <span>{opponentName}</span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300">
-                              <span>{formatCount(matchup.matches)} matches</span>
-                              <span>
-                                Wins <span className="font-semibold text-white">{formatCount(matchup.wins)}</span>
-                              </span>
-                              <span>
-                                Losses <span className="font-semibold text-white">{formatCount(matchup.losses)}</span>
-                              </span>
-                              <span>{formatWinrate(matchup.winrate)}</span>
-                              <span className="text-neutral-400">
-                                Last played {formatLastPlayed(matchup.lastPlayed)}
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300">
+                            <span>{formatCount(matchup.matches)} matches</span>
+                            <span>
+                              Wins <span className="font-semibold text-white">{formatCount(matchup.wins)}</span>
+                            </span>
+                            <span>
+                              Losses <span className="font-semibold text-white">{formatCount(matchup.losses)}</span>
+                            </span>
+                            <span>{formatWinrate(matchup.winrate)}</span>
+                            <span className="text-neutral-400">
+                              Last played {formatLastPlayed(matchup.lastPlayed)}
                               </span>
                             </div>
                           </div>

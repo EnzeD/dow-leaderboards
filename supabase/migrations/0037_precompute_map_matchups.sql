@@ -1,3 +1,26 @@
+-- Precompute map race matchups for faster nested breakdowns.
+
+create table if not exists public.stats_map_race_matchups (
+  window_days integer not null,
+  map_identifier text not null,
+  my_race_id smallint not null,
+  opponent_race_id smallint not null,
+  matches integer not null,
+  wins integer not null,
+  losses integer not null,
+  winrate numeric,
+  last_played timestamptz,
+  computed_at timestamptz not null default now(),
+  constraint stats_map_race_matchups_pkey primary key (window_days, map_identifier, my_race_id, opponent_race_id)
+);
+
+create index if not exists stats_map_race_matchups_matches_idx
+  on public.stats_map_race_matchups (window_days, map_identifier, my_race_id, matches desc);
+
+alter table public.stats_map_race_matchups enable row level security;
+create policy stats_map_race_matchups_read on public.stats_map_race_matchups
+  for select using (true);
+
 create or replace function public.stats_refresh_global()
 returns void
 language plpgsql

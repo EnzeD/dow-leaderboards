@@ -32,12 +32,7 @@ type SupabaseMatchupRow = {
   losses: number | null;
   winrate: number | null;
   last_played: string | null;
-};
-
-const buildSinceTimestamp = (windowDays: number): string => {
-  const now = new Date();
-  const since = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
-  return since.toISOString();
+  computed_at?: string | null;
 };
 
 export async function GET(
@@ -95,20 +90,21 @@ export async function GET(
 
   const requestedWindow = resolveWindowDays(new URL(req.url).searchParams);
   const windowDays = pickAllowedNumber(requestedWindow, ALLOWED_WINDOWS, 90);
-  const sinceTimestamp = buildSinceTimestamp(windowDays);
 
   try {
-    const { data, error } = await supabase.rpc(
-      "stats_get_map_race_matchups",
-      {
-        p_map_identifier: decodedMapId,
-        p_race_id: parsedRaceId,
-        p_since: sinceTimestamp,
-      },
-    );
+    const { data, error } = await supabase
+      .from("stats_map_race_matchups")
+      .select(
+        "opponent_race_id, matches, wins, losses, winrate, last_played, computed_at",
+      )
+      .eq("window_days", windowDays)
+      .eq("map_identifier", decodedMapId)
+      .eq("my_race_id", parsedRaceId)
+      .order("matches", { ascending: false })
+      .limit(20);
 
     if (error) {
-      console.error("[stats] stats_get_map_race_matchups rpc failed", error);
+      console.error("[stats] stats_map_race_matchups query failed", error);
       return NextResponse.json<MapRaceMatchupsResponse>(
         {
           mapIdentifier: decodedMapId,
@@ -143,7 +139,10 @@ export async function GET(
         mapIdentifier: decodedMapId,
         raceId: parsedRaceId,
         windowDays,
-        generatedAt,
+        generatedAt:
+          typedData?.[0]?.computed_at && typeof typedData[0].computed_at === "string"
+            ? typedData[0].computed_at
+            : generatedAt,
         rows,
       },
       { headers: { "Cache-Control": PUBLIC_CACHE_CONTROL } },
