@@ -8,6 +8,7 @@ import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
 import AdvancedStatsPanel, { AdvancedStatsCollapsedPreview } from "@/app/_components/premium/AdvancedStatsPanel";
+import StatsTab from "@/app/_components/stats/StatsTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -408,11 +409,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
     searchQuery?: string;
     searchProfileId?: string;
     selectedFaction?: string;
@@ -467,6 +468,8 @@ export default function Home() {
       p.set('tab', 'favorites');
     } else if (state.view === 'replays') {
       p.set('tab', 'replays');
+    } else if (state.view === 'stats') {
+      p.set('tab', 'stats');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -504,6 +507,9 @@ export default function Home() {
     }
     if (tab === 'replays') {
       return { view: 'replays' };
+    }
+    if (tab === 'stats') {
+      return { view: 'stats' };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -932,6 +938,8 @@ export default function Home() {
       setActiveTab('favorites');
     } else if (initialFromUrl.view === 'replays') {
       setActiveTab('replays');
+    } else if (initialFromUrl.view === 'stats') {
+      setActiveTab('stats');
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -2067,10 +2075,22 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleMobileNavSelect('stats')}
+                    className={mobileNavButtonClass('stats')}
+                  >
+                    <span className="flex items-center gap-2">
+                      Stats
+                      <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                        NEW
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
-                    <SupportTabKoFiButton className="h-9" />
+                    <SupportTabKoFiButton />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
@@ -2114,10 +2134,10 @@ export default function Home() {
 
           {/* Desktop Header */}
           <div className="hidden sm:flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3">
               <Link
                 href="/"
-                className="mr-4 block"
+                className="mr-4 block flex-shrink-0"
                 aria-label="Go to home"
               >
                 <img
@@ -2126,18 +2146,18 @@ export default function Home() {
                   className="h-16 w-auto object-contain"
                 />
               </Link>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
-                  <span className="block lg:inline">Dawn of War: Definitive Edition</span>
-                  <span className="block lg:inline lg:ml-2">Leaderboards</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight whitespace-nowrap">
+                  <span>Dawn of War: Definitive Edition</span>{' '}
+                  <span className="inline md:inline">Leaderboards</span>
                 </h1>
-                <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
+                <span className="ml-1.5 px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md flex-shrink-0 self-center">
                   BETA
                 </span>
               </div>
             </div>
-            <div className="ml-6 flex items-center gap-3 whitespace-nowrap">
-              <div className="hidden md:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
+            <div className="ml-6 flex items-center gap-3 whitespace-nowrap flex-shrink-0">
+              <div className="hidden lg:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-green-500 mr-2" aria-hidden></span>
                 <span className="text-sm text-neutral-300">Players online</span>
                 <span className="ml-2 text-sm font-semibold text-white">
@@ -2172,10 +2192,10 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
           {/* Desktop Navigation */}
-          <div className="hidden sm:flex flex-wrap items-center gap-2">
+          <div className="hidden sm:flex items-end">
             <button
               onClick={() => setActiveTab('leaderboards')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'leaderboards'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2185,7 +2205,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('search')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'search'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2195,7 +2215,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('favorites')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'favorites'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2205,7 +2225,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('replays')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'replays'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2218,11 +2238,26 @@ export default function Home() {
                 </span>
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Stats
+                <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                  NEW
+                </span>
+              </span>
+            </button>
             <a
               href="https://github.com/EnzeD/dow-leaderboards"
               target="_blank"
               rel="noopener noreferrer"
-              className="lg:ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
+              className="lg:ml-auto px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Contribute on GitHub
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2231,7 +2266,7 @@ export default function Home() {
             </a>
             <button
               onClick={() => setShowFeedbackModal(true)}
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
+              className="px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Provide Feedback
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2240,13 +2275,13 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
                 activeTab === 'support'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
               }`}
             >
-              <SupportTabKoFiButton className="h-9" />
+              <SupportTabKoFiButton />
             </button>
           </div>
         </div>
@@ -3372,6 +3407,10 @@ export default function Home() {
               await handlePlayerSearch(playerName, { pushHistory: true });
             }}
           />
+        )}
+
+        {activeTab === 'stats' && (
+          <StatsTab />
         )}
 
 

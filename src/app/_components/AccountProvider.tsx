@@ -120,7 +120,10 @@ export function AccountProvider({ children, initialUser }: AccountProviderProps)
   });
 
   const value = useMemo<AccountContextValue>(() => {
-    const loading = shouldFetch ? (isValidating && !error) : false;
+    // Only show loading when there's no data yet (initial load)
+    // Don't show loading during revalidation when we already have data
+    const hasData = Boolean(data || fallbackAccount);
+    const loading = shouldFetch ? (isValidating && !hasData && !error) : false;
     const wrappedRefresh = async () => {
       if (!shouldFetch) return undefined;
       const result = await mutate();
