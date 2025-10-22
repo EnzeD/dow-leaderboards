@@ -430,8 +430,10 @@ export default function StatsMapsPanel() {
         const textColor = getFactionColor(row.raceId, "text");
         const isExpanded = expandedRaceId === row.raceId;
         const matchupState = matchupsForMap[row.raceId];
-        const containerBorder = isExpanded ? accentBorder : "border-neutral-800/60 hover:border-neutral-600";
-        const containerBackground = isExpanded ? accentBackground : "bg-neutral-900/70 hover:bg-neutral-900/80";
+        const containerBorder = isExpanded
+          ? accentBorder
+          : "border-neutral-800/60 hover:border-neutral-600";
+        const containerBackground = "bg-neutral-900/70 hover:bg-neutral-900/80";
         const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
 
         return (
@@ -509,12 +511,11 @@ export default function StatsMapsPanel() {
                       {matchupState.rows.map(matchup => {
                         const opponentName = getFactionName(matchup.opponentRaceId);
                         const opponentIcon = getFactionIcon(matchup.opponentRaceId);
-                        const opponentAccent = getFactionColor(matchup.opponentRaceId, "softBg");
                         const opponentBorder = getFactionColor(matchup.opponentRaceId, "border");
                         return (
                           <div
                             key={`${mapIdentifier}-${row.raceId}-${matchup.opponentRaceId}`}
-                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 ${opponentBorder} ${opponentAccent}`}
+                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 bg-neutral-900/75 ${opponentBorder}`}
                           >
                             <div className="flex items-center gap-3 text-sm text-neutral-200">
                               {opponentIcon ? (
