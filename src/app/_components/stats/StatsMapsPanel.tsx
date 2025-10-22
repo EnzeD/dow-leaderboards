@@ -438,18 +438,19 @@ export default function StatsMapsPanel() {
         {state.rows.map(row => {
           const factionName = getFactionName(row.raceId);
           const factionIcon = getFactionIcon(row.raceId);
-          const accentBorderClass = getFactionColor(row.raceId, "border");
           const textColor = getFactionColor(row.raceId, "text");
           const isExpanded = expandedRaceId === row.raceId;
           const matchupState = matchupsForMap[row.raceId];
           const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
           const accentHex = getFactionHexColor(row.raceId);
-          const borderColor = hexToRgba(accentHex, isExpanded ? 0.55 : 0.4);
+          const borderColor = isExpanded
+            ? hexToRgba(accentHex, 0.55)
+            : "rgba(68, 64, 60, 0.35)";
 
           return (
             <div
               key={`${mapIdentifier}-${row.raceId}`}
-              className={`rounded-lg border bg-neutral-900/70 transition-colors hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-black/25 ${accentBorderClass}`}
+              className="rounded-lg border bg-neutral-900/70 transition-colors hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-black/25"
               style={{ borderColor }}
             >
               <button
