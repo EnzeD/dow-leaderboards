@@ -2134,10 +2134,10 @@ export default function Home() {
 
           {/* Desktop Header */}
           <div className="hidden sm:flex items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3">
               <Link
                 href="/"
-                className="mr-4 block"
+                className="mr-4 block flex-shrink-0"
                 aria-label="Go to home"
               >
                 <img
@@ -2146,18 +2146,18 @@ export default function Home() {
                   className="h-16 w-auto object-contain"
                 />
               </Link>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
-                  <span className="block lg:inline">Dawn of War: Definitive Edition</span>
-                  <span className="block lg:inline lg:ml-2">Leaderboards</span>
+                  <span>Dawn of War: Definitive Edition</span>{' '}
+                  <span className="inline md:inline">Leaderboards</span>
                 </h1>
-                <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
+                <span className="ml-1.5 px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md flex-shrink-0 self-center">
                   BETA
                 </span>
               </div>
             </div>
-            <div className="ml-6 flex items-center gap-3 whitespace-nowrap">
-              <div className="hidden md:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
+            <div className="ml-6 flex items-center gap-3 whitespace-nowrap flex-shrink-0">
+              <div className="hidden lg:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-green-500 mr-2" aria-hidden></span>
                 <span className="text-sm text-neutral-300">Players online</span>
                 <span className="ml-2 text-sm font-semibold text-white">
