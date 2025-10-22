@@ -2090,7 +2090,7 @@ export default function Home() {
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
-                    <SupportTabKoFiButton className="h-9" />
+                    <SupportTabKoFiButton />
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
@@ -2146,8 +2146,8 @@ export default function Home() {
                   className="h-16 w-auto object-contain"
                 />
               </Link>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
+              <div className="flex items-center gap-2 min-w-0">
+                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight whitespace-nowrap">
                   <span>Dawn of War: Definitive Edition</span>{' '}
                   <span className="inline md:inline">Leaderboards</span>
                 </h1>
@@ -2192,10 +2192,10 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
           {/* Desktop Navigation */}
-          <div className="hidden sm:flex flex-wrap items-center gap-2">
+          <div className="hidden sm:flex items-end">
             <button
               onClick={() => setActiveTab('leaderboards')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'leaderboards'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2205,7 +2205,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('search')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'search'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2215,7 +2215,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('favorites')}
-              className={`px-6 py-3 font-medium transition-all duration-300 ${
+              className={`px-4 py-3 font-medium transition-all duration-300 ${
                 activeTab === 'favorites'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2225,7 +2225,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('replays')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'replays'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2240,7 +2240,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('stats')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'stats'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
@@ -2257,7 +2257,7 @@ export default function Home() {
               href="https://github.com/EnzeD/dow-leaderboards"
               target="_blank"
               rel="noopener noreferrer"
-              className="lg:ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
+              className="lg:ml-auto px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Contribute on GitHub
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2266,7 +2266,7 @@ export default function Home() {
             </a>
             <button
               onClick={() => setShowFeedbackModal(true)}
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
+              className="px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Provide Feedback
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2275,13 +2275,13 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('support')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
+              className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center ${
                 activeTab === 'support'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
               }`}
             >
-              <SupportTabKoFiButton className="h-9" />
+              <SupportTabKoFiButton />
             </button>
           </div>
         </div>
