@@ -50,6 +50,24 @@ type RaceBreakdownResponse = {
   reason?: string;
 };
 
+type RaceMatchupRow = {
+  opponentRaceId: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  winrate: number | null;
+  lastPlayed: string | null;
+};
+
+type RaceMatchupResponse = {
+  mapIdentifier: string;
+  raceId: number;
+  windowDays: number;
+  generatedAt: string;
+  rows: RaceMatchupRow[];
+  reason?: string;
+};
+
 type LoadingState = {
   loading: boolean;
   error: string | null;
@@ -62,9 +80,21 @@ type BreakdownState = {
   rows: RaceBreakdownRow[];
 };
 
+type MatchupState = {
+  loading: boolean;
+  error: string | null;
+  rows: RaceMatchupRow[];
+};
+
 const WINDOW_OPTIONS = [30, 90] as const;
 
 const createInitialBreakdown = (): BreakdownState => ({
+  loading: false,
+  error: null,
+  rows: [],
+});
+
+const createInitialMatchup = (): MatchupState => ({
   loading: false,
   error: null,
   rows: [],
@@ -126,6 +156,12 @@ export default function StatsMapsPanel() {
   const [breakdowns, setBreakdowns] = useState<Record<string, BreakdownState>>(
     {},
   );
+  const [raceMatchups, setRaceMatchups] = useState<
+    Record<string, Record<number, MatchupState>>
+  >({});
+  const [expandedRaceByMap, setExpandedRaceByMap] = useState<
+    Record<string, number | null>
+  >({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -157,6 +193,8 @@ export default function StatsMapsPanel() {
         });
         setBreakdowns({});
         setExpandedMap(null);
+        setRaceMatchups({});
+        setExpandedRaceByMap({});
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = extractErrorMessage(
@@ -272,6 +310,82 @@ export default function StatsMapsPanel() {
     }
   };
 
+  const loadRaceMatchups = async (mapIdentifier: string, raceId: number) => {
+    setRaceMatchups(prev => ({
+      ...prev,
+      [mapIdentifier]: {
+        ...(prev[mapIdentifier] ?? {}),
+        [raceId]: {
+          ...(prev[mapIdentifier]?.[raceId] ?? createInitialMatchup()),
+          loading: true,
+          error: null,
+        },
+      },
+    }));
+
+    try {
+      const res = await fetch(
+        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}/race/${raceId}?windowDays=${effectiveWindow}`,
+      );
+
+      if (!res.ok) {
+        let reason = "Failed to load matchup breakdown.";
+        try {
+          const payload = (await res.json()) as Partial<RaceMatchupResponse>;
+          if (payload?.reason) {
+            reason = `Breakdown failed (${payload.reason}).`;
+          }
+        } catch {
+          // ignore
+        }
+        throw new Error(reason);
+      }
+
+      const payload = (await res.json()) as RaceMatchupResponse;
+      setRaceMatchups(prev => ({
+        ...prev,
+        [mapIdentifier]: {
+          ...(prev[mapIdentifier] ?? {}),
+          [raceId]: {
+            loading: false,
+            error: null,
+            rows: payload.rows ?? [],
+          },
+        },
+      }));
+    } catch (error) {
+      const message = extractErrorMessage(
+        error,
+        "Unable to load matchup breakdown.",
+      );
+      setRaceMatchups(prev => ({
+        ...prev,
+        [mapIdentifier]: {
+          ...(prev[mapIdentifier] ?? {}),
+          [raceId]: {
+            ...(prev[mapIdentifier]?.[raceId] ?? createInitialMatchup()),
+            loading: false,
+            error: message,
+          },
+        },
+      }));
+    }
+  };
+
+  const handleToggleRace = (mapIdentifier: string, raceId: number) => {
+    setExpandedRaceByMap(prev => {
+      const current = prev[mapIdentifier] ?? null;
+      const next = current === raceId ? null : raceId;
+      if (next !== null && !raceMatchups[mapIdentifier]?.[raceId]) {
+        void loadRaceMatchups(mapIdentifier, raceId);
+      }
+      return {
+        ...prev,
+        [mapIdentifier]: next,
+      };
+    });
+  };
+
   const renderBreakdown = (mapIdentifier: string) => {
     const state = breakdowns[mapIdentifier];
     if (!state) {
@@ -307,6 +421,9 @@ export default function StatsMapsPanel() {
       );
     }
 
+    const expandedRaceId = expandedRaceByMap[mapIdentifier] ?? null;
+    const matchupsForMap = raceMatchups[mapIdentifier] ?? {};
+
     return (
       <div className="space-y-3 rounded-xl border border-neutral-800/60 bg-neutral-900/60 p-4">
         {state.rows.map(row => {
@@ -314,51 +431,123 @@ export default function StatsMapsPanel() {
           const factionIcon = getFactionIcon(row.raceId);
           const accent = getFactionColor(row.raceId, "border");
           const textColor = getFactionColor(row.raceId, "text");
+          const isExpanded = expandedRaceId === row.raceId;
+          const matchupState = matchupsForMap[row.raceId];
 
           return (
             <div
               key={`${mapIdentifier}-${row.raceId}`}
-              className={`flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-neutral-900/70 px-4 py-3 ${accent}`}
+              className={`rounded-lg border bg-neutral-900/70 ${accent}`}
             >
-              <div className="flex min-w-[200px] flex-1 items-center gap-3">
-                {factionIcon ? (
-                  <Image
-                    src={factionIcon}
-                    alt=""
-                    className="h-10 w-10 rounded-full border border-neutral-700/80 bg-neutral-800/80 p-1"
-                  />
-                ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-700/80 bg-neutral-800/80 text-sm font-semibold text-neutral-300">
-                    {factionName.slice(0, 2).toUpperCase()}
-                  </span>
-                )}
-                <div>
-                  <p className={`text-sm font-semibold ${textColor}`}>
-                    {factionName}
-                  </p>
-                  <p className="text-xs text-neutral-400">
-                    {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
-                  </p>
+              <button
+                type="button"
+                onClick={() => handleToggleRace(mapIdentifier, row.raceId)}
+                aria-expanded={isExpanded}
+                className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-left"
+              >
+                <div className="flex min-w-[200px] flex-1 items-center gap-3">
+                  {factionIcon ? (
+                    <Image
+                      src={factionIcon}
+                      alt=""
+                      className="h-10 w-10 rounded-full border border-neutral-700/80 bg-neutral-800/80 p-1"
+                    />
+                  ) : (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-700/80 bg-neutral-800/80 text-sm font-semibold text-neutral-300">
+                      {factionName.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
+                  <div>
+                    <p className={`text-sm font-semibold ${textColor}`}>
+                      {factionName}
+                    </p>
+                    <p className="text-xs text-neutral-400">
+                      {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-300">
-                <span>
-                  Wins{" "}
-                  <span className="font-semibold text-white">
-                    {formatCount(row.wins)}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-300">
+                  <span>
+                    Wins <span className="font-semibold text-white">{formatCount(row.wins)}</span>
                   </span>
-                </span>
-                <span>
-                  Losses{" "}
-                  <span className="font-semibold text-white">
-                    {formatCount(row.losses)}
+                  <span>
+                    Losses <span className="font-semibold text-white">{formatCount(row.losses)}</span>
                   </span>
-                </span>
-                <span className="text-neutral-400">
-                  Last played {formatLastPlayed(row.lastPlayed)}
-                </span>
-              </div>
+                  <span className="text-neutral-400">
+                    Last played {formatLastPlayed(row.lastPlayed)}
+                  </span>
+                </div>
+              </button>
+
+              {isExpanded ? (
+                <div className="border-t border-neutral-800/60 px-4 pb-4 pt-3">
+                  {matchupState?.loading ? (
+                    <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/70 p-3 text-sm text-neutral-300">
+                      Loading opponent breakdown…
+                    </div>
+                  ) : matchupState?.error ? (
+                    <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-100">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{matchupState.error}</span>
+                        <button
+                          type="button"
+                          onClick={() => loadRaceMatchups(mapIdentifier, row.raceId)}
+                          className="rounded-md border border-rose-300/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-rose-50 hover:border-rose-200 hover:text-white"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+                  ) : !matchupState || matchupState.rows.length === 0 ? (
+                    <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/70 p-3 text-sm text-neutral-300">
+                      No opponent breakdown available for this matchup.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {matchupState.rows.map(matchup => {
+                        const opponentName = getFactionName(matchup.opponentRaceId);
+                        const opponentIcon = getFactionIcon(matchup.opponentRaceId);
+                        const opponentAccent = getFactionColor(matchup.opponentRaceId, "softBg");
+                        return (
+                          <div
+                            key={`${mapIdentifier}-${row.raceId}-${matchup.opponentRaceId}`}
+                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-800/60 ${opponentAccent} px-3 py-2`}
+                          >
+                            <div className="flex items-center gap-3 text-sm text-neutral-200">
+                              {opponentIcon ? (
+                                <Image
+                                  src={opponentIcon}
+                                  alt=""
+                                  className="h-6 w-6 rounded-full border border-neutral-700/70 bg-neutral-800/70 p-0.5"
+                                />
+                              ) : (
+                                <span className="flex h-6 w-6 items-center justify-center rounded-full border border-neutral-700/70 bg-neutral-800/70 text-[10px] font-semibold text-neutral-300">
+                                  {opponentName.slice(0, 2).toUpperCase()}
+                                </span>
+                              )}
+                              <span>{opponentName}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300">
+                              <span>{formatCount(matchup.matches)} matches</span>
+                              <span>
+                                Wins <span className="font-semibold text-white">{formatCount(matchup.wins)}</span>
+                              </span>
+                              <span>
+                                Losses <span className="font-semibold text-white">{formatCount(matchup.losses)}</span>
+                              </span>
+                              <span>{formatWinrate(matchup.winrate)}</span>
+                              <span className="text-neutral-400">
+                                Last played {formatLastPlayed(matchup.lastPlayed)}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
           );
         })}
