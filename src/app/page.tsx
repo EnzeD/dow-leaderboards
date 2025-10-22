@@ -2133,8 +2133,8 @@ export default function Home() {
           </div>
 
           {/* Desktop Header */}
-          <div className="hidden sm:flex items-center justify-between">
-            <div className="flex items-center">
+          <div className="hidden sm:flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
               <Link
                 href="/"
                 className="mr-4 block"
@@ -2147,15 +2147,16 @@ export default function Home() {
                 />
               </Link>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl md:text-3xl font-bold text-white">
-                  Dawn of War: Definitive Edition Leaderboards
+                <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">
+                  <span className="block lg:inline">Dawn of War: Definitive Edition</span>
+                  <span className="block lg:inline lg:ml-2">Leaderboards</span>
                 </h1>
                 <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md">
                   BETA
                 </span>
               </div>
             </div>
-            <div className="ml-6 flex items-center gap-3">
+            <div className="ml-6 flex items-center gap-3 whitespace-nowrap">
               <div className="hidden md:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-green-500 mr-2" aria-hidden></span>
                 <span className="text-sm text-neutral-300">Players online</span>
@@ -2191,7 +2192,7 @@ export default function Home() {
         {/* Tab Navigation */}
         <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
           {/* Desktop Navigation */}
-          <div className="hidden sm:flex">
+          <div className="hidden sm:flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTab('leaderboards')}
               className={`px-6 py-3 font-medium transition-all duration-300 ${
@@ -2256,7 +2257,7 @@ export default function Home() {
               href="https://github.com/EnzeD/dow-leaderboards"
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-1.5"
+              className="lg:ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Contribute on GitHub
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2265,7 +2266,7 @@ export default function Home() {
             </a>
             <button
               onClick={() => setShowFeedbackModal(true)}
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-1.5"
+              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
             >
               Provide Feedback
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
