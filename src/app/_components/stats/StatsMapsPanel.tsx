@@ -425,22 +425,26 @@ export default function StatsMapsPanel() {
         {state.rows.map(row => {
           const factionName = getFactionName(row.raceId);
           const factionIcon = getFactionIcon(row.raceId);
-          const accent = getFactionColor(row.raceId, "border");
-          const textColor = getFactionColor(row.raceId, "text");
-          const isExpanded = expandedRaceId === row.raceId;
-          const matchupState = matchupsForMap[row.raceId];
+        const accentBorder = getFactionColor(row.raceId, "border");
+        const accentBackground = getFactionColor(row.raceId, "softBg");
+        const textColor = getFactionColor(row.raceId, "text");
+        const isExpanded = expandedRaceId === row.raceId;
+        const matchupState = matchupsForMap[row.raceId];
+        const containerBorder = isExpanded ? accentBorder : "border-neutral-800/60 hover:border-neutral-600";
+        const containerBackground = isExpanded ? accentBackground : "bg-neutral-900/70 hover:bg-neutral-900/80";
+        const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
 
-          return (
-            <div
-              key={`${mapIdentifier}-${row.raceId}`}
-              className={`rounded-lg border bg-neutral-900/70 ${accent}`}
+        return (
+          <div
+            key={`${mapIdentifier}-${row.raceId}`}
+            className={`rounded-lg border transition-colors ${containerBorder} ${containerBackground}`}
+          >
+            <button
+              type="button"
+              onClick={() => handleToggleRace(mapIdentifier, row.raceId)}
+              aria-expanded={isExpanded}
+              className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-left"
             >
-              <button
-                type="button"
-                onClick={() => handleToggleRace(mapIdentifier, row.raceId)}
-                aria-expanded={isExpanded}
-                className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-left"
-              >
                 <div className="flex min-w-[200px] flex-1 items-center gap-3">
                   {factionIcon ? (
                     <Image
@@ -454,27 +458,31 @@ export default function StatsMapsPanel() {
                     </span>
                   )}
                   <div>
-                    <p className={`text-sm font-semibold ${textColor}`}>
-                      {factionName}
-                    </p>
-                    <p className="text-xs text-neutral-400">
-                      {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
-                    </p>
-                  </div>
+                  <p className={`text-sm font-semibold ${textColor}`}>
+                    {factionName}
+                  </p>
+                  <p className="text-xs text-neutral-400">
+                    {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
+                  </p>
                 </div>
+              </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-300">
-                  <span>
-                    Wins <span className="font-semibold text-white">{formatCount(row.wins)}</span>
-                  </span>
-                  <span>
-                    Losses <span className="font-semibold text-white">{formatCount(row.losses)}</span>
-                  </span>
-                </div>
-              </button>
+              <div className="flex items-center gap-4 text-sm text-neutral-300">
+                <span>
+                  Wins <span className="font-semibold text-white">{formatCount(row.wins)}</span>
+                </span>
+                <span>
+                  Losses <span className="font-semibold text-white">{formatCount(row.losses)}</span>
+                </span>
+                <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  {indicatorLabel}
+                  <ChevronIcon open={isExpanded} />
+                </span>
+              </div>
+            </button>
 
-              {isExpanded ? (
-                <div className="border-t border-neutral-800/60 px-4 pb-4 pt-3">
+            {isExpanded ? (
+              <div className="border-t border-neutral-800/60 px-4 pb-4 pt-3">
                   {matchupState?.loading ? (
                     <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/70 p-3 text-sm text-neutral-300">
                       Loading opponent breakdown…
@@ -502,10 +510,11 @@ export default function StatsMapsPanel() {
                         const opponentName = getFactionName(matchup.opponentRaceId);
                         const opponentIcon = getFactionIcon(matchup.opponentRaceId);
                         const opponentAccent = getFactionColor(matchup.opponentRaceId, "softBg");
+                        const opponentBorder = getFactionColor(matchup.opponentRaceId, "border");
                         return (
                           <div
                             key={`${mapIdentifier}-${row.raceId}-${matchup.opponentRaceId}`}
-                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-800/60 ${opponentAccent} px-3 py-2`}
+                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 ${opponentBorder} ${opponentAccent}`}
                           >
                             <div className="flex items-center gap-3 text-sm text-neutral-200">
                               {opponentIcon ? (
