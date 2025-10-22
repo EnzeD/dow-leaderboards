@@ -11,7 +11,6 @@ import {
 } from "@/lib/factions";
 import {
   formatCount,
-  formatLastPlayed,
   formatWinrate,
   winrateToHeatmapColor,
   winrateToTextColor,
@@ -234,7 +233,7 @@ export default function StatsMatchupsHeatmap() {
                       const matchesDisplay = formatCount(cell.matches);
                       const textColour = winrateToTextColor(cell.winrate);
                       const background = winrateToHeatmapColor(cell.winrate);
-                      const tooltip = `${getFactionName(cell.myRaceId)} vs ${getFactionName(cell.opponentRaceId)} · ${matchesDisplay} matches · ${winrateDisplay} winrate · Last ${formatLastPlayed(cell.lastPlayed)}`;
+                      const tooltip = `${getFactionName(cell.myRaceId)} vs ${getFactionName(cell.opponentRaceId)} · ${matchesDisplay} matches · ${winrateDisplay} winrate`;
 
                       return (
                         <td key={`cell-${rowFaction.raceId}-${colFaction.raceId}`} className="px-2 py-2 text-center align-middle">

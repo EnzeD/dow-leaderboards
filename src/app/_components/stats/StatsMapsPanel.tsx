@@ -4,11 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { StatsCard } from "@/app/_components/stats/StatsCard";
 import { getMapImage, getMapName } from "@/lib/mapMetadata";
-import {
-  formatCount,
-  formatLastPlayed,
-  formatWinrate,
-} from "@/lib/stats-formatters";
+import { formatCount, formatWinrate } from "@/lib/stats-formatters";
 import {
   getFactionColor,
   getFactionIcon,
@@ -474,9 +470,6 @@ export default function StatsMapsPanel() {
                   <span>
                     Losses <span className="font-semibold text-white">{formatCount(row.losses)}</span>
                   </span>
-                  <span className="text-neutral-400">
-                    Last played {formatLastPlayed(row.lastPlayed)}
-                  </span>
                 </div>
               </button>
 
@@ -528,18 +521,15 @@ export default function StatsMapsPanel() {
                               )}
                               <span>{opponentName}</span>
                             </div>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300">
-                            <span>{formatCount(matchup.matches)} matches</span>
-                            <span>
-                              Wins <span className="font-semibold text-white">{formatCount(matchup.wins)}</span>
-                            </span>
-                            <span>
-                              Losses <span className="font-semibold text-white">{formatCount(matchup.losses)}</span>
-                            </span>
-                            <span>{formatWinrate(matchup.winrate)}</span>
-                            <span className="text-neutral-400">
-                              Last played {formatLastPlayed(matchup.lastPlayed)}
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-300">
+                              <span>{formatCount(matchup.matches)} matches</span>
+                              <span>
+                                Wins <span className="font-semibold text-white">{formatCount(matchup.wins)}</span>
                               </span>
+                              <span>
+                                Losses <span className="font-semibold text-white">{formatCount(matchup.losses)}</span>
+                              </span>
+                              <span>{formatWinrate(matchup.winrate)}</span>
                             </div>
                           </div>
                         );
