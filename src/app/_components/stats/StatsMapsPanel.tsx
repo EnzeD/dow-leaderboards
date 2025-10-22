@@ -7,6 +7,7 @@ import { getMapImage, getMapName } from "@/lib/mapMetadata";
 import { formatCount, formatWinrate } from "@/lib/stats-formatters";
 import {
   getFactionColor,
+  getFactionHexColor,
   getFactionIcon,
   getFactionName,
 } from "@/lib/factions";
@@ -138,6 +139,18 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error) return error.message || fallback;
   if (typeof error === "string") return error;
   return fallback;
+};
+
+const hexToRgba = (hex: string, alpha: number): string => {
+  const sanitized = hex.replace("#", "");
+  if (sanitized.length !== 6) return `rgba(148, 163, 184, ${alpha})`;
+  const r = parseInt(sanitized.slice(0, 2), 16);
+  const g = parseInt(sanitized.slice(2, 4), 16);
+  const b = parseInt(sanitized.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return `rgba(148, 163, 184, ${alpha})`;
+  }
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
 export default function StatsMapsPanel() {
@@ -425,28 +438,29 @@ export default function StatsMapsPanel() {
         {state.rows.map(row => {
           const factionName = getFactionName(row.raceId);
           const factionIcon = getFactionIcon(row.raceId);
-        const accentBorder = getFactionColor(row.raceId, "border");
-        const accentBackground = getFactionColor(row.raceId, "softBg");
-        const textColor = getFactionColor(row.raceId, "text");
-        const isExpanded = expandedRaceId === row.raceId;
-        const matchupState = matchupsForMap[row.raceId];
-        const containerBorder = isExpanded
-          ? accentBorder
-          : "border-neutral-800/60 hover:border-neutral-600";
-        const containerBackground = "bg-neutral-900/70 hover:bg-neutral-900/80";
-        const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
+          const accentBorderClass = getFactionColor(row.raceId, "border");
+          const textColor = getFactionColor(row.raceId, "text");
+          const isExpanded = expandedRaceId === row.raceId;
+          const matchupState = matchupsForMap[row.raceId];
+          const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
+          const accentHex = getFactionHexColor(row.raceId);
+          const borderColor = hexToRgba(accentHex, isExpanded ? 0.55 : 0.4);
+          const backgroundColor = isExpanded
+            ? hexToRgba(accentHex, 0.16)
+            : "rgba(17, 24, 39, 0.78)";
 
-        return (
-          <div
-            key={`${mapIdentifier}-${row.raceId}`}
-            className={`rounded-lg border transition-colors ${containerBorder} ${containerBackground}`}
-          >
-            <button
-              type="button"
-              onClick={() => handleToggleRace(mapIdentifier, row.raceId)}
-              aria-expanded={isExpanded}
-              className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-left"
+          return (
+            <div
+              key={`${mapIdentifier}-${row.raceId}`}
+              className={`rounded-lg border transition-colors hover:shadow-lg hover:shadow-black/25 ${accentBorderClass}`}
+              style={{ borderColor, backgroundColor }}
             >
+              <button
+                type="button"
+                onClick={() => handleToggleRace(mapIdentifier, row.raceId)}
+                aria-expanded={isExpanded}
+                className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-left"
+              >
                 <div className="flex min-w-[200px] flex-1 items-center gap-3">
                   {factionIcon ? (
                     <Image
@@ -460,18 +474,18 @@ export default function StatsMapsPanel() {
                     </span>
                   )}
                   <div>
-                  <p className={`text-sm font-semibold ${textColor}`}>
-                    {factionName}
-                  </p>
-                  <p className="text-xs text-neutral-400">
-                    {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
-                  </p>
+                    <p className={`text-sm font-semibold ${textColor}`}>
+                      {factionName}
+                    </p>
+                    <p className="text-xs text-neutral-300">
+                      {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-4 text-sm text-neutral-300">
-                <span>
-                  Wins <span className="font-semibold text-white">{formatCount(row.wins)}</span>
+                <div className="flex items-center gap-4 text-sm text-neutral-300">
+                  <span>
+                    Wins <span className="font-semibold text-white">{formatCount(row.wins)}</span>
                 </span>
                 <span>
                   Losses <span className="font-semibold text-white">{formatCount(row.losses)}</span>
@@ -484,7 +498,7 @@ export default function StatsMapsPanel() {
             </button>
 
             {isExpanded ? (
-              <div className="border-t border-neutral-800/60 px-4 pb-4 pt-3">
+                <div className="border-t border-neutral-800/50 px-4 pb-4 pt-3">
                   {matchupState?.loading ? (
                     <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/70 p-3 text-sm text-neutral-300">
                       Loading opponent breakdown…
@@ -511,11 +525,17 @@ export default function StatsMapsPanel() {
                       {matchupState.rows.map(matchup => {
                         const opponentName = getFactionName(matchup.opponentRaceId);
                         const opponentIcon = getFactionIcon(matchup.opponentRaceId);
-                        const opponentBorder = getFactionColor(matchup.opponentRaceId, "border");
+                        const opponentHex = getFactionHexColor(matchup.opponentRaceId);
+                        const opponentBorderColor = hexToRgba(opponentHex, 0.45);
+                        const opponentBgColor = hexToRgba(opponentHex, 0.2);
                         return (
                           <div
                             key={`${mapIdentifier}-${row.raceId}-${matchup.opponentRaceId}`}
-                            className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 bg-neutral-900/75 ${opponentBorder}`}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm shadow-black/10"
+                            style={{
+                              borderColor: opponentBorderColor,
+                              backgroundColor: opponentBgColor,
+                            }}
                           >
                             <div className="flex items-center gap-3 text-sm text-neutral-200">
                               {opponentIcon ? (
