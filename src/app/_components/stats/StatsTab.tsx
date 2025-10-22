@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StatsMapsPanel from "@/app/_components/stats/StatsMapsPanel";
 import StatsRacePickrateChart from "@/app/_components/stats/StatsRacePickrateChart";
 import StatsMatchupsHeatmap from "@/app/_components/stats/StatsMatchupsHeatmap";
+import { formatCount } from "@/lib/stats-formatters";
 
 type StatsView = "maps" | "pickrate" | "matchups";
 
@@ -15,6 +16,40 @@ const VIEWS: Array<{ key: StatsView; label: string; helper?: string }> = [
 
 export default function StatsTab() {
   const [activeView, setActiveView] = useState<StatsView>("maps");
+  const [totalMatches, setTotalMatches] = useState<number | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSummary = async () => {
+      try {
+        const res = await fetch("/api/stats/summary");
+        if (!res.ok) {
+          setSummaryError("Total matches unavailable");
+          return;
+        }
+        const payload = (await res.json()) as {
+          totalMatches: number;
+        };
+        if (!cancelled) {
+          setTotalMatches(Number.isFinite(payload.totalMatches) ? payload.totalMatches : 0);
+          setSummaryError(null);
+        }
+      } catch (error) {
+        console.error("[stats] summary fetch failed", error);
+        if (!cancelled) {
+          setSummaryError("Total matches unavailable");
+        }
+      }
+    };
+
+    loadSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeHelper = useMemo(() => {
     const entry = VIEWS.find(v => v.key === activeView);
@@ -45,11 +80,16 @@ export default function StatsTab() {
             );
           })}
         </div>
-        {activeHelper ? (
-          <p className="text-sm text-neutral-400">
-            {activeHelper}
-          </p>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-400">
+          {activeHelper ? <span>{activeHelper}</span> : null}
+          {totalMatches !== null ? (
+            <span className="text-neutral-500">
+              • Tracking {formatCount(totalMatches)} ranked 1v1 matches
+            </span>
+          ) : summaryError ? (
+            <span className="text-amber-400">{summaryError}</span>
+          ) : null}
+        </div>
       </header>
 
       {activeView === "maps" ? <StatsMapsPanel /> : null}

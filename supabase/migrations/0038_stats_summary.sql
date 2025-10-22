@@ -1,3 +1,5 @@
+-- Add stats_summary table and extend stats_refresh_global to populate totals.
+
 create table if not exists public.stats_map_race_matchups (
   window_days integer not null,
   map_identifier text not null,

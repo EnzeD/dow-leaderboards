@@ -110,7 +110,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function StatsRacePickrateChart() {
   const factions = useMemo(() => allFactions(), []);
-  const [weeks, setWeeks] = useState<number>(12);
+  const [weeks, setWeeks] = useState<number>(6);
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState<LoadingState>({
     loading: true,
