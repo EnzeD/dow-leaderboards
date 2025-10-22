@@ -445,15 +445,12 @@ export default function StatsMapsPanel() {
           const indicatorLabel = isExpanded ? "Hide matchups" : "View matchups";
           const accentHex = getFactionHexColor(row.raceId);
           const borderColor = hexToRgba(accentHex, isExpanded ? 0.55 : 0.4);
-          const backgroundColor = isExpanded
-            ? hexToRgba(accentHex, 0.16)
-            : "rgba(17, 24, 39, 0.78)";
 
           return (
             <div
               key={`${mapIdentifier}-${row.raceId}`}
-              className={`rounded-lg border transition-colors hover:shadow-lg hover:shadow-black/25 ${accentBorderClass}`}
-              style={{ borderColor, backgroundColor }}
+              className={`rounded-lg border bg-neutral-900/70 transition-colors hover:bg-neutral-900/80 hover:shadow-lg hover:shadow-black/25 ${accentBorderClass}`}
+              style={{ borderColor }}
             >
               <button
                 type="button"
@@ -477,7 +474,7 @@ export default function StatsMapsPanel() {
                     <p className={`text-sm font-semibold ${textColor}`}>
                       {factionName}
                     </p>
-                    <p className="text-xs text-neutral-300">
+                    <p className="text-xs text-neutral-400">
                       {formatCount(row.matches)} matches · {formatWinrate(row.winrate)}
                     </p>
                   </div>
@@ -527,14 +524,12 @@ export default function StatsMapsPanel() {
                         const opponentIcon = getFactionIcon(matchup.opponentRaceId);
                         const opponentHex = getFactionHexColor(matchup.opponentRaceId);
                         const opponentBorderColor = hexToRgba(opponentHex, 0.45);
-                        const opponentBgColor = hexToRgba(opponentHex, 0.2);
                         return (
                           <div
                             key={`${mapIdentifier}-${row.raceId}-${matchup.opponentRaceId}`}
-                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm shadow-black/10"
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-neutral-900/80 px-3 py-2 shadow-sm shadow-black/10"
                             style={{
                               borderColor: opponentBorderColor,
-                              backgroundColor: opponentBgColor,
                             }}
                           >
                             <div className="flex items-center gap-3 text-sm text-neutral-200">
