@@ -16,6 +16,7 @@ create index if not exists stats_map_race_matchups_matches_idx
   on public.stats_map_race_matchups (window_days, map_identifier, my_race_id, matches desc);
 
 alter table public.stats_map_race_matchups enable row level security;
+drop policy if exists stats_map_race_matchups_read on public.stats_map_race_matchups;
 create policy stats_map_race_matchups_read on public.stats_map_race_matchups
   for select using (true);
 
@@ -26,6 +27,7 @@ create table if not exists public.stats_summary (
 );
 
 alter table public.stats_summary enable row level security;
+drop policy if exists stats_summary_read on public.stats_summary;
 create policy stats_summary_read on public.stats_summary
   for select using (true);
 
@@ -44,6 +46,10 @@ declare
   max_map_window integer;
   max_matchup_window integer;
   max_base_window integer;
+  prev_total_matches numeric;
+  prev_computed_at timestamptz;
+  total_matches numeric;
+  total_matches_delta numeric;
 begin
   select coalesce(max(w.window_days), 90)
     into max_map_window
@@ -72,24 +78,49 @@ begin
   truncate table public.stats_matchup_matrix;
   truncate table public.stats_race_pickrate;
   truncate table public.stats_map_race_matchups;
-  truncate table public.stats_summary;
 
+  select value, computed_at
+    into prev_total_matches, prev_computed_at
+  from public.stats_summary
+  where metric = 'total_1v1_matches'
+  limit 1;
+
+  if prev_total_matches is null or prev_computed_at is null then
+    select count(*)::numeric
+      into total_matches
+    from (
+      select m.match_id
+      from public.matches m
+      join public.match_participants mp on mp.match_id = m.match_id
+      where m.match_type_id = 1
+        and m.completed_at is not null
+      group by m.match_id
+      having
+        count(*) filter (where mp.is_computer = false and mp.team_id is not null) = 2
+        and count(*) filter (where mp.is_computer = true) = 0
+    ) as eligible_matches_total;
+  else
+    select count(*)::numeric
+      into total_matches_delta
+    from (
+      select m.match_id
+      from public.matches m
+      join public.match_participants mp on mp.match_id = m.match_id
+      where m.match_type_id = 1
+        and m.completed_at is not null
+        and m.completed_at > prev_computed_at
+      group by m.match_id
+      having
+        count(*) filter (where mp.is_computer = false and mp.team_id is not null) = 2
+        and count(*) filter (where mp.is_computer = true) = 0
+    ) as eligible_matches_delta;
+
+    total_matches := coalesce(prev_total_matches, 0) + coalesce(total_matches_delta, 0);
+  end if;
+
+  delete from public.stats_summary where metric = 'total_1v1_matches';
   insert into public.stats_summary (metric, value, computed_at)
-  select
-    'total_1v1_matches',
-    count(*)::numeric,
-    now_ts
-  from (
-    select m.match_id
-    from public.matches m
-    join public.match_participants mp on mp.match_id = m.match_id
-    where m.match_type_id = 1
-      and m.completed_at is not null
-    group by m.match_id
-    having
-      count(*) filter (where mp.is_computer = false and mp.team_id is not null) = 2
-      and count(*) filter (where mp.is_computer = true) = 0
-  ) as eligible_matches_total;
+  values ('total_1v1_matches', coalesce(total_matches, 0), now_ts);
 
   create temporary table tmp_matches
   on commit drop as
