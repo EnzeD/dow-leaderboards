@@ -22,6 +22,7 @@
      - `public.stats_get_map_race_breakdown(p_map_identifier text, p_since timestamptz)` returning per-race win/loss counts for a given map.
      - `public.stats_get_race_pickrate(p_since timestamptz, p_weeks integer)` returning weekly race counts and match totals (using `date_trunc('week', completed_at)`).
      - `public.stats_get_matchup_matrix(p_since timestamptz)` returning race-vs-race aggregates (matches, wins, losses, winrate, last_played).
+   - To avoid request-time statement timeouts, introduce summary tables (`stats_map_overview`, `stats_map_race_breakdown`, `stats_race_pickrate`, `stats_matchup_matrix`) populated by a service-role refresh routine (`stats_refresh_global`). An Edge Function (`supabase/functions/stats-refresh`) runs the refresh and can be scheduled nightly via Supabase Cron. Windows are capped to 30 and 90 days for maps/matchups and 24 weeks for pickrates so each refresh stays within Supabase’s statement timeout.
    - Functions should:
      - Filter to `m.match_type_id = 1` (1v1) and `my.is_computer = false`.
      - Normalize `map_identifier` with `coalesce(nullif(trim(m.map_name), ''), 'unknown')` to match the premium schema.
@@ -90,4 +91,3 @@
 - [ ] Build UI components and integrate Stats tab navigation.
 - [ ] Verify TypeScript builds locally (`npm run typecheck`) after user review.
 - [ ] Capture screenshots for PR / documentation once UI stabilizes.
-

@@ -8,6 +8,7 @@ import SupportButton from "@/app/_components/SupportButton";
 import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
 import AdvancedStatsPanel, { AdvancedStatsCollapsedPreview } from "@/app/_components/premium/AdvancedStatsPanel";
+import StatsTab from "@/app/_components/stats/StatsTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -408,11 +409,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
     searchQuery?: string;
     searchProfileId?: string;
     selectedFaction?: string;
@@ -467,6 +468,8 @@ export default function Home() {
       p.set('tab', 'favorites');
     } else if (state.view === 'replays') {
       p.set('tab', 'replays');
+    } else if (state.view === 'stats') {
+      p.set('tab', 'stats');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -504,6 +507,9 @@ export default function Home() {
     }
     if (tab === 'replays') {
       return { view: 'replays' };
+    }
+    if (tab === 'stats') {
+      return { view: 'stats' };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -932,6 +938,8 @@ export default function Home() {
       setActiveTab('favorites');
     } else if (initialFromUrl.view === 'replays') {
       setActiveTab('replays');
+    } else if (initialFromUrl.view === 'stats') {
+      setActiveTab('stats');
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -2067,6 +2075,13 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleMobileNavSelect('stats')}
+                    className={mobileNavButtonClass('stats')}
+                  >
+                    <span>Stats</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleMobileNavSelect('support')}
                     className={mobileNavButtonClass('support')}
                   >
@@ -2216,6 +2231,16 @@ export default function Home() {
                   NEW
                 </span>
               </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+              }`}
+            >
+              Stats
             </button>
             <a
               href="https://github.com/EnzeD/dow-leaderboards"
@@ -3371,6 +3396,10 @@ export default function Home() {
               await handlePlayerSearch(playerName, { pushHistory: true });
             }}
           />
+        )}
+
+        {activeTab === 'stats' && (
+          <StatsTab />
         )}
 
 
