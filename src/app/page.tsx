@@ -2078,7 +2078,12 @@ export default function Home() {
                     onClick={() => handleMobileNavSelect('stats')}
                     className={mobileNavButtonClass('stats')}
                   >
-                    <span>Stats</span>
+                    <span className="flex items-center gap-2">
+                      Stats
+                      <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                        NEW
+                      </span>
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -2234,19 +2239,24 @@ export default function Home() {
             </button>
             <button
               onClick={() => setActiveTab('stats')}
-              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center whitespace-nowrap ${
+              className={`px-6 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'stats'
                   ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
               }`}
             >
-              Stats
+              <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                Stats
+                <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
+                  NEW
+                </span>
+              </span>
             </button>
             <a
               href="https://github.com/EnzeD/dow-leaderboards"
               target="_blank"
               rel="noopener noreferrer"
-              className="ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
+              className="ml-auto px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-1.5"
             >
               Contribute on GitHub
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2255,7 +2265,7 @@ export default function Home() {
             </a>
             <button
               onClick={() => setShowFeedbackModal(true)}
-              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2"
+              className="px-6 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-1.5"
             >
               Provide Feedback
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
