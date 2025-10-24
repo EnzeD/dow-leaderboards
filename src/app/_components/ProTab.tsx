@@ -251,7 +251,7 @@ export default function ProTab() {
             <span className="text-lg text-neutral-300">/month</span>
           </div>
           <p className="text-sm text-neutral-400 mb-6">
-            7-day free trial. No commitment. Less than a coffee per month to support the site and improve faster. The Emperors thanks you personally for keeping this website alive.
+            7-day free trial. No commitment. This supports the site and will help you improve faster. The Emperors thanks you personally for keeping this website alive.
           </p>
           {!isProMember && (
             <Link
