@@ -128,10 +128,10 @@ export function AdvancedStatsIntentBanner({ active, intentAlias }: AdvancedStats
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <p className="text-base font-semibold text-yellow-200">
-            Ready to unlock advanced analytics for {displayAlias}?
+            Ready to become a Dow: DE Pro member for {displayAlias}?
           </p>
           <p className="text-xs text-yellow-100/80">
-            Finish your subscription below, or jump back to the search page once you&apos;re set.
+            Start your free one-week trial below to unlock Pro features, or return to search.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -140,7 +140,7 @@ export function AdvancedStatsIntentBanner({ active, intentAlias }: AdvancedStats
             onClick={handleStartSubscription}
             className="inline-flex items-center justify-center rounded-md border border-yellow-400/60 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300"
           >
-            Start subscription flow
+            Start Pro trial
           </button>
           {returnUrl && (
             <button

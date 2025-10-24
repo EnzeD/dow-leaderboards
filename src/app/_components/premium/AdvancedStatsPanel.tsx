@@ -191,7 +191,7 @@ export default function AdvancedStatsPanel({
 
   const intro = (
     <div>
-      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Advanced analytics</p>
+      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Pro Analytics</p>
       <p className={descriptionClass}>
         Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
       </p>
@@ -351,7 +351,7 @@ const VALUE_POINTS = [
   "Map-by-map performance with recent form",
   "Head-to-head records against frequent opponents",
   "Unlimited match history (from activation onward)",
-  "Most importantly: support this website for the long term <3",
+  "Support Dow: DE and help us improve the site",
 ];
 
 const LOCKED_SECTION_DESCRIPTIONS: Record<AdvancedStatsSection, string> = {
@@ -385,22 +385,22 @@ function LockedAdvancedStatsPreview({
   const defaultLabel =
     reason === "not_authenticated"
       ? "Sign in to continue"
-      : "Activate advanced statistics";
+      : "Go Pro";
   const buttonLabel = effectiveLoading
     ? "Opening..."
     : ctaLabel ?? defaultLabel;
   const reasonMessage = (() => {
     switch (reason) {
       case "not_authenticated":
-        return "Sign in to your account to unlock advanced analytics.";
+        return "Sign in to your account to unlock Pro analytics.";
       case "profile_not_linked":
-        return "Link your Dawn of War profile on the account page to enable premium insights.";
+        return "Link your Dawn of War profile on the account page to enable Pro insights.";
       case "profile_mismatch":
-        return "You can only view advanced statistics for your own linked profile.";
+        return "You can only view Pro analytics for your own linked profile.";
       case "not_subscribed":
-        return "Premium analytics require an active subscription.";
+        return "Pro analytics require an active membership. Start your free one-week trial.";
       case "supabase_unavailable":
-        return "Premium analytics are temporarily unavailable. Please try again shortly.";
+        return "Pro analytics are temporarily unavailable. Please try again shortly.";
       default:
         return null;
     }
@@ -430,7 +430,7 @@ function LockedAdvancedStatsPreview({
               </svg>
             </span>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-white">Advanced statistics</p>
+              <p className="text-sm font-semibold text-white">Pro analytics</p>
               <p className="text-xs text-neutral-300">
                 Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
               </p>
@@ -442,13 +442,13 @@ function LockedAdvancedStatsPreview({
             </div>
           </div>
           <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
-            <span className="uppercase tracking-wide text-yellow-300">Built for Dawn of War</span>
+            <span className="uppercase tracking-wide text-yellow-300">Dow: DE Pro</span>
             <span>Everything you need to climb.</span>
           </div>
         </div>
       </header>
       <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why upgrade</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why go Pro</h3>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {VALUE_POINTS.map((point, index) => (
             <li key={point} className="flex items-start gap-3 text-sm text-neutral-200">

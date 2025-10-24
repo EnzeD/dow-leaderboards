@@ -26,11 +26,11 @@ export default function AdvancedStatsTeaser({ alias, loading, refresh, onRequest
           </svg>
         </span>
         <div>
-          <h3 className="text-lg font-semibold text-white">Advanced statistics</h3>
+          <h3 className="text-lg font-semibold text-white">Pro analytics</h3>
           <p className="text-sm text-neutral-400">
-            This profile is not yet activated for advanced analytics. Unlock Elo trends, matchup intelligence, and more.
+            Become a Dow: DE Pro member to unlock Elo trends, matchup intelligence, and more.
           </p>
-          <p className="text-xs text-neutral-500 mt-1">{alias || "Player"} can request access via the advanced statistics program.</p>
+          <p className="text-xs text-neutral-500 mt-1">Start your free one-week trial to access Pro features.</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-3 text-sm text-neutral-300">
@@ -84,7 +84,7 @@ export default function AdvancedStatsTeaser({ alias, loading, refresh, onRequest
               <path d="M12 12a5 5 0 1 0-5-5" />
               <path d="M12 12v7m0 3a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z" />
             </svg>
-            Request access
+            Start free trial
           </button>
         )}
         <span className="text-xs text-neutral-500">Advanced telemetry in development — activation managed via Supabase dashboard.</span>

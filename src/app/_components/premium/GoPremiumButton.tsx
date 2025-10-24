@@ -81,11 +81,11 @@ export function GoPremiumButton({
         disabled={disabled}
         className="inline-flex items-center justify-center rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Redirecting…" : "Go Premium"}
+        {loading ? "Redirecting…" : "Go Pro"}
       </button>
       {!profileId && (
         <p className="text-xs text-neutral-400">
-          Link your Dawn of War profile above to enable premium checkout.
+          Link your Dawn of War profile above to start your Pro trial.
         </p>
       )}
       {error && (
@@ -153,7 +153,7 @@ export function ManageSubscriptionButton({
         disabled={loading}
         className="inline-flex items-center justify-center rounded-lg border border-neutral-600/60 bg-neutral-800/40 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:bg-neutral-700/50 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Opening portal…" : "Manage subscription"}
+        {loading ? "Opening portal…" : "Manage Pro membership"}
       </button>
       {error && (
         <p className="text-xs text-red-300">
