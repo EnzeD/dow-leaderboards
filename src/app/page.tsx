@@ -425,6 +425,7 @@ export default function Home() {
     selectedCountry?: string;
     selectedId?: number;
     combinedViewMode?: 'best' | 'all';
+    returnToProfile?: string; // Profile ID to return to after Pro subscription
   };
 
   type AdvancedStatsIntentPayload = {
@@ -447,6 +448,7 @@ export default function Home() {
     p.delete('q');
     p.delete('pid');
     p.delete('combined');
+    p.delete('returnTo');
 
     if (state.view === 'leaderboards') {
       // leaderboards is the default tab; keep root clean by omitting defaults
@@ -476,6 +478,9 @@ export default function Home() {
       p.set('tab', 'stats');
     } else if (state.view === 'pro') {
       p.set('tab', 'pro');
+      if (state.returnToProfile) {
+        p.set('returnTo', state.returnToProfile);
+      }
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -518,7 +523,11 @@ export default function Home() {
       return { view: 'stats' };
     }
     if (tab === 'pro') {
-      return { view: 'pro' };
+      const returnTo = p.get('returnTo');
+      return {
+        view: 'pro',
+        returnToProfile: returnTo || undefined,
+      };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -561,6 +570,7 @@ export default function Home() {
     return !linkedProfileId || linkedProfileId === profileId;
   };
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
+  const [returnToProfile, setReturnToProfile] = useState<string | undefined>(undefined);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
@@ -952,6 +962,9 @@ export default function Home() {
       setActiveTab('stats');
     } else if (initialFromUrl.view === 'pro') {
       setActiveTab('pro');
+      if (initialFromUrl.returnToProfile) {
+        setReturnToProfile(initialFromUrl.returnToProfile);
+      }
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -1315,10 +1328,11 @@ export default function Home() {
       selectedCountry,
       selectedId,
       combinedViewMode,
+      returnToProfile,
     };
     syncUrl(state);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId, combinedViewMode]);
+  }, [activeTab, searchQuery, selectedFaction, selectedMatchType, selectedCountry, selectedId, combinedViewMode, returnToProfile]);
 
   // Collapse mobile navigation when switching tabs
   useEffect(() => {
@@ -1780,10 +1794,14 @@ export default function Home() {
     }
   };
 
-  const navigateToTab = (tab: TabType) => {
+  const navigateToTab = (tab: TabType, returnToProfileParam?: string) => {
     if (typeof window === 'undefined') return;
 
     try {
+      // Update state
+      setActiveTab(tab);
+      setReturnToProfile(returnToProfileParam);
+
       // Build new state
       const newState: AppState = {
         view: tab,
@@ -1793,14 +1811,12 @@ export default function Home() {
         selectedCountry,
         selectedId,
         combinedViewMode,
+        returnToProfile: returnToProfileParam,
       };
 
       // Push to history (so back button works)
       const newUrl = buildUrl(newState);
       window.history.pushState(newState, '', newUrl);
-
-      // Update tab state
-      setActiveTab(tab);
 
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2976,7 +2992,7 @@ export default function Home() {
                               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <h4 className="text-white font-medium">{result.playerName}</h4>
                                 {profileIdStr && proBadgeStatuses[profileIdStr]?.showBadge && (
-                                  <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
+                                  <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro', profileIdStr)} />
                                 )}
                                 {result.personalStats?.profile?.country && (
                                   <div className="flex items-center gap-1">
@@ -3056,7 +3072,7 @@ export default function Home() {
                                   ? (
                                     <AdvancedStatsCollapsedPreview
                                       displayName={aliasPrimary || aliasFallback || profileIdStr}
-                                      onNavigateToPro={() => navigateToTab('pro')}
+                                      onNavigateToPro={() => navigateToTab('pro', profileIdStr)}
                                     />
                                   ) : (
                                     <AdvancedStatsPanel
@@ -3071,7 +3087,7 @@ export default function Home() {
                                       ctaState={advancedStatsCta}
                                       variant="embedded"
                                       onPlayerNavigate={runSearchByName}
-                                      onNavigateToPro={() => navigateToTab('pro')}
+                                      onNavigateToPro={() => navigateToTab('pro', profileIdStr)}
                                     />
                                   )}
                               </div>
@@ -3254,17 +3270,17 @@ export default function Home() {
                                                         </span>
                                                       )}
                                                       {entry.faction !== 'Unknown' && (
-                                                      <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
-                                                        (
-                                                        <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
-                                                        <span>{entry.faction}</span>
-                                                        )
-                                                      </span>
+                                                        <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
+                                                          (
+                                                          <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
+                                                          <span>{entry.faction}</span>
+                                                          )
+                                                        </span>
+                                                      )}
+                                                    </button>
+                                                    {!entry.isSelf && entry.profileId && proBadgeStatuses[entry.profileId]?.showBadge && (
+                                                      <ProBadge size="xs" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                                                     )}
-                                                  </button>
-                                                  {!entry.isSelf && entry.profileId && proBadgeStatuses[entry.profileId]?.showBadge && (
-                                                    <ProBadge size="xs" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
-                                                  )}
                                                   </span>
                                                 </Fragment>
                                               ))}

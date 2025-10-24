@@ -99,11 +99,16 @@ export default async function AccountPage({ searchParams }: PageProps) {
     redirect(`/login?redirectTo=${encodeURIComponent("/account")}`);
   }
 
-  const subscribeIntentActive = parseBooleanParam(
+  // Parse returnTo parameter for post-subscription redirect
+  const returnToProfileId = parseProfileIdParam(searchParams?.returnTo) ?? null;
+
+  // Treat returnTo as automatic subscription intent
+  const subscribeIntentActive = returnToProfileId !== null || parseBooleanParam(
     (searchParams?.subscribe ?? searchParams?.subscribeIntent) as string | string[] | undefined,
   );
 
   let intentProfileId =
+    returnToProfileId ??
     parseProfileIdParam(searchParams?.profileId) ??
     parseProfileIdParam(searchParams?.profile_id) ??
     parseProfileIdParam(searchParams?.profileID) ??
@@ -383,6 +388,20 @@ export default async function AccountPage({ searchParams }: PageProps) {
   const checkoutStatus = Array.isArray(checkoutStatusRaw)
     ? checkoutStatusRaw[0]
     : checkoutStatusRaw;
+
+  // Redirect to profile page after successful checkout if returnTo is present
+  if (checkoutStatus === "success" && returnToProfileId && supabase) {
+    // Fetch profile name for better redirect
+    const { data: profileData } = await supabase
+      .from("players")
+      .select("current_alias, profile_id")
+      .eq("profile_id", returnToProfileId)
+      .maybeSingle();
+
+    const profileName = profileData?.current_alias || `Profile ${returnToProfileId}`;
+    redirect(`/?tab=search&q=${encodeURIComponent(profileName)}&pid=${returnToProfileId}`);
+  }
+
   const pendingActivation =
     !subscriptionActive &&
     hasStripeCustomer &&
@@ -566,6 +585,8 @@ export default async function AccountPage({ searchParams }: PageProps) {
             profileId={primaryProfileId}
             premiumExpiresAt={effectivePremiumExpiry}
             isPremiumActive={subscriptionActive}
+            returnToProfileId={returnToProfileId}
+            autoTrigger={subscribeIntentActive && Boolean(primaryProfileId)}
           />
           )}
           {showManageButton && (

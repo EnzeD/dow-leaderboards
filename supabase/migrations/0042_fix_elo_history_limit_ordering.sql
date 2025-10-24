@@ -1,6 +1,7 @@
--- Ensure premium_get_elo_history returns the most recent snapshots.
+-- Ensure premium_get_elo_history returns the most recent snapshots per leaderboard.
 -- Previously, the function ordered snapshots ascending before applying the limit,
--- which truncated the newest rows when more than the limit existed in the window.
+-- which truncated the newest rows when more than the limit existed in the window,
+-- especially when fetching all ladders simultaneously.
 
 create or replace function public.premium_get_elo_history(
   p_profile_id bigint,
@@ -19,19 +20,21 @@ language sql
 security definer
 set search_path = public
 as $$
-  with recent_history as (
+  with ranked_history as (
     select
       lrh.captured_at as snapshot_at,
       lrh.leaderboard_id,
       lrh.rating,
       lrh.rank,
-      null::integer as rank_total
+      null::integer as rank_total,
+      row_number() over (
+        partition by lrh.leaderboard_id
+        order by lrh.captured_at desc
+      ) as rn
     from public.leaderboard_rank_history as lrh
     where lrh.profile_id = p_profile_id::text
       and (p_leaderboard_id is null or lrh.leaderboard_id = p_leaderboard_id)
       and (p_since is null or lrh.captured_at >= p_since)
-    order by lrh.captured_at desc, lrh.leaderboard_id desc
-    limit greatest(10, least(coalesce(p_limit, 200), 1000))
   )
   select
     snapshot_at,
@@ -39,7 +42,8 @@ as $$
     rating,
     rank,
     rank_total
-  from recent_history
+  from ranked_history
+  where rn <= greatest(10, least(coalesce(p_limit, 200), 1000))
   order by snapshot_at asc, leaderboard_id asc;
 $$;
 

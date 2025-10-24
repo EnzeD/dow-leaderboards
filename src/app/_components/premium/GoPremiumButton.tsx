@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 
 type GoPremiumButtonProps = {
   profileId: number | null;
   premiumExpiresAt: string | null;
   isPremiumActive?: boolean;
+  returnToProfileId?: number | null;
+  autoTrigger?: boolean;
 };
 
 const isFutureDate = (iso: string | null): boolean => {
@@ -19,9 +21,13 @@ export function GoPremiumButton({
   profileId,
   premiumExpiresAt,
   isPremiumActive,
+  returnToProfileId,
+  autoTrigger = false,
 }: GoPremiumButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasTriggered = useRef(false);
+
   const hasPremium = useMemo(() => {
     if (typeof isPremiumActive === "boolean") {
       return isPremiumActive;
@@ -31,17 +37,28 @@ export function GoPremiumButton({
 
   const disabled = loading || !profileId;
 
-  const handleClick = async () => {
+  const handleClick = useCallback(async () => {
     if (!profileId || loading) return;
+    hasTriggered.current = true;
     try {
       setLoading(true);
       setError(null);
+
+      // Build custom return URLs if returnToProfileId is provided
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      const body: Record<string, unknown> = { profileId };
+
+      if (returnToProfileId && baseUrl) {
+        body.successUrl = `${baseUrl}/account?checkout=success&session_id={CHECKOUT_SESSION_ID}&returnTo=${returnToProfileId}`;
+        body.cancelUrl = `${baseUrl}/account?checkout=cancelled&returnTo=${returnToProfileId}`;
+      }
+
       const response = await fetch("/api/premium/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ profileId }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -67,7 +84,18 @@ export function GoPremiumButton({
       setError("Unexpected error starting checkout. Please try again.");
       setLoading(false);
     }
-  };
+  }, [profileId, loading, returnToProfileId]);
+
+  // Auto-trigger checkout when requested
+  useEffect(() => {
+    if (autoTrigger && !hasTriggered.current && profileId && !hasPremium && !loading) {
+      // Small delay to ensure page is fully loaded
+      const timer = setTimeout(() => {
+        handleClick();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [autoTrigger, profileId, hasPremium, loading, handleClick]);
 
   if (hasPremium) {
     return null;
