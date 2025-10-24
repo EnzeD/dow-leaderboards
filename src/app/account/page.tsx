@@ -20,6 +20,8 @@ import { AccountRefresher } from "@/app/_components/AccountRefresher";
 import { PortalReturnHandler } from "@/app/_components/PortalReturnHandler";
 import { ProBadgeToggle } from "@/app/_components/ProBadgeToggle";
 import ProBadge from "@/components/ProBadge";
+import { RefreshSubscriptionButton } from "@/app/_components/RefreshSubscriptionButton";
+import { AccountPageTracker } from "@/app/_components/AccountPageTracker";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -462,6 +464,11 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
+      <AccountPageTracker
+        auth0Sub={session.user.sub}
+        hasSubscription={subscriptionActive}
+        subscriptionStatus={stripeSubscriptionStatus}
+      />
       <AccountRefresher shouldRefresh={shouldRefreshSession} />
       <PortalReturnHandler />
       <header className="flex flex-col gap-4">

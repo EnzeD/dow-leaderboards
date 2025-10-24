@@ -5,6 +5,7 @@ import StatsMapsPanel from "@/app/_components/stats/StatsMapsPanel";
 import StatsRacePickrateChart from "@/app/_components/stats/StatsRacePickrateChart";
 import StatsMatchupsHeatmap from "@/app/_components/stats/StatsMatchupsHeatmap";
 import { formatCount } from "@/lib/stats-formatters";
+import { getEventTracker } from "@/lib/analytics/event-tracker";
 
 type StatsView = "maps" | "pickrate" | "matchups";
 
@@ -14,10 +15,27 @@ const VIEWS: Array<{ key: StatsView; label: string; helper?: string }> = [
   { key: "matchups", label: "Matchups", helper: "Race-versus-race win rates" },
 ];
 
-export default function StatsTab() {
+interface StatsTabProps {
+  auth0Sub?: string | null;
+}
+
+export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
   const [activeView, setActiveView] = useState<StatsView>("maps");
   const [totalMatches, setTotalMatches] = useState<number | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // Track stats sub-tab changes
+  useEffect(() => {
+    const tracker = getEventTracker(auth0Sub);
+    tracker.track({
+      event_type: 'page_view',
+      event_name: 'page_viewed',
+      properties: {
+        page_name: `stats:${activeView}`,
+        parent_page: 'stats'
+      }
+    });
+  }, [activeView, auth0Sub]);
 
   useEffect(() => {
     let cancelled = false;
