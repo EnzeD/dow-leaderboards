@@ -23,9 +23,9 @@ const resolveReturnUrl = () => {
     "http://localhost:3000";
   try {
     const url = new URL(raw);
-    return `${url.origin}/account`;
+    return `${url.origin}/account?fromPortal=true`;
   } catch {
-    return "http://localhost:3000/account";
+    return "http://localhost:3000/account?fromPortal=true";
   }
 };
 
