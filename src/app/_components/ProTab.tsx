@@ -40,7 +40,7 @@ export default function ProTab() {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              <span className="flex items-center gap-1">You're already <span className="scale-90"><ProBadge size="sm" clickable={false} /></span></span>
+              <span className="flex items-center gap-1">You&apos;re already <span className="scale-90"><ProBadge size="sm" clickable={false} /></span></span>
             </Link>
           ) : (
             <div className="flex flex-col items-center gap-3">
@@ -65,11 +65,11 @@ export default function ProTab() {
         <div className="grid lg:grid-cols-[1fr_3fr] gap-14 items-center">
           <div className="order-2 lg:order-1">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              "The Emperor tracks."
+              &quot;The Emperor tracks.&quot;
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Track your progress over time</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
-              Every ranked player asks: "Am I actually improving?" <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> answers that question. See your Elo trajectory across all ladders, spot when you're tilting, and identify the patches where you peaked. No guessing, just data.
+              Every ranked player asks: &quot;Am I actually improving?&quot; <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> answers that question. See your Elo trajectory across all ladders, spot when you&apos;re tilting, and identify the patches where you peaked. No guessing, just data.
             </p>
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
@@ -78,7 +78,7 @@ export default function ProTab() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
-                <span>See exactly when you're on a winning streak or need a break</span>
+                <span>See exactly when you&apos;re on a winning streak or need a break</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
@@ -116,7 +116,7 @@ export default function ProTab() {
           </div>
           <div className="order-2">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              "The Emperor reveals."
+              &quot;The Emperor reveals.&quot;
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Find your bad matchups</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
@@ -125,7 +125,7 @@ export default function ProTab() {
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
-                <span>Win rates for every faction combination you've played</span>
+                <span>Win rates for every faction combination you&apos;ve played</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
@@ -145,11 +145,11 @@ export default function ProTab() {
         <div className="grid lg:grid-cols-[1fr_3fr] gap-14 items-center">
           <div className="order-2 lg:order-1">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              "The Emperor guides."
+              &quot;The Emperor guides.&quot;
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Master your map pool</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
-              Vetoes matter in ranked. Map analytics shows your win rate and recent form on every map. Struggling on a specific map? You'll see it instantly. Dominating certain maps? Prioritize them in your veto strategy.
+              Vetoes matter in ranked. Map analytics shows your win rate and recent form on every map. Struggling on a specific map? You&apos;ll see it instantly. Dominating certain maps? Prioritize them in your veto strategy.
             </p>
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
@@ -158,7 +158,7 @@ export default function ProTab() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
-                <span>Recent form indicators show if you're improving or slipping</span>
+                <span>Recent form indicators show if you&apos;re improving or slipping</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-400 mt-0.5">✓</span>
@@ -196,11 +196,11 @@ export default function ProTab() {
           </div>
           <div className="order-2">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              "The Emperor knows."
+              &quot;The Emperor knows.&quot;
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Study your rivals</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
-              Queue into the same players often? <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> tracks your head-to-head records against everyone you face regularly. See who you dominate, who's your nemesis, and which matchups you need to study replays for.
+              Queue into the same players often? <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> tracks your head-to-head records against everyone you face regularly. See who you dominate, who&apos;s your nemesis, and which matchups you need to study replays for.
             </p>
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
@@ -224,7 +224,7 @@ export default function ProTab() {
       <div className="bg-neutral-900/60 border border-neutral-600/30 rounded-lg p-6 sm:p-8 shadow-xl">
         <div className="text-center max-w-2xl mx-auto">
           <div className="mb-3 text-xs italic text-amber-400/80">
-            "The Emperor provides."
+            &quot;The Emperor provides.&quot;
           </div>
           <div className="text-4xl mb-4">🤖</div>
           <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Set it and forget it</h3>
@@ -267,7 +267,7 @@ export default function ProTab() {
               How does the trial work?
             </summary>
             <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
-              7 days, completely free. You need to add a payment method, but you won't be charged until the trial ends. Cancel anytime during the trial and pay nothing.
+              7 days, completely free. You need to add a payment method, but you won&apos;t be charged until the trial ends. Cancel anytime during the trial and pay nothing.
             </p>
           </details>
 
