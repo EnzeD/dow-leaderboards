@@ -177,12 +177,15 @@ export default function StatsMatchupsHeatmap() {
         </div>
       ) : (
         <div className="space-y-6">
+          <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/40 px-4 py-3 text-sm text-neutral-300">
+            <span className="font-medium text-neutral-200">How to read:</span> Each cell shows the row faction's win rate against the column faction. For example, if Dark Eldar (row) vs Sisters (column) shows 44.0%, this means Dark Eldar wins 44% of matches against Sisters.
+          </div>
           <div className="overflow-auto">
             <table className="min-w-max border-collapse text-sm">
               <thead>
                 <tr>
                   <th className="sticky left-0 z-10 bg-neutral-950/95 px-3 py-2 text-left text-xs uppercase tracking-wide text-neutral-400">
-                    Row faction
+                    Row % win vs. Column
                   </th>
                   {factions.map(faction => (
                     <th
@@ -267,7 +270,7 @@ export default function StatsMatchupsHeatmap() {
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-flex h-3 w-3 rounded-full bg-neutral-600/60" />
-              <span>Grey cells indicate limited sample size</span>
+              <span>Grey cells indicate limited sample size or a 50% rate.</span>
             </div>
           </div>
         </div>

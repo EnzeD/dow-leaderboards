@@ -69,6 +69,10 @@ export const winrateToHeatmapColor = (
     return "rgba(125, 125, 125, 0.08)";
   }
 
+  if (Math.abs(delta) < 0.0005) {
+    return "rgba(115, 115, 115, 0.25)";
+  }
+
   const clamped = Math.max(-0.3, Math.min(0.3, delta));
   const intensity = Math.abs(clamped) / 0.3;
   const alpha = 0.18 + 0.4 * intensity;
