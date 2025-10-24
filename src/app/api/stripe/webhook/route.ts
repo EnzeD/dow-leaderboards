@@ -3,10 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import {
-  getSupabaseAdmin,
-  upsertSubscriptionSnapshot,
-} from "@/lib/premium/subscription-server";
+import { getSupabaseAdmin } from "@/lib/premium/subscription-server";
 
 const webhookSecret =
   process.env.STRIPE_WEBHOOK_SECRET ??
@@ -119,54 +116,50 @@ const updatePremiumForSubscription = async (subscription: Stripe.Subscription) =
     ? new Date(subscriptionWithPeriods.current_period_start * 1000).toISOString()
     : new Date().toISOString();
 
-  const updatePayload: Record<string, unknown> = {
-    stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: stripeSubscriptionId,
-    stripe_subscription_status: subscription.status,
-    stripe_subscription_cancel_at_period_end: Boolean(
-      subscription.cancel_at_period_end,
-    ),
-    premium_expires_at: periodEnd,
-  };
+  const priceId =
+    typeof subscription.items?.data?.[0]?.price?.id === "string"
+      ? subscription.items.data[0].price.id
+      : null;
 
   // Don't set primary_profile_id from webhooks - users should link profiles explicitly
   // Webhooks should only update subscription/billing fields, not profile linkage
 
   if (resolvedAuth0Sub) {
-    const { error } = await supabase
-      .from("app_users")
-      .update(updatePayload)
-      .eq("auth0_sub", resolvedAuth0Sub);
-
-    if (error) {
-      console.error("[stripe/webhook] failed to update app_user by auth0_sub", error);
-    }
-
-    await upsertSubscriptionSnapshot(supabase, {
-      auth0Sub: resolvedAuth0Sub,
-      stripeCustomerId: stripeCustomerId ?? null,
-      stripeSubscriptionId: stripeSubscriptionId,
-      status: subscription.status,
-      cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-      currentPeriodStart: periodStart,
-      currentPeriodEnd: periodEnd,
-      priceId:
-        typeof subscription.items?.data?.[0]?.price?.id === "string"
-          ? subscription.items.data[0].price.id
-          : null,
+    // Use atomic database function to update all subscription data in a single transaction
+    // This ensures consistency across app_users and premium_subscriptions tables
+    const { data, error } = await supabase.rpc("update_subscription_atomic", {
+      p_auth0_sub: resolvedAuth0Sub,
+      p_stripe_customer_id: stripeCustomerId,
+      p_stripe_subscription_id: stripeSubscriptionId,
+      p_subscription_status: subscription.status,
+      p_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+      p_current_period_start: periodStart,
+      p_current_period_end: periodEnd,
+      p_price_id: priceId,
     });
 
-    // Mark trial as used when subscription starts with trialing status
-    if (subscription.status === "trialing") {
-      const { error: trialMarkError } = await supabase
-        .from("app_users")
-        .update({ has_used_trial: true })
-        .eq("auth0_sub", resolvedAuth0Sub);
+    if (error) {
+      console.error("[stripe/webhook] atomic subscription update failed", {
+        auth0_sub: resolvedAuth0Sub,
+        subscriptionId: subscription.id,
+        error,
+      });
+      return;
+    }
 
-      if (trialMarkError) {
-        console.error("[stripe/webhook] failed to mark trial as used", {
+    if (data && typeof data === "object" && "success" in data) {
+      const result = data as { success: boolean; error?: string };
+      if (!result.success) {
+        console.error("[stripe/webhook] atomic function returned failure", {
           auth0_sub: resolvedAuth0Sub,
-          error: trialMarkError,
+          subscriptionId: subscription.id,
+          error: result.error,
+        });
+      } else {
+        console.log("[stripe/webhook] subscription updated successfully", {
+          auth0_sub: resolvedAuth0Sub,
+          subscriptionId: subscription.id,
+          status: subscription.status,
         });
       }
     }
