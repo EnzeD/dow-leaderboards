@@ -1723,54 +1723,54 @@ If you have transactional emails (e.g., via Stripe):
 
 ### 6.1 Badge Testing
 
-- [ ] **Leaderboards**: Pro badge displays next to Pro members' names
-- [ ] **Badge click**: Badge links to `/pro` page
-- [ ] **Badge visibility toggle**: User can hide/show badge in account settings
-- [ ] **Badge hidden**: Badge respects user's visibility setting (hidden when toggled off)
-- [ ] **Search results**: Badge shows in autocomplete search results
-- [ ] **Replay listings**: Badge shows next to replay uploader names
-- [ ] **Match history**: Badge shows in Pro analytics match history tables
-- [ ] **Badge styling**: Golden gradient background, italic font, proper sizing
-- [ ] **Performance**: Badge fetching doesn't slow down page loads
+- [x] **Leaderboards**: Pro badge displays next to Pro members' names
+- [x] **Badge click**: Badge links to `/pro` page
+- [x] **Badge visibility toggle**: User can hide/show badge in account settings
+- [x] **Badge hidden**: Badge respects user's visibility setting (hidden when toggled off)
+- [x] **Search results**: Badge shows in autocomplete search results
+- [x] **Replay listings**: Badge shows next to replay uploader names
+- [x] **Match history**: Badge shows in Pro analytics match history tables
+- [x] **Badge styling**: Golden gradient background, italic font, proper sizing
+- [x] **Performance**: Badge fetching doesn't slow down page loads
 
 ---
 
 ### 6.2 Trial Testing
 
-- [ ] **New user trial**: New user can start free trial with payment method
-- [ ] **Trial status**: Trial status shows "Pro member (trial)" in account page
-- [ ] **Trial countdown**: Trial expiration date displays correctly
-- [ ] **Multiple trials blocked**: User cannot start multiple trials
-- [ ] **Trial conversion**: Trial converts to paid after 7 days automatically
-- [ ] **Trial cancellation**: Canceling during trial prevents charge
-- [ ] **Webhook updates**: Stripe webhook correctly updates trial status
-- [ ] **Pro features work**: All Pro features accessible during trial
-- [ ] **Badge during trial**: Pro badge displays during trial period
+- [x] **New user trial**: New user can start free trial with payment method
+- [x] **Trial status**: Trial status shows "Pro member (trial)" in account page
+- [x] **Trial countdown**: Trial expiration date displays correctly
+- [x] **Multiple trials blocked**: User cannot start multiple trials
+- [x] **Trial conversion**: Trial converts to paid after 7 days automatically
+- [x] **Trial cancellation**: Canceling during trial prevents charge
+- [x] **Webhook updates**: Stripe webhook correctly updates trial status
+- [x] **Pro features work**: All Pro features accessible during trial
+- [x] **Badge during trial**: Pro badge displays during trial period
 
 ---
 
 ### 6.3 Pro Page Testing
 
-- [ ] **Public access**: `/pro` page loads for all users (logged out, logged in, Pro members)
-- [ ] **CTA for guests**: Non-logged-in users see "Sign in to start trial"
-- [ ] **CTA for members**: Logged-in non-Pro users see "Start free trial"
-- [ ] **Already Pro**: Pro members see "You're a Pro member" message
-- [ ] **Navigation**: "Go Pro" link in main navigation works
-- [ ] **Badge clickability**: Clicking any Pro badge navigates to `/pro` page
-- [ ] **Responsive design**: Page looks good on mobile, tablet, desktop
-- [ ] **FAQ accordion**: FAQ items expand/collapse correctly
+- [x] **Public access**: `/pro` page loads for all users (logged out, logged in, Pro members)
+- [x] **CTA for guests**: Non-logged-in users see "Sign in to start trial"
+- [x] **CTA for members**: Logged-in non-Pro users see "Start free trial"
+- [x] **Already Pro**: Pro members see "You're a Pro member" message
+- [x] **Navigation**: "Go Pro" link in main navigation works
+- [x] **Badge clickability**: Clicking any Pro badge navigates to `/pro` page
+- [x] **Responsive design**: Page looks good on mobile, tablet, desktop
+- [x] **FAQ accordion**: FAQ items expand/collapse correctly
 
 ---
 
 ### 6.4 Wording Testing
 
-- [ ] **"Premium" removed**: All user-facing "Premium" text updated to "Pro"
-- [ ] **"Advanced Statistics" removed**: Updated to "Pro Analytics"
-- [ ] **Trial messaging**: "Start your free 7-day trial" appears in relevant places
-- [ ] **Account page labels**: Status shows "Pro member" instead of "Premium account"
-- [ ] **Error messages**: Updated error messages mention "Pro membership required"
-- [ ] **Button text**: "Go Pro" and "Start free trial" buttons appear correctly
-- [ ] **Checkout success**: Success message mentions trial and $4.99/month charge
+- [x] **"Premium" removed**: All user-facing "Premium" text updated to "Pro"
+- [x] **"Advanced Statistics" removed**: Updated to "Pro Analytics"
+- [x] **Trial messaging**: "Start your free 7-day trial" appears in relevant places
+- [x] **Account page labels**: Status shows "Pro member" instead of "Premium account"
+- [x] **Error messages**: Updated error messages mention "Pro membership required"
+- [x] **Button text**: "Go Pro" and "Start free trial" buttons appear correctly
+- [x] **Checkout success**: Success message mentions trial and $4.99/month charge
 
 ---
 
