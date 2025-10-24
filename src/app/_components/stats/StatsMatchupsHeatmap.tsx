@@ -178,7 +178,7 @@ export default function StatsMatchupsHeatmap() {
       ) : (
         <div className="space-y-6">
           <div className="rounded-lg border border-neutral-800/60 bg-neutral-900/40 px-4 py-3 text-sm text-neutral-300">
-            <span className="font-medium text-neutral-200">How to read:</span> Each cell shows the row faction's win rate against the column faction. For example, if Dark Eldar (row) vs Sisters (column) shows 44.0%, this means Dark Eldar wins 44% of matches against Sisters.
+            <span className="font-medium text-neutral-200">How to read:</span> Each cell shows the row faction&apos;s win rate against the column faction. For example, if Dark Eldar (row) vs Sisters (column) shows 44.0%, this means Dark Eldar wins 44% of matches against Sisters.
           </div>
           <div className="overflow-auto">
             <table className="min-w-max border-collapse text-sm">
