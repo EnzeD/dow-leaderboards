@@ -1,7 +1,7 @@
 "use client";
 
 interface ProBadgeProps {
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   clickable?: boolean;
   className?: string;
   onNavigateToPro?: () => void;
@@ -14,6 +14,7 @@ export default function ProBadge({
   onNavigateToPro
 }: ProBadgeProps) {
   const sizeClasses = {
+    xs: "px-1.5 py-0.5 text-[10px] leading-tight",
     sm: "px-2 py-0.5 text-xs leading-tight",
     md: "px-2 py-0.5 text-sm leading-tight",
     lg: "px-2 py-0.5 text-base leading-tight"

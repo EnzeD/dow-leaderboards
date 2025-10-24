@@ -202,6 +202,7 @@ interface PlayerTeamProps {
   showDetails?: boolean;
   compact?: boolean;
   className?: string;
+  proBadgeStatuses?: Record<string, { isProMember: boolean; showBadge: boolean }>;
 }
 
 export function PlayerTeam({
@@ -210,7 +211,8 @@ export function PlayerTeam({
   onPlayerClick,
   showDetails = false,
   compact = false,
-  className = ""
+  className = "",
+  proBadgeStatuses = {}
 }: PlayerTeamProps) {
   if (!Array.isArray(profiles) || profiles.length === 0) {
     return <span className={className}>Unknown</span>;
@@ -223,18 +225,24 @@ export function PlayerTeam({
 
   return (
     <span className={className}>
-      {members.map((profile, index) => (
-        <span key={`${profile.alias}-${index}`}>
-          {index > 0 && <span className="text-neutral-500 mx-1">·</span>}
-          <ClickablePlayer
-            profile={profile}
-            onPlayerClick={onPlayerClick}
-            showFaction={true}
-            showDetails={showDetails}
-            compact={compact}
-          />
-        </span>
-      ))}
+      {members.map((profile, index) => {
+        const profileId = profile.profile_id ? String(profile.profile_id) : undefined;
+        const badgeStatus = profileId ? proBadgeStatuses[profileId] : undefined;
+        return (
+          <span key={`${profile.alias}-${index}`}>
+            {index > 0 && <span className="text-neutral-500 mx-1">·</span>}
+            <ClickablePlayer
+              profile={profile}
+              onPlayerClick={onPlayerClick}
+              showFaction={true}
+              showDetails={showDetails}
+              compact={compact}
+              showProBadge={badgeStatus?.showBadge ?? false}
+              isProMember={badgeStatus?.isProMember ?? false}
+            />
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -246,6 +254,7 @@ interface PlayerListProps {
   showDetails?: boolean;
   compact?: boolean;
   className?: string;
+  proBadgeStatuses?: Record<string, { isProMember: boolean; showBadge: boolean }>;
 }
 
 export function PlayerList({
@@ -254,7 +263,8 @@ export function PlayerList({
   showTeams = true,
   showDetails = true,
   compact = false,
-  className = ""
+  className = "",
+  proBadgeStatuses = {}
 }: PlayerListProps) {
   if (!Array.isArray(profiles) || profiles.length === 0) {
     return <span className={className}>No players</span>;
@@ -262,21 +272,27 @@ export function PlayerList({
 
   return (
     <span className={className}>
-      {profiles.map((profile, index) => (
-        <span key={`${profile.alias}-${index}`}>
-          {index > 0 && <span className="text-neutral-500 mx-1">·</span>}
-          <ClickablePlayer
-            profile={profile}
-            onPlayerClick={onPlayerClick}
-            showFaction={true}
-            showDetails={showDetails}
-            compact={compact}
-          />
-          {showTeams && (
-            <span className="text-neutral-400 text-xs ml-1">[Team {profile.team}]</span>
-          )}
-        </span>
-      ))}
+      {profiles.map((profile, index) => {
+        const profileId = profile.profile_id ? String(profile.profile_id) : undefined;
+        const badgeStatus = profileId ? proBadgeStatuses[profileId] : undefined;
+        return (
+          <span key={`${profile.alias}-${index}`}>
+            {index > 0 && <span className="text-neutral-500 mx-1">·</span>}
+            <ClickablePlayer
+              profile={profile}
+              onPlayerClick={onPlayerClick}
+              showFaction={true}
+              showDetails={showDetails}
+              compact={compact}
+              showProBadge={badgeStatus?.showBadge ?? false}
+              isProMember={badgeStatus?.isProMember ?? false}
+            />
+            {showTeams && (
+              <span className="text-neutral-400 text-xs ml-1">[Team {profile.team}]</span>
+            )}
+          </span>
+        );
+      })}
     </span>
   );
 }
