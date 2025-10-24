@@ -543,11 +543,22 @@ export default async function AccountPage({ searchParams }: PageProps) {
       </section>
 
       <section id="premium-billing" className={premiumSectionClassName}>
-        <h2 className="text-xl font-semibold text-white">Pro membership</h2>
+        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+          <ProBadge size="md" clickable={false} />
+          {" "}membership
+        </h2>
         <p className="mt-2 text-sm text-neutral-400">
           {subscriptionActive
-            ? "Manage your Pro membership and billing settings below."
-            : "Become a Pro member to access advanced analytics and support the site. Start your free one-week trial."}
+            ? (
+              <>
+                Manage your <ProBadge size="xs" clickable={false} /> membership and billing settings below.
+              </>
+            )
+            : (
+              <>
+                Become a <ProBadge size="xs" clickable={false} /> member to access advanced analytics and support the site. Start your free one-week trial.
+              </>
+            )}
         </p>
         {subscribeIntentActive && intentStatusMessage && !switchPromptData && (
           <div className={`mt-4 mb-4 rounded-xl border px-4 py-3 text-xs sm:text-sm ${intentMessageClassName}`}>
@@ -564,7 +575,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
             />
           </div>
         )}
-        <dl className="mt-4 grid gap-3 text-sm text-neutral-300 md:grid-cols-2">
+        <dl className="mt-4 grid gap-3 text-sm text-neutral-300 sm:grid-cols-2">
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
               Status
@@ -583,7 +594,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
             </dd>
           </div>
         </dl>
-        <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
+        <div className="mt-4 flex flex-wrap items-start gap-3">
           {showGoPremium && !pendingActivation && (
           <GoPremiumButton
             profileId={primaryProfileId}
