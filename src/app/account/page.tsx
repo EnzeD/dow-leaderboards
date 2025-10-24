@@ -523,6 +523,19 @@ export default async function AccountPage({ searchParams }: PageProps) {
                 {profileCountry.toUpperCase()}
               </dd>
             )}
+            {primaryProfileId && (profileAlias || primaryProfileId) && (
+              <div className="mt-3">
+                <a
+                  href={`/?tab=search&q=${encodeURIComponent(profileAlias ?? String(primaryProfileId))}&pid=${primaryProfileId}`}
+                  className="inline-flex items-center gap-2 rounded-md border border-neutral-600/50 bg-neutral-800/40 px-3 py-1.5 text-xs font-semibold text-neutral-100 transition hover:bg-neutral-700/60"
+                >
+                  <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span>View my profile</span>
+                </a>
+              </div>
+            )}
           </div>
         </dl>
       </section>
