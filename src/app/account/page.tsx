@@ -464,7 +464,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
       {checkoutStatus === "success" && (
         <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/15 px-6 py-4 text-sm text-emerald-100 shadow-lg">
-          Welcome to Dow: DE Pro! Your free trial has started. You'll be charged after 7 days unless you cancel.
+          Welcome to Dow: DE Pro! Your free trial has started. You&apos;ll be charged after 7 days unless you cancel.
         </div>
       )}
 
@@ -592,7 +592,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
               <div>
                 <p className="font-semibold text-amber-100">Free trial active</p>
                 <p className="mt-1">
-                  Your trial ends on {formatDateTime(effectivePremiumExpiry)}. You'll be charged $4.99/month after that unless you cancel.
+                  Your trial ends on {formatDateTime(effectivePremiumExpiry)}. You&apos;ll be charged $4.99/month after that unless you cancel.
                 </p>
               </div>
             </div>
