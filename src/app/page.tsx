@@ -590,6 +590,7 @@ export default function Home() {
   const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntent | null>(null);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [proBadgeStatuses, setProBadgeStatuses] = useState<Record<string, { isProMember: boolean; showBadge: boolean }>>({});
 
   const persistStoredUpgradeIntent = useCallback((payload: UpgradeIntent & { redirectUrl: string }) => {
     if (typeof window === "undefined") return;
@@ -1112,6 +1113,39 @@ export default function Home() {
   });
 
   const hasRankDeltaData = sortedRows.some(row => typeof row.rankDelta === "number");
+
+  // Create stable profileIds key for Pro badge fetching
+  const profileIdsKey = sortedRows
+    .map(row => row.profileId)
+    .filter((id): id is string => typeof id === "string" && id !== "")
+    .sort()
+    .join(',');
+
+  // Fetch Pro badge statuses for visible players
+  useEffect(() => {
+    const fetchBadgeStatuses = async () => {
+      if (!profileIdsKey) return;
+
+      const profileIds = profileIdsKey.split(',');
+
+      try {
+        const response = await fetch("/api/pro/badge-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileIds }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProBadgeStatuses(data.statuses || {});
+        }
+      } catch (error) {
+        console.error("Failed to fetch Pro badge statuses", error);
+      }
+    };
+
+    fetchBadgeStatuses();
+  }, [profileIdsKey]);
 
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
 
@@ -2632,6 +2666,9 @@ export default function Home() {
                                   >
                                     {row.playerName}
                                   </button>
+                                  {proBadgeStatuses[row.profileId]?.showBadge && (
+                                    <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                  )}
                                   {row.level && (
                                     <span className="text-xs text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">
                                       Lv. {row.level}
@@ -2691,6 +2728,9 @@ export default function Home() {
                               >
                                 {row.playerName}
                               </button>
+                              {proBadgeStatuses[row.profileId]?.showBadge && (
+                                <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                              )}
                               {row.level && (
                                 <span className="text-xs text-neutral-400 bg-neutral-800 px-1 py-0.5 rounded">
                                   {row.level}
