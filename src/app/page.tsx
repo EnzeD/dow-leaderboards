@@ -472,6 +472,8 @@ export default function Home() {
       p.set('tab', 'replays');
     } else if (state.view === 'stats') {
       p.set('tab', 'stats');
+    } else if (state.view === 'pro') {
+      p.set('tab', 'pro');
     } else if (state.view === 'support') {
       p.set('tab', 'support');
     }
@@ -512,6 +514,9 @@ export default function Home() {
     }
     if (tab === 'stats') {
       return { view: 'stats' };
+    }
+    if (tab === 'pro') {
+      return { view: 'pro' };
     }
     if (tab === 'support') {
       return { view: 'support' };
@@ -942,6 +947,8 @@ export default function Home() {
       setActiveTab('replays');
     } else if (initialFromUrl.view === 'stats') {
       setActiveTab('stats');
+    } else if (initialFromUrl.view === 'pro') {
+      setActiveTab('pro');
     } else if (initialFromUrl.view === 'support') {
       setActiveTab('support');
     }
@@ -2272,7 +2279,7 @@ export default function Home() {
                 rel="noopener noreferrer"
                 className="lg:ml-auto px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
               >
-                Contribute on GitHub
+                Contribute
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
@@ -2281,7 +2288,7 @@ export default function Home() {
                 onClick={() => setShowFeedbackModal(true)}
                 className="px-4 py-3 font-medium text-neutral-300 hover:text-white hover:bg-neutral-800/30 transition-all duration-300 flex items-center gap-2 whitespace-nowrap"
               >
-                Provide Feedback
+                Feedback
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
