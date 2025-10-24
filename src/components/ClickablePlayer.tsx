@@ -1,6 +1,7 @@
 "use client";
 
 import { EnrichedReplayProfile } from '@/lib/replay-player-matching';
+import ProBadge from "@/components/ProBadge";
 // Import faction icons
 import chaosIcon from "../../assets/factions/chaos.png";
 import darkEldarIcon from "../../assets/factions/darkeldar.png";
@@ -118,6 +119,8 @@ interface ClickablePlayerProps {
   showDetails?: boolean;  // Show rating, flag, etc.
   compact?: boolean;      // Compact display mode
   className?: string;
+  showProBadge?: boolean; // Whether to show Pro badge
+  isProMember?: boolean;  // Whether player is Pro member
 }
 
 export default function ClickablePlayer({
@@ -126,7 +129,9 @@ export default function ClickablePlayer({
   showFaction = true,
   showDetails = true,
   compact = false,
-  className = ""
+  className = "",
+  showProBadge = false,
+  isProMember = false
 }: ClickablePlayerProps) {
   const isLinked = Boolean(profile.profile_id);
   const displayName = profile.current_alias || profile.alias;
@@ -157,6 +162,9 @@ export default function ClickablePlayer({
 
       {/* Player name */}
       <span className="font-medium">{displayName}</span>
+
+      {/* Pro badge */}
+      {isProMember && showProBadge && <ProBadge size="sm" />}
 
       {/* Faction with colored icon */}
       {showFaction && (

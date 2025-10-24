@@ -17,6 +17,8 @@ import { syncStripeSubscription } from "@/lib/premium/stripe-sync";
 import { AdvancedStatsIntentBanner } from "@/app/_components/AdvancedStatsIntentBanner";
 import { ProfileSwitchPrompt } from "@/app/_components/ProfileSwitchPrompt";
 import { AccountRefresher } from "@/app/_components/AccountRefresher";
+import { ProBadgeToggle } from "@/app/_components/ProBadgeToggle";
+import ProBadge from "@/components/ProBadge";
 
 const formatDateTime = (iso: string | null | undefined) => {
   if (!iso) return "—";
@@ -389,16 +391,16 @@ export default async function AccountPage({ searchParams }: PageProps) {
   const subscriptionRenewing = subscriptionActive && !cancelAtPeriodEnd;
   const accountStatusLabel = subscriptionActive
     ? cancelAtPeriodEnd
-      ? "Premium account (will expire)"
-      : "Premium account"
+      ? "Pro member (will expire)"
+      : "Pro member"
     : pendingActivation
-      ? "Premium account (activation pending)"
+      ? "Pro member (activation pending)"
       : "Free account";
   const effectivePremiumExpiry = subscriptionCurrentPeriodEnd;
   const showManageButton = hasStripeCustomer;
   const showGoPremium = !subscriptionActive;
   const hasRenewalDate = Boolean(effectivePremiumExpiry);
-  const expiryLabel = subscriptionRenewing ? "Subscription renews" : "Premium expires";
+  const expiryLabel = subscriptionRenewing ? "Pro membership renews" : "Pro membership expires";
   const expiryValueClass = hasRenewalDate
     ? subscriptionRenewing
       ? "text-base font-semibold text-emerald-200"
@@ -408,9 +410,9 @@ export default async function AccountPage({ searchParams }: PageProps) {
     ? formatDateTime(effectivePremiumExpiry)
     : "—";
   const premiumStatusNote = subscriptionRenewing
-    ? "Premium benefits renew automatically for your linked profile."
+    ? "Pro membership renews automatically for your linked profile."
     : subscriptionActive
-      ? "Premium benefits remain active until your expiry."
+      ? "Pro membership remains active until your expiry."
       : null;
   const premiumStatusTone = subscriptionRenewing ? "text-emerald-300" : "text-amber-300";
   const premiumSectionClassName = [
@@ -443,7 +445,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
         </Link>
         <h1 className="text-3xl font-semibold text-white">Account</h1>
         <p className="text-sm text-neutral-400">
-          Manage your login, subscription, and premium analytics access.
+          Manage your login, Pro membership, and analytics access.
         </p>
       </header>
 
@@ -456,13 +458,13 @@ export default async function AccountPage({ searchParams }: PageProps) {
 
       {checkoutStatus === "success" && (
         <div className="rounded-2xl border border-emerald-500/50 bg-emerald-500/15 px-6 py-4 text-sm text-emerald-100 shadow-lg">
-          Subscription confirmed! Stripe will finalise your payment shortly, and premium access unlocks automatically.
+          Welcome to Dow: DE Pro! Your free trial has started. You'll be charged after 7 days unless you cancel.
         </div>
       )}
 
       {checkoutStatus === "cancelled" && (
         <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 px-6 py-4 text-sm text-amber-100 shadow-lg">
-          Checkout cancelled. You can try again anytime using the Go Premium button below.
+          Checkout cancelled. You can start your free Pro trial anytime below.
         </div>
       )}
 
@@ -499,7 +501,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
       <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
         <h2 className="text-xl font-semibold text-white">Link Dawn of War Profile</h2>
         <p className="mt-2 text-sm text-neutral-400">
-          Connect your in-game profile to unlock personalised insights and premium analytics.
+          Connect your in-game profile to unlock Pro analytics.
         </p>
         <div className="mt-5">
           <AccountProfileLinker
@@ -512,9 +514,11 @@ export default async function AccountPage({ searchParams }: PageProps) {
       </section>
 
       <section id="premium-billing" className={premiumSectionClassName}>
-        <h2 className="text-xl font-semibold text-white">Premium & Billing</h2>
+        <h2 className="text-xl font-semibold text-white">Pro membership</h2>
         <p className="mt-2 text-sm text-neutral-400">
-          Unlock advanced analytics and premium ladders with a monthly subscription.
+          {subscriptionActive
+            ? "Manage your Pro membership and billing settings below."
+            : "Become a Pro member to access advanced analytics and support the site. Start your free one-week trial."}
         </p>
         {subscribeIntentActive && intentStatusMessage && !switchPromptData && (
           <div className={`mt-4 mb-4 rounded-xl border px-4 py-3 text-xs sm:text-sm ${intentMessageClassName}`}>
@@ -536,8 +540,9 @@ export default async function AccountPage({ searchParams }: PageProps) {
             <dt className="text-xs uppercase tracking-wide text-neutral-500">
               Status
             </dt>
-            <dd className="mt-1 text-base font-semibold text-white">
-              {accountStatusLabel}
+            <dd className="mt-1 flex items-center gap-2 text-base font-semibold text-white">
+              <span>{accountStatusLabel}</span>
+              {subscriptionActive && <ProBadge size="sm" clickable={false} />}
             </dd>
           </div>
           <div className="rounded-lg border border-neutral-700/40 bg-neutral-800/40 p-4">
@@ -572,6 +577,16 @@ export default async function AccountPage({ searchParams }: PageProps) {
           )}
         </div>
       </section>
+
+      {subscriptionActive && (
+        <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
+          <h2 className="text-xl font-semibold text-white">Pro badge visibility</h2>
+          <p className="mt-2 text-sm text-neutral-400">
+            Control whether your Pro badge is displayed next to your name across the site.
+          </p>
+          <ProBadgeToggle />
+        </section>
+      )}
 
       <section className="rounded-2xl border border-neutral-700/60 bg-neutral-900/80 p-6 shadow-lg">
         <h2 className="text-xl font-semibold text-white">Actions</h2>
