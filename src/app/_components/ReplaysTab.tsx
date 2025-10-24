@@ -229,6 +229,62 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [formWinnerTeam, setFormWinnerTeam] = useState<number | null>(null);
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
 
+  // Pro badge state
+  const [proBadgeStatuses, setProBadgeStatuses] = useState<Record<string, { isProMember: boolean; showBadge: boolean }>>({});
+
+  // Collect all profile IDs from replays for badge fetching
+  const replayProfileIdsKey = useMemo(() => {
+    const profileIds = new Set<string>();
+
+    // Add profiles from replays list
+    replays.forEach(replay => {
+      if (Array.isArray(replay.profiles)) {
+        replay.profiles.forEach((profile: any) => {
+          if (profile.profile_id) {
+            profileIds.add(String(profile.profile_id));
+          }
+        });
+      }
+    });
+
+    // Add profiles from preview
+    if (preview && Array.isArray(preview.profiles)) {
+      preview.profiles.forEach((profile: any) => {
+        if (profile.profile_id) {
+          profileIds.add(String(profile.profile_id));
+        }
+      });
+    }
+
+    return Array.from(profileIds).sort().join(',');
+  }, [replays, preview]);
+
+  // Fetch Pro badge statuses for replay profiles
+  useEffect(() => {
+    const fetchReplayBadgeStatuses = async () => {
+      if (!replayProfileIdsKey) return;
+
+      const profileIds = replayProfileIdsKey.split(',');
+
+      try {
+        const response = await fetch("/api/pro/badge-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileIds }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProBadgeStatuses(data.statuses || {});
+        }
+      } catch (error) {
+        console.error("Failed to fetch replay Pro badge statuses", error);
+      }
+    };
+
+    fetchReplayBadgeStatuses();
+  }, [replayProfileIdsKey]);
+
   // Extract unique values for filters
   const availableFactions = useMemo(() => {
     const factions = new Set<string>();
@@ -793,6 +849,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     showTeams={true}
                     showDetails={true}
                     compact={false}
+                    proBadgeStatuses={proBadgeStatuses}
                   />
                 </p>
               )}
@@ -1311,6 +1368,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                                 showDetails={true}
                                 compact={false}
                                 className="text-neutral-200 text-xs flex-1"
+                                proBadgeStatuses={proBadgeStatuses}
                               />
                               {enrichedProfile.faction_rating && (
                                 <span className="text-xs font-semibold text-yellow-400">
@@ -1383,6 +1441,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                                 showDetails={true}
                                 compact={false}
                                 className="text-neutral-200 text-xs flex-1"
+                                proBadgeStatuses={proBadgeStatuses}
                               />
                               {enrichedProfile.faction_rating && (
                                 <span className="text-xs font-semibold text-yellow-400">

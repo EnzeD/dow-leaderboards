@@ -82,6 +82,8 @@ type RosterEntry = {
   faction: string;
   rating?: number;
   onClick?: () => void;
+  profileId?: string;
+  isSelf?: boolean;
 };
 
 type FavoriteEntry = {
@@ -1147,6 +1149,39 @@ export default function Home() {
     fetchBadgeStatuses();
   }, [profileIdsKey]);
 
+  // Create stable profileIds key for search results badge fetching
+  const searchResultsProfileIdsKey = searchResults
+    .map(result => result?.profileId ? String(result.profileId) : '')
+    .filter(id => id !== '')
+    .sort()
+    .join(',');
+
+  // Fetch Pro badge statuses for search results
+  useEffect(() => {
+    const fetchSearchBadgeStatuses = async () => {
+      if (!searchResultsProfileIdsKey) return;
+
+      const profileIds = searchResultsProfileIdsKey.split(',');
+
+      try {
+        const response = await fetch("/api/pro/badge-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileIds }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProBadgeStatuses(prev => ({ ...prev, ...data.statuses }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch search results Pro badge statuses", error);
+      }
+    };
+
+    fetchSearchBadgeStatuses();
+  }, [searchResultsProfileIdsKey]);
+
   const selectedLeaderboard = leaderboards.find(lb => lb.id === selectedId);
 
   // Auto-expand search on leaderboards tab when no results are found
@@ -1510,6 +1545,39 @@ export default function Home() {
   })();
 
   const favoriteEntries = Object.values(favorites);
+
+  // Create stable profileIds key for favorites badge fetching
+  const favoritesProfileIdsKey = favoriteEntries
+    .map(entry => entry.profileId ? String(entry.profileId) : '')
+    .filter(id => id !== '')
+    .sort()
+    .join(',');
+
+  // Fetch Pro badge statuses for favorites
+  useEffect(() => {
+    const fetchFavoritesBadgeStatuses = async () => {
+      if (!favoritesProfileIdsKey) return;
+
+      const profileIds = favoritesProfileIdsKey.split(',');
+
+      try {
+        const response = await fetch("/api/pro/badge-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileIds }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setProBadgeStatuses(prev => ({ ...prev, ...data.statuses }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch favorites Pro badge statuses", error);
+      }
+    };
+
+    fetchFavoritesBadgeStatuses();
+  }, [favoritesProfileIdsKey]);
 
   const handleOpenAdvancedStats = (details: { profileId?: string; alias?: string | null; playerName?: string | null }) => {
     const profileId = (details.profileId || '').trim();
@@ -2876,6 +2944,9 @@ export default function Home() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <h4 className="text-white font-medium">{result.playerName}</h4>
+                                {profileIdStr && proBadgeStatuses[profileIdStr]?.showBadge && (
+                                  <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                )}
                                 {result.personalStats?.profile?.country && (
                                   <div className="flex items-center gap-1">
                                     <FlagIcon countryCode={result.personalStats.profile.country} />
@@ -3090,6 +3161,8 @@ export default function Home() {
                                               faction: myFaction,
                                               rating: isAutomatch ? selfRating : undefined,
                                               onClick: displaySelfAlias ? () => runSearchByName(displaySelfAlias, String(result.profileId)) : undefined,
+                                              profileId: String(result.profileId),
+                                              isSelf: true,
                                             },
                                             ...allies.slice(0, 2).map((p: any, index: number) => {
                                               const label = p.alias || String(p.profileId);
@@ -3101,6 +3174,7 @@ export default function Home() {
                                                 faction,
                                                 rating: isAutomatch ? playerRating : undefined,
                                                 onClick: p.alias ? () => runSearchByName(p.alias, String(p.profileId)) : undefined,
+                                                profileId: String(p.profileId),
                                               } satisfies RosterEntry;
                                             }),
                                           ];
@@ -3115,6 +3189,7 @@ export default function Home() {
                                               faction,
                                               rating: isAutomatch ? playerRating : undefined,
                                               onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                              profileId: String(p.profileId),
                                             } satisfies RosterEntry;
                                           });
 
@@ -3130,21 +3205,22 @@ export default function Home() {
                                               {entries.map((entry, index) => (
                                                 <Fragment key={entry.key || `${entry.label}-${index}`}>
                                                   {index > 0 && <span className="text-neutral-500 select-none">•</span>}
-                                                  <button
-                                                    type="button"
-                                                    onClick={entry.onClick}
-                                                    className={`hover:underline ${entry.onClick ? 'text-blue-300' : 'text-neutral-400 cursor-default'
-                                                      }`}
-                                                    title={typeof entry.rating === 'number' ? `${entry.label} (${entry.rating})` : entry.label}
-                                                    disabled={!entry.onClick}
-                                                  >
-                                                    {entry.label}
-                                                    {typeof entry.rating === 'number' && (
-                                                      <span className="ml-1 text-neutral-400 whitespace-nowrap">
-                                                        {entry.rating}
-                                                      </span>
-                                                    )}
-                                                    {entry.faction !== 'Unknown' && (
+                                                  <span className="inline-flex items-center gap-1">
+                                                    <button
+                                                      type="button"
+                                                      onClick={entry.onClick}
+                                                      className={`hover:underline ${entry.onClick ? 'text-blue-300' : 'text-neutral-400 cursor-default'
+                                                        }`}
+                                                      title={typeof entry.rating === 'number' ? `${entry.label} (${entry.rating})` : entry.label}
+                                                      disabled={!entry.onClick}
+                                                    >
+                                                      {entry.label}
+                                                      {typeof entry.rating === 'number' && (
+                                                        <span className="ml-1 text-neutral-400 whitespace-nowrap">
+                                                          {entry.rating}
+                                                        </span>
+                                                      )}
+                                                      {entry.faction !== 'Unknown' && (
                                                       <span className={`ml-1 ${getFactionColor(entry.faction)} inline-flex items-center`}>
                                                         (
                                                         <FactionLogo faction={entry.faction} size={11} yOffset={0} className="mx-1" />
@@ -3153,6 +3229,10 @@ export default function Home() {
                                                       </span>
                                                     )}
                                                   </button>
+                                                  {!entry.isSelf && entry.profileId && proBadgeStatuses[entry.profileId]?.showBadge && (
+                                                    <ProBadge size="xs" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                                  )}
+                                                  </span>
                                                 </Fragment>
                                               ))}
                                               {extraCount > 0 && (
@@ -3319,6 +3399,9 @@ export default function Home() {
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-white font-medium">{displayName}</h4>
+                            {entry.profileId && proBadgeStatuses[String(entry.profileId)]?.showBadge && (
+                              <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                            )}
                             {countryCode && (
                               <div className="flex items-center gap-1">
                                 <FlagIcon countryCode={countryCode} />
