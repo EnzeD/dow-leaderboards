@@ -17,6 +17,7 @@ import { syncStripeSubscription } from "@/lib/premium/stripe-sync";
 import { AdvancedStatsIntentBanner } from "@/app/_components/AdvancedStatsIntentBanner";
 import { ProfileSwitchPrompt } from "@/app/_components/ProfileSwitchPrompt";
 import { AccountRefresher } from "@/app/_components/AccountRefresher";
+import { PortalReturnHandler } from "@/app/_components/PortalReturnHandler";
 import { ProBadgeToggle } from "@/app/_components/ProBadgeToggle";
 import ProBadge from "@/components/ProBadge";
 
@@ -260,8 +261,9 @@ export default async function AccountPage({ searchParams }: PageProps) {
   }
 
   const checkoutSessionId = resolveCheckoutSessionId(searchParams);
+  const fromPortal = parseBooleanParam(searchParams?.fromPortal);
 
-  if (supabase && (stripeCustomerId || checkoutSessionId)) {
+  if (supabase && (stripeCustomerId || checkoutSessionId || fromPortal)) {
     const syncResult = await syncStripeSubscription({
       auth0Sub: session.user.sub,
       checkoutSessionId,
@@ -455,11 +457,13 @@ export default async function AccountPage({ searchParams }: PageProps) {
   const shouldRefreshSession =
     checkoutStatus === "success" ||
     (subscribeIntentActive && intentStatusTone === "success") ||
-    Boolean(checkoutSessionId);
+    Boolean(checkoutSessionId) ||
+    fromPortal;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-10 text-neutral-100">
       <AccountRefresher shouldRefresh={shouldRefreshSession} />
+      <PortalReturnHandler />
       <header className="flex flex-col gap-4">
         <Link
           href="/"
@@ -604,16 +608,22 @@ export default async function AccountPage({ searchParams }: PageProps) {
           )}
         </div>
         {isTrialing && effectivePremiumExpiry && (
-          <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+          <div className={`mt-4 rounded-lg border p-4 text-sm ${cancelAtPeriodEnd ? 'border-neutral-600/40 bg-neutral-800/40 text-neutral-200' : 'border-amber-400/40 bg-amber-500/10 text-amber-200'}`}>
             <div className="flex items-start gap-3">
-              <svg className="h-5 w-5 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className={`h-5 w-5 shrink-0 ${cancelAtPeriodEnd ? 'text-neutral-400' : 'text-amber-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v6l4 2" />
               </svg>
               <div>
-                <p className="font-semibold text-amber-100">Free trial active</p>
+                <p className={`font-semibold ${cancelAtPeriodEnd ? 'text-neutral-100' : 'text-amber-100'}`}>
+                  {cancelAtPeriodEnd ? 'Trial cancelled' : 'Free trial active'}
+                </p>
                 <p className="mt-1">
-                  Your trial ends on {formatDateTime(effectivePremiumExpiry)}. You&apos;ll be charged $4.99/month after that unless you cancel.
+                  {cancelAtPeriodEnd ? (
+                    <>Your trial will end on {formatDateTime(effectivePremiumExpiry)}. You won&apos;t be charged. You can reactivate anytime before then.</>
+                  ) : (
+                    <>Your trial ends on {formatDateTime(effectivePremiumExpiry)}. You&apos;ll be charged $4.99/month after that unless you cancel.</>
+                  )}
                 </p>
               </div>
             </div>
