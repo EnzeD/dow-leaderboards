@@ -194,7 +194,7 @@ export default function AdvancedStatsPanel({
 
   const intro = (
     <div>
-      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400 inline-flex items-baseline gap-1.5">
+      <p className="text-xs uppercase tracking-wide text-yellow-400 inline-flex items-baseline gap-1.5">
         Advanced Statistics <ProBadge size="xs" clickable={Boolean(onNavigateToPro)} onNavigateToPro={onNavigateToPro} />
       </p>
       <p className={descriptionClass}>
