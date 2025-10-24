@@ -81,11 +81,15 @@ export function GoPremiumButton({
         disabled={disabled}
         className="inline-flex items-center justify-center rounded-lg border border-amber-400/60 bg-amber-500/20 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Redirecting…" : "Go Pro"}
+        {loading ? "Starting trial…" : "Start free trial"}
       </button>
-      {!profileId && (
+      {!profileId ? (
         <p className="text-xs text-neutral-400">
           Link your Dawn of War profile above to start your Pro trial.
+        </p>
+      ) : (
+        <p className="text-xs text-neutral-400">
+          7-day free trial • $4.99/month after
         </p>
       )}
       {error && (

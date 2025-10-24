@@ -155,6 +155,21 @@ const updatePremiumForSubscription = async (subscription: Stripe.Subscription) =
           ? subscription.items.data[0].price.id
           : null,
     });
+
+    // Mark trial as used when subscription starts with trialing status
+    if (subscription.status === "trialing") {
+      const { error: trialMarkError } = await supabase
+        .from("app_users")
+        .update({ has_used_trial: true })
+        .eq("auth0_sub", resolvedAuth0Sub);
+
+      if (trialMarkError) {
+        console.error("[stripe/webhook] failed to mark trial as used", {
+          auth0_sub: resolvedAuth0Sub,
+          error: trialMarkError,
+        });
+      }
+    }
   } else {
     console.warn("[stripe/webhook] unable to associate subscription with app_user", {
       subscriptionId: subscription.id,

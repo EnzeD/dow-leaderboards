@@ -167,6 +167,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
   let profileAlias: string | null = null;
   let profileCountry: string | null = null;
   let profileAvatarUrl: string | null = null;
+  let hasUsedTrial: boolean = false;
 
   if (supabase) {
     const { error: upsertError } = await upsertAppUser({
@@ -196,7 +197,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
     const { data, error } = await supabase
       .from("app_users")
       .select(
-        "premium_expires_at, stripe_customer_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, primary_profile_id",
+        "premium_expires_at, stripe_customer_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, primary_profile_id, has_used_trial",
       )
       .eq("auth0_sub", session.user.sub)
       .maybeSingle();
@@ -210,6 +211,7 @@ export default async function AccountPage({ searchParams }: PageProps) {
       primaryProfileId = data.primary_profile_id
         ? Number.parseInt(String(data.primary_profile_id), 10)
         : null;
+      hasUsedTrial = data.has_used_trial ?? false;
 
       if (primaryProfileId) {
         const { data: player, error: playerError } = await supabase
@@ -389,10 +391,14 @@ export default async function AccountPage({ searchParams }: PageProps) {
       stripeSubscriptionStatus === "incomplete_expired");
   const cancelAtPeriodEnd = Boolean(stripeSubscriptionCancelAtPeriodEnd);
   const subscriptionRenewing = subscriptionActive && !cancelAtPeriodEnd;
+  const isTrialing = stripeSubscriptionStatus === "trialing";
+  const isTrialEligible = !hasUsedTrial && !subscriptionActive;
   const accountStatusLabel = subscriptionActive
-    ? cancelAtPeriodEnd
-      ? "Pro member (will expire)"
-      : "Pro member"
+    ? isTrialing
+      ? "Pro member (trial)"
+      : cancelAtPeriodEnd
+        ? "Pro member (will expire)"
+        : "Pro member"
     : pendingActivation
       ? "Pro member (activation pending)"
       : "Free account";
@@ -576,6 +582,22 @@ export default async function AccountPage({ searchParams }: PageProps) {
             </span>
           )}
         </div>
+        {isTrialing && effectivePremiumExpiry && (
+          <div className="mt-4 rounded-lg border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+            <div className="flex items-start gap-3">
+              <svg className="h-5 w-5 shrink-0 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              <div>
+                <p className="font-semibold text-amber-100">Free trial active</p>
+                <p className="mt-1">
+                  Your trial ends on {formatDateTime(effectivePremiumExpiry)}. You'll be charged $4.99/month after that unless you cancel.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       {subscriptionActive && (

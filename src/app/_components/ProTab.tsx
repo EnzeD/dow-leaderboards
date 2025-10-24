@@ -10,6 +10,8 @@ export default function ProTab() {
   const isProMember = account?.subscription?.active ?? false;
   const profileId = account?.profile?.profileId ?? null;
   const authUser = account?.user ?? null;
+  const hasUsedTrial = account?.appUser?.has_used_trial ?? false;
+  const isTrialEligible = authUser && !hasUsedTrial && !isProMember;
 
   const ctaUrl = authUser
     ? profileId
@@ -49,7 +51,9 @@ export default function ProTab() {
                 {authUser ? "Start 7-day trial" : "Sign in to start"}
               </Link>
               <p className="text-xs text-neutral-400">
-                Free trial • $4.99/month after • Cancel anytime
+                {isTrialEligible
+                  ? "7-day free trial • Cancel anytime • No commitment"
+                  : "$4.99/month • Cancel anytime"}
               </p>
             </div>
           )}

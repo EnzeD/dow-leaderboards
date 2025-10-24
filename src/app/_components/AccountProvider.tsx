@@ -31,6 +31,7 @@ type AccountResponse = {
     stripe_subscription_cancel_at_period_end: boolean | null;
     premium_expires_at: string | null;
     primary_profile_id: number | null;
+    has_used_trial: boolean | null;
   } | null;
   subscription: {
     stripeCustomerId: string | null;

@@ -65,13 +65,23 @@ export async function POST(request: Request) {
 
   const { data: appUser, error: lookupError } = await supabase
     .from("app_users")
-    .select("primary_profile_id, stripe_customer_id")
+    .select("primary_profile_id, stripe_customer_id, has_used_trial")
     .eq("auth0_sub", session.user.sub)
     .maybeSingle();
 
   if (lookupError) {
     console.error("[premium/checkout] failed to load app user", lookupError);
     return NextResponse.json({ error: "lookup_failed" }, { status: 500 });
+  }
+
+  // Check if user already used trial
+  const hasUsedTrial = appUser?.has_used_trial ?? false;
+
+  if (hasUsedTrial) {
+    return NextResponse.json({
+      error: "trial_already_used",
+      message: "You've already used your free trial. You can still subscribe for $4.99/month."
+    }, { status: 400 });
   }
 
   const profileId =
@@ -159,6 +169,7 @@ export async function POST(request: Request) {
       metadata,
       subscription_data: {
         metadata,
+        trial_period_days: 7,
       },
       line_items: [
         {

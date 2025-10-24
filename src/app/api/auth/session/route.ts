@@ -25,6 +25,7 @@ export async function GET() {
     stripe_subscription_cancel_at_period_end: boolean | null;
     premium_expires_at: string | null;
     primary_profile_id: number | null;
+    has_used_trial: boolean | null;
   } | null = null;
   let subscription: {
     stripeCustomerId: string | null;
@@ -61,7 +62,7 @@ export async function GET() {
       const { data, error: fetchError } = await supabase
         .from("app_users")
         .select(
-        "stripe_customer_id, stripe_subscription_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, premium_expires_at, primary_profile_id",
+        "stripe_customer_id, stripe_subscription_id, stripe_subscription_status, stripe_subscription_cancel_at_period_end, premium_expires_at, primary_profile_id, has_used_trial",
       )
         .eq("auth0_sub", session.user.sub)
         .maybeSingle();
@@ -77,6 +78,7 @@ export async function GET() {
             data.stripe_subscription_cancel_at_period_end ?? null,
           premium_expires_at: data.premium_expires_at ?? null,
           primary_profile_id: data.primary_profile_id ?? null,
+          has_used_trial: data.has_used_trial ?? null,
         };
 
         const snapshot = await fetchSubscriptionSnapshot(supabase, session.user.sub);
