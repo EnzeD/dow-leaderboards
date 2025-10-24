@@ -9,6 +9,7 @@ import SupportTabKoFiButton from "@/app/_components/SupportTabKoFiButton";
 import ReplaysTab from "@/app/_components/ReplaysTab";
 import AdvancedStatsPanel, { AdvancedStatsCollapsedPreview } from "@/app/_components/premium/AdvancedStatsPanel";
 import StatsTab from "@/app/_components/stats/StatsTab";
+import ProTab from "@/app/_components/ProTab";
 import AutocompleteSearch from "@/components/AutocompleteSearch";
 import { LadderRow, Leaderboard } from "@/lib/relic";
 import { PlayerSearchResult, supabase } from "@/lib/supabase";
@@ -19,6 +20,7 @@ import { useAccount } from "@/app/_components/AccountProvider";
 import { AccountIcon } from "@/components/icons";
 import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
 import { AccountDropdown } from "@/app/_components/AccountDropdown";
+import ProBadge from "@/components/ProBadge";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -409,11 +411,11 @@ const getRankColor = (rank: number): string => {
 };
 
 // Tab types
-type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
+type TabType = 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'pro' | 'support';
 
 export default function Home() {
   type AppState = {
-    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'support';
+    view: 'leaderboards' | 'search' | 'favorites' | 'replays' | 'stats' | 'pro' | 'support';
     searchQuery?: string;
     searchProfileId?: string;
     selectedFaction?: string;
@@ -1831,8 +1833,8 @@ export default function Home() {
   };
 
   const mobileNavButtonClass = (tab: TabType) => `w-full flex items-center justify-between gap-3 px-4 py-3 font-medium rounded-md border transition-colors duration-300 ${activeTab === tab
-      ? 'text-white bg-neutral-800/70 border-neutral-500/60 shadow-lg'
-      : 'text-neutral-200 bg-neutral-900/40 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
+    ? 'text-white bg-neutral-800/70 border-neutral-500/60 shadow-lg'
+    : 'text-neutral-200 bg-neutral-900/40 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
     }`;
 
   const handleMobileNavSelect = (tab: TabType) => {
@@ -2017,8 +2019,8 @@ export default function Home() {
                   type="button"
                   onClick={() => setMobileNavOpen(prev => !prev)}
                   className={`flex h-10 w-10 items-center justify-center rounded-md border transition-colors duration-300 ${mobileNavOpen
-                      ? 'bg-neutral-800/80 border-neutral-500/60 text-white'
-                      : 'bg-neutral-900/60 border-neutral-700/60 text-neutral-200 hover:bg-neutral-900/80'
+                    ? 'bg-neutral-800/80 border-neutral-500/60 text-white'
+                    : 'bg-neutral-900/60 border-neutral-700/60 text-neutral-200 hover:bg-neutral-900/80'
                     }`}
                   aria-label="Toggle navigation"
                   aria-expanded={mobileNavOpen}
@@ -2056,7 +2058,7 @@ export default function Home() {
                       onClick={() => handleMobileNavSelect('favorites')}
                       className={mobileNavButtonClass('favorites')}
                     >
-                      <span>Favourites</span>
+                      <span>Favs</span>
                     </button>
                     <button
                       type="button"
@@ -2080,6 +2082,15 @@ export default function Home() {
                         <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
                           NEW
                         </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMobileNavSelect('pro')}
+                      className={`${mobileNavButtonClass('pro')} ${activeTab === 'pro' ? 'border-amber-400 bg-amber-500/20' : ''}`}
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        Become <ProBadge size="sm" clickable={false} />
                       </span>
                     </button>
                     <button
@@ -2193,8 +2204,8 @@ export default function Home() {
               <button
                 onClick={() => setActiveTab('leaderboards')}
                 className={`px-4 py-3 font-medium transition-all duration-300 ${activeTab === 'leaderboards'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
                 Leaderboards
@@ -2202,8 +2213,8 @@ export default function Home() {
               <button
                 onClick={() => setActiveTab('search')}
                 className={`px-4 py-3 font-medium transition-all duration-300 ${activeTab === 'search'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
                 Search
@@ -2211,17 +2222,17 @@ export default function Home() {
               <button
                 onClick={() => setActiveTab('favorites')}
                 className={`px-4 py-3 font-medium transition-all duration-300 ${activeTab === 'favorites'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
-                Favourites
+                Favs
               </button>
               <button
                 onClick={() => setActiveTab('replays')}
                 className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'replays'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
                 <span className="inline-flex items-center gap-2 whitespace-nowrap">
@@ -2234,8 +2245,8 @@ export default function Home() {
               <button
                 onClick={() => setActiveTab('stats')}
                 className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'stats'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
                 <span className="inline-flex items-center gap-2 whitespace-nowrap">
@@ -2244,6 +2255,16 @@ export default function Home() {
                     NEW
                   </span>
                 </span>
+              </button>
+              <button
+                onClick={() => setActiveTab('pro')}
+                className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'pro'
+                  ? 'text-white border-b-3 border-amber-400 bg-amber-500/20 shadow-lg'
+                  : 'text-amber-200 hover:text-amber-100 hover:bg-amber-500/10'
+                  }`}
+              >
+                <span>Become</span>
+                <ProBadge size="sm" clickable={false} />
               </button>
               <a
                 href="https://github.com/EnzeD/dow-leaderboards"
@@ -2268,8 +2289,8 @@ export default function Home() {
               <button
                 onClick={() => setActiveTab('support')}
                 className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center ${activeTab === 'support'
-                    ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
-                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
+                  ? 'text-white border-b-3 border-neutral-400 bg-neutral-800/50 shadow-lg'
+                  : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
                 <SupportTabKoFiButton />
@@ -2777,8 +2798,8 @@ export default function Home() {
                               country: result.personalStats?.profile?.country,
                             }, result)}
                             className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${isFavorite
-                                ? 'text-yellow-400 bg-neutral-800/70'
-                                : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
+                              ? 'text-yellow-400 bg-neutral-800/70'
+                              : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
                               } ${extraClasses}`.trim()}
                             aria-pressed={isFavorite}
                             disabled={!canFavorite}
@@ -3285,8 +3306,8 @@ export default function Home() {
                                   country: entry.country,
                                 })}
                                 className={`inline-flex items-center justify-center rounded-full border border-neutral-600/40 px-3 py-1 transition ${isFavorite
-                                    ? 'text-yellow-400 bg-neutral-800/70'
-                                    : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
+                                  ? 'text-yellow-400 bg-neutral-800/70'
+                                  : 'text-neutral-300 hover:text-yellow-300 hover:bg-neutral-800/40'
                                   }`}
                                 aria-pressed={isFavorite}
                                 title={isFavorite ? 'Remove from favourites' : 'Add to favourites'}
@@ -3400,6 +3421,10 @@ export default function Home() {
             <StatsTab />
           )}
 
+          {/* Pro Tab Content */}
+          {activeTab === 'pro' && (
+            <ProTab />
+          )}
 
           {/* Support Tab Content */}
           {activeTab === 'support' && (
