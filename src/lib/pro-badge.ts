@@ -20,7 +20,7 @@ export async function getProBadgeStatus(profileId: string | number): Promise<Pro
   // Find app_user linked to this profile
   const { data: appUser } = await supabase
     .from("app_users")
-    .select("auth0_sub, show_pro_badge")
+    .select("stripe_subscription_status, premium_expires_at, show_pro_badge")
     .eq("primary_profile_id", profileId)
     .maybeSingle();
 
@@ -28,23 +28,16 @@ export async function getProBadgeStatus(profileId: string | number): Promise<Pro
     return { isProMember: false, showBadge: false };
   }
 
-  // Check subscription status
-  const { data: subscription } = await supabase
-    .from("premium_subscriptions")
-    .select("status, current_period_end")
-    .eq("auth0_sub", appUser.auth0_sub)
-    .maybeSingle();
-
-  if (!subscription) {
-    return { isProMember: false, showBadge: false };
-  }
-
   // Check if subscription is active
   const activeStatuses = ["active", "trialing", "past_due"];
-  const isActive = activeStatuses.includes(subscription.status || "");
+  const isActive = activeStatuses.includes(appUser.stripe_subscription_status || "");
 
-  const periodEnd = subscription.current_period_end;
-  const isFuture = periodEnd ? Date.parse(periodEnd) > Date.now() : false;
+  // If subscription is active but no expiry date, treat as valid (likely recurring subscription)
+  // If expiry date exists, check it's in the future
+  const periodEnd = appUser.premium_expires_at;
+  const isFuture = periodEnd
+    ? Date.parse(periodEnd) > Date.now()
+    : isActive; // If active with no expiry, consider it valid
 
   const isProMember = isActive && isFuture;
   const showBadge = isProMember && (appUser.show_pro_badge ?? true);
@@ -58,12 +51,15 @@ export async function getProBadgeStatus(profileId: string | number): Promise<Pro
  */
 export async function getBatchProBadgeStatus(
   profileIds: (string | number)[]
-): Promise<Map<string | number, ProBadgeStatus>> {
+): Promise<Map<string, ProBadgeStatus>> {
   const supabase = getSupabaseAdmin();
-  const resultMap = new Map<string | number, ProBadgeStatus>();
+  const resultMap = new Map<string, ProBadgeStatus>();
 
-  if (!supabase || profileIds.length === 0) {
-    profileIds.forEach(id => {
+  // Normalize all profile IDs to strings for consistent Map keys
+  const normalizedIds = profileIds.map(id => String(id));
+
+  if (!supabase || normalizedIds.length === 0) {
+    normalizedIds.forEach(id => {
       resultMap.set(id, { isProMember: false, showBadge: false });
     });
     return resultMap;
@@ -72,26 +68,15 @@ export async function getBatchProBadgeStatus(
   // Get all app_users linked to these profiles
   const { data: appUsers } = await supabase
     .from("app_users")
-    .select("auth0_sub, primary_profile_id, show_pro_badge")
+    .select("primary_profile_id, stripe_subscription_status, premium_expires_at, show_pro_badge")
     .in("primary_profile_id", profileIds);
 
   if (!appUsers || appUsers.length === 0) {
-    profileIds.forEach(id => {
+    normalizedIds.forEach(id => {
       resultMap.set(id, { isProMember: false, showBadge: false });
     });
     return resultMap;
   }
-
-  // Get all subscriptions for these users
-  const auth0Subs = appUsers.map(u => u.auth0_sub);
-  const { data: subscriptions } = await supabase
-    .from("premium_subscriptions")
-    .select("auth0_sub, status, current_period_end")
-    .in("auth0_sub", auth0Subs);
-
-  const subscriptionMap = new Map(
-    subscriptions?.map(s => [s.auth0_sub, s]) || []
-  );
 
   // Build result map
   const activeStatuses = ["active", "trialing", "past_due"];
@@ -101,25 +86,22 @@ export async function getBatchProBadgeStatus(
     const profileId = appUser.primary_profile_id;
     if (!profileId) return;
 
-    const subscription = subscriptionMap.get(appUser.auth0_sub);
-    if (!subscription) {
-      resultMap.set(profileId, { isProMember: false, showBadge: false });
-      return;
-    }
-
-    const isActive = activeStatuses.includes(subscription.status || "");
-    const isFuture = subscription.current_period_end
-      ? Date.parse(subscription.current_period_end) > now
-      : false;
+    const isActive = activeStatuses.includes(appUser.stripe_subscription_status || "");
+    // If subscription is active but no expiry date, treat as valid (likely recurring subscription)
+    // If expiry date exists, check it's in the future
+    const isFuture = appUser.premium_expires_at
+      ? Date.parse(appUser.premium_expires_at) > now
+      : isActive; // If active with no expiry, consider it valid
 
     const isProMember = isActive && isFuture;
     const showBadge = isProMember && (appUser.show_pro_badge ?? true);
 
-    resultMap.set(profileId, { isProMember, showBadge });
+    // Normalize profileId to string for consistent Map keys
+    resultMap.set(String(profileId), { isProMember, showBadge });
   });
 
   // Fill in missing profiles
-  profileIds.forEach(id => {
+  normalizedIds.forEach(id => {
     if (!resultMap.has(id)) {
       resultMap.set(id, { isProMember: false, showBadge: false });
     }
