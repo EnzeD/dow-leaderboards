@@ -21,6 +21,8 @@ import { AccountIcon } from "@/components/icons";
 import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
 import { AccountDropdown } from "@/app/_components/AccountDropdown";
 import ProBadge from "@/components/ProBadge";
+import { getEventTracker } from "@/lib/analytics/event-tracker";
+import { NavigationContext } from "@/lib/analytics/navigation-context";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -572,6 +574,13 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<TabType>('leaderboards');
   const [returnToProfile, setReturnToProfile] = useState<string | undefined>(undefined);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Initialize event tracker with auth0 sub
+  const eventTracker = useRef(getEventTracker(authUser?.sub || null));
+  useEffect(() => {
+    eventTracker.current.setAuth0Sub(authUser?.sub || null);
+  }, [authUser?.sub]);
+
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
   const [ladderData, setLadderData] = useState<LadderData | null>(null);
@@ -928,6 +937,14 @@ export default function Home() {
   // Initialize from URL and handle back/forward
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Track page view on mount
+    const { trackPageView } = require('@/lib/analytics/tracking-helpers');
+    trackPageView({
+      pageName: 'home',
+      auth0Sub: authUser?.sub || null,
+    });
+
     // 1) Apply URL params to local state on first load
     const initialFromUrl = parseStateFromUrl();
     if (initialFromUrl.view === 'search') {
@@ -1359,6 +1376,20 @@ export default function Home() {
     const q = (name || '').trim();
     if (!q) return;
 
+    // Track profile view if we have a profile ID
+    if (profileId) {
+      NavigationContext.setLastVisitedProfile(profileId, name);
+      eventTracker.current.track({
+        event_type: 'feature_interaction',
+        event_name: 'profile_viewed',
+        properties: {
+          profile_id: profileId,
+          player_name: name,
+          source: 'search_click'
+        }
+      });
+    }
+
     // If we have a profile ID, use the precise search method
     if (profileId) {
       setSearchQuery(q);
@@ -1424,6 +1455,18 @@ export default function Home() {
     _setSelectedPlayer(player);
     setSearchQuery(player.current_alias);
     _setSearchProfileId(player.profile_id);
+
+    // Track profile view from autocomplete
+    NavigationContext.setLastVisitedProfile(player.profile_id, player.current_alias);
+    eventTracker.current.track({
+      event_type: 'feature_interaction',
+      event_name: 'profile_viewed',
+      properties: {
+        profile_id: player.profile_id,
+        player_name: player.current_alias,
+        source: 'autocomplete_select'
+      }
+    });
 
     // Use the rich existing search API and filter results by profile ID
     try {
@@ -1798,6 +1841,40 @@ export default function Home() {
     if (typeof window === 'undefined') return;
 
     try {
+      // Get previous tab for context
+      const previousTab = NavigationContext.getCurrentTab();
+
+      // Track all page views
+      const baseProperties = {
+        page_name: tab,
+        previous_page: previousTab,
+      };
+
+      // Add tab-specific properties
+      if (tab === 'pro') {
+        eventTracker.current.track({
+          event_type: 'page_view',
+          event_name: 'page_viewed',
+          properties: {
+            ...baseProperties,
+            is_pro_member: subscriptionActive,
+            has_used_trial: account?.appUser?.has_used_trial || false,
+            profile_linked: !!linkedProfileId,
+            return_to_profile: returnToProfileParam || null
+          }
+        });
+      } else if (tab === 'search' || tab === 'favorites' || tab === 'replays' || tab === 'stats' || tab === 'support') {
+        eventTracker.current.track({
+          event_type: 'page_view',
+          event_name: 'page_viewed',
+          properties: baseProperties
+        });
+      }
+      // Note: 'leaderboards' tab is the default/home page, could track if needed
+
+      // Update navigation context
+      NavigationContext.setCurrentTab(tab);
+
       // Update state
       setActiveTab(tab);
       setReturnToProfile(returnToProfileParam);
@@ -3592,14 +3669,32 @@ export default function Home() {
                 setActiveTab('search');
                 setSearchQuery(playerName);
 
-                // Trigger the search
-                await handlePlayerSearch(playerName, { pushHistory: true });
+                // Track profile view if clicked from replays
+                if (profileId) {
+                  NavigationContext.setLastVisitedProfile(profileId, playerName);
+                  eventTracker.current.track({
+                    event_type: 'feature_interaction',
+                    event_name: 'profile_viewed',
+                    properties: {
+                      profile_id: profileId,
+                      player_name: playerName,
+                      source: 'replays_click'
+                    }
+                  });
+                }
+
+                // Trigger the search with profile ID if available
+                if (profileId) {
+                  await runSearchByName(playerName, profileId);
+                } else {
+                  await handlePlayerSearch(playerName, { pushHistory: true });
+                }
               }}
             />
           )}
 
           {activeTab === 'stats' && (
-            <StatsTab />
+            <StatsTab auth0Sub={authUser?.sub || null} />
           )}
 
           {/* Pro Tab Content */}
