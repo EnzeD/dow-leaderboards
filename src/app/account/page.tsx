@@ -621,12 +621,12 @@ export default async function AccountPage({ searchParams }: PageProps) {
             <ManageSubscriptionButton stripeCustomerId={stripeCustomerId} />
           )}
           {pendingActivation && (
-            <span className="text-xs text-amber-300">
+            <span className="self-center text-xs text-amber-300">
               Activation pending — refresh after a minute or open the billing portal to verify your payment.
             </span>
           )}
           {premiumStatusNote && !pendingActivation && (
-            <span className={`text-xs ${premiumStatusTone}`}>
+            <span className={`self-center text-xs ${premiumStatusTone}`}>
               {premiumStatusNote}
             </span>
           )}
