@@ -29,7 +29,10 @@ export default function ProTab() {
             <ProBadge size="lg" clickable={false} />
           </div>
           <p className="text-base sm:text-lg text-neutral-300 mb-6">
-            Track what matters. Fix your weaknesses. Climb faster.
+            Track all your matches. Find what to improve. Climb to the top of the ladder.
+          </p>
+          <p className="text-base sm:text-lg text-neutral-300 mb-6">
+            Fullfil the Emperor's will.
           </p>
 
           {isProMember ? (
@@ -65,7 +68,7 @@ export default function ProTab() {
         <div className="grid lg:grid-cols-[1fr_3fr] gap-14 items-center">
           <div className="order-2 lg:order-1">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              &quot;The Emperor tracks.&quot;
+              &quot;The Emperor watches.&quot;
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Track your progress over time</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
@@ -120,7 +123,7 @@ export default function ProTab() {
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Find your bad matchups</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
-              You know you struggle against certain factions, but which ones exactly? The matchup matrix breaks down your win rate for every faction pairing. Stop blaming balance patches and start fixing the matchups you actually lose.
+              You know you struggle against certain factions, but which ones exactly? The matchup matrix breaks down your win rate for every faction pairing. Start fixing the matchups you actually lose.
             </p>
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
@@ -149,7 +152,7 @@ export default function ProTab() {
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Master your map pool</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
-              Vetoes matter in ranked. Map analytics shows your win rate and recent form on every map. Struggling on a specific map? You&apos;ll see it instantly. Dominating certain maps? Prioritize them in your veto strategy.
+              Map analytics shows your win rate and recent form on every map. Struggling on a specific map? You&apos;ll see it instantly. Dominating certain maps? Prioritize them in tournaments.
             </p>
             <ul className="space-y-2 text-sm text-neutral-400">
               <li className="flex items-start gap-2">
@@ -196,9 +199,9 @@ export default function ProTab() {
           </div>
           <div className="order-2">
             <div className="mb-3 text-xs italic text-amber-400/80">
-              &quot;The Emperor knows.&quot;
+              &quot;The Emperor spies.&quot;
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Study your rivals</h3>
+            <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Study your friends and rivals</h3>
             <p className="text-neutral-300 text-sm sm:text-base mb-4 leading-relaxed">
               Queue into the same players often? <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> tracks your head-to-head records against everyone you face regularly. See who you dominate, who&apos;s your nemesis, and which matchups you need to study replays for.
             </p>
@@ -245,7 +248,7 @@ export default function ProTab() {
             <span className="text-lg text-neutral-300">/month</span>
           </div>
           <p className="text-sm text-neutral-400 mb-6">
-            7-day free trial. No commitment. Less than a coffee per month to support the site and improve faster.
+            7-day free trial. No commitment. Less than a coffee per month to support the site and improve faster. The Emperors thanks you personally for keeping this website alive.
           </p>
           {!isProMember && (
             <Link
@@ -285,7 +288,7 @@ export default function ProTab() {
               What if I cancel and rejoin later?
             </summary>
             <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
-              All your historical data stays in the database. Rejoin whenever and pick up right where you left off.
+              All your historical data stays in the database. You may have a gap in your data, as the bot will stop running for you. Rejoin whenever and pick up right where you left off.
             </p>
           </details>
 
@@ -303,7 +306,7 @@ export default function ProTab() {
               Why does this cost money?
             </summary>
             <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
-              Running dedicated crawlers, storing historical data, and maintaining this site costs real money. <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> keeps the lights on while giving you better tools to improve.
+              Running dedicated crawlers, storing historical data, and maintaining this site costs real money. <span className="inline-flex items-center scale-75 -mx-1"><ProBadge size="sm" clickable={false} /></span> keeps the lights on while giving you better tools to improve. This is a labor of love, and your support keeps it alive. If someday we generate benefits, we will give that for tournaments.
             </p>
           </details>
         </div>

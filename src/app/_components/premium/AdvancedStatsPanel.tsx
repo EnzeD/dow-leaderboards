@@ -10,6 +10,7 @@ import MatchupMatrixCard from "./MatchupMatrixCard";
 import MapPerformanceCard from "./MapPerformanceCard";
 import FrequentOpponentsCard, { MatchScope } from "./FrequentOpponentsCard";
 import ProfileOverviewCard, { ProfileOverview } from "./ProfileOverviewCard";
+import ProBadge from "@/components/ProBadge";
 
 type LockedCtaState = {
   label?: string;
@@ -25,6 +26,7 @@ export type AdvancedStatsPanelProps = {
   ctaState?: LockedCtaState;
   variant?: "standalone" | "embedded";
   onPlayerNavigate?: (alias: string, profileId?: string) => void;
+  onNavigateToPro?: () => void;
 };
 
 type AdvancedStatsSection = "elo" | "matchups" | "maps" | "opponents";
@@ -62,6 +64,7 @@ export default function AdvancedStatsPanel({
   ctaState,
   variant = "standalone",
   onPlayerNavigate,
+  onNavigateToPro,
 }: AdvancedStatsPanelProps) {
   const activation = useAdvancedStatsActivation(profileId);
   const leaderboards = useCombinedLeaderboards();
@@ -191,7 +194,9 @@ export default function AdvancedStatsPanel({
 
   const intro = (
     <div>
-      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400">Pro Analytics</p>
+      <p className="text-xs uppercase tracking-[0.4em] text-yellow-400 inline-flex items-baseline gap-1.5">
+        Advanced Statistics <ProBadge size="xs" clickable={Boolean(onNavigateToPro)} onNavigateToPro={onNavigateToPro} />
+      </p>
       <p className={descriptionClass}>
         Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
       </p>
@@ -227,6 +232,7 @@ export default function AdvancedStatsPanel({
           ctaLabel={ctaState?.label}
           ctaDescription={ctaState?.description}
           ctaLoading={ctaState?.loading}
+          onNavigateToPro={onNavigateToPro}
         />
       </AdvancedStatsContext.Provider>
     );
@@ -241,11 +247,10 @@ export default function AdvancedStatsPanel({
             key={id}
             type="button"
             onClick={() => setActiveSection(id)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
-              active
-                ? 'bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow'
-                : 'bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
-            }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${active
+              ? 'bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow'
+              : 'bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white'
+              }`}
           >
             {label}
           </button>
@@ -369,6 +374,7 @@ type LockedAdvancedStatsPreviewProps = {
   ctaLabel?: string;
   ctaDescription?: string;
   ctaLoading?: boolean;
+  onNavigateToPro?: () => void;
 };
 
 function LockedAdvancedStatsPreview({
@@ -379,28 +385,43 @@ function LockedAdvancedStatsPreview({
   ctaLabel,
   ctaDescription,
   ctaLoading,
+  onNavigateToPro,
 }: LockedAdvancedStatsPreviewProps) {
   const [activeSection, setActiveSection] = useState<AdvancedStatsSection>("elo");
   const effectiveLoading = loading || Boolean(ctaLoading);
   const defaultLabel =
     reason === "not_authenticated"
       ? "Sign in to continue"
-      : "Go Pro";
+      : "Discover what's in Pro";
   const buttonLabel = effectiveLoading
     ? "Opening..."
     : ctaLabel ?? defaultLabel;
   const reasonMessage = (() => {
     switch (reason) {
-      case "not_authenticated":
-        return "Sign in to your account to unlock Pro analytics.";
       case "profile_not_linked":
-        return "Link your Dawn of War profile on the account page to enable Pro insights.";
+        return (
+          <span className="inline-flex items-center gap-1 flex-wrap">
+            Link your Dawn of War profile on the account page to enable <ProBadge size="xs" clickable={false} /> insights.
+          </span>
+        );
       case "profile_mismatch":
-        return "You can only view Pro analytics for your own linked profile.";
+        return (
+          <span className="inline-flex items-center gap-1 flex-wrap">
+            You can only view <ProBadge size="xs" clickable={false} /> analytics for your own linked profile.
+          </span>
+        );
       case "not_subscribed":
-        return "Pro analytics require an active membership. Start your free one-week trial.";
+        return (
+          <span className="inline-flex items-center gap-1 flex-wrap">
+            <ProBadge size="xs" clickable={false} /> analytics require an active membership. Start your free one-week trial.
+          </span>
+        );
       case "supabase_unavailable":
-        return "Pro analytics are temporarily unavailable. Please try again shortly.";
+        return (
+          <span className="inline-flex items-center gap-1 flex-wrap">
+            <ProBadge size="xs" clickable={false} /> analytics are temporarily unavailable. Please try again shortly.
+          </span>
+        );
       default:
         return null;
     }
@@ -430,7 +451,11 @@ function LockedAdvancedStatsPreview({
               </svg>
             </span>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-white">Pro analytics</p>
+              <p className="text-sm font-semibold text-white">
+                <span className="inline-flex items-baseline gap-1.5">
+                  Advanced Statistics <ProBadge size="sm" clickable={Boolean(onNavigateToPro)} onNavigateToPro={onNavigateToPro} />
+                </span>
+              </p>
               <p className="text-xs text-neutral-300">
                 Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
               </p>
@@ -442,13 +467,17 @@ function LockedAdvancedStatsPreview({
             </div>
           </div>
           <div className="flex shrink-0 flex-col text-xs text-neutral-400 sm:text-right">
-            <span className="uppercase tracking-wide text-yellow-300">Dow: DE Pro</span>
+            <span className="uppercase tracking-wide text-yellow-300 inline-flex items-center justify-end gap-1.5">
+              Built for Dawn of War
+            </span>
             <span>Everything you need to climb.</span>
           </div>
         </div>
       </header>
       <section className="rounded-2xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
-        <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-400">Why go Pro</h3>
+        <h3 className="text-sm font-semibold uppercase tracking-[0.1em] text-neutral-400 inline-flex items-center gap-2">
+          Why go <ProBadge size="xs" clickable={false} />
+        </h3>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {VALUE_POINTS.map((point, index) => (
             <li key={point} className="flex items-start gap-3 text-sm text-neutral-200">
@@ -491,11 +520,10 @@ function LockedAdvancedStatsPreview({
                 key={id}
                 type="button"
                 onClick={() => setActiveSection(id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${
-                  active
-                    ? "bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow"
-                    : "bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white"
-                }`}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition ${active
+                  ? "bg-yellow-500/20 text-yellow-200 border-yellow-500/40 shadow"
+                  : "bg-neutral-900/60 text-neutral-300 border-neutral-700/60 hover:bg-neutral-800/60 hover:text-white"
+                  }`}
               >
                 {label}
               </button>
@@ -525,7 +553,7 @@ function LockedAdvancedStatsPreview({
             )}
             <button
               type="button"
-              onClick={onActivate}
+              onClick={onNavigateToPro || onActivate}
               disabled={effectiveLoading}
               className="inline-flex items-center justify-center gap-2 rounded-md border border-yellow-400/30 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:opacity-70"
             >
@@ -566,7 +594,7 @@ const LockedStatCard = ({ title, subtitle }: LockedStatCardProps) => (
   </div>
 );
 
-export const AdvancedStatsCollapsedPreview = ({ displayName }: { displayName: string }) => (
+export const AdvancedStatsCollapsedPreview = ({ displayName, onNavigateToPro }: { displayName: string; onNavigateToPro?: () => void }) => (
   <div className="space-y-4 rounded-xl border border-neutral-700/40 bg-neutral-900/70 p-4 shadow-lg">
     <header className="rounded-xl border border-yellow-500/25 bg-neutral-900/80 p-4 shadow-lg">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -589,7 +617,11 @@ export const AdvancedStatsCollapsedPreview = ({ displayName }: { displayName: st
             </svg>
           </span>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-white">Advanced statistics</p>
+            <p className="text-sm font-semibold text-white">
+              <span className="inline-flex items-baseline gap-1.5">
+                Advanced Statistics <ProBadge size="sm" clickable={Boolean(onNavigateToPro)} onNavigateToPro={onNavigateToPro} />
+              </span>
+            </p>
             <p className="text-xs text-neutral-300">
               Detailed insights for {displayName} across ratings, matchups, maps, and opponents.
             </p>

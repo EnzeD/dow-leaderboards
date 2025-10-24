@@ -549,7 +549,7 @@ export default function Home() {
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
   const accountButtonLabel = linkedAlias ?? "Account";
   const advancedStatsCta = {
-    label: "Activate advanced statistics",
+    label: "Discover what's in Pro",
     description: "Unlock Elo trends, matchup intel, and more.",
     loading: accountLoading,
   };
@@ -1780,6 +1780,37 @@ export default function Home() {
     }
   };
 
+  const navigateToTab = (tab: TabType) => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      // Build new state
+      const newState: AppState = {
+        view: tab,
+        searchQuery: '',
+        selectedFaction,
+        selectedMatchType,
+        selectedCountry,
+        selectedId,
+        combinedViewMode,
+      };
+
+      // Push to history (so back button works)
+      const newUrl = buildUrl(newState);
+      window.history.pushState(newState, '', newUrl);
+
+      // Update tab state
+      setActiveTab(tab);
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Navigation failed', error);
+      // Fallback to simple tab change
+      setActiveTab(tab);
+    }
+  };
+
   const handleSupportLink = () => activateTabFromFooter('support');
 
   const toggleFavorite = (
@@ -2366,7 +2397,7 @@ export default function Home() {
                 </span>
               </button>
               <button
-                onClick={() => setActiveTab('pro')}
+                onClick={() => navigateToTab('pro')}
                 className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'pro'
                   ? 'text-white border-b-3 border-amber-400 bg-amber-500/20 shadow-lg'
                   : 'text-amber-200 hover:text-amber-100 hover:bg-amber-500/10'
@@ -2735,7 +2766,7 @@ export default function Home() {
                                     {row.playerName}
                                   </button>
                                   {proBadgeStatuses[row.profileId]?.showBadge && (
-                                    <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                    <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                                   )}
                                   {row.level && (
                                     <span className="text-xs text-neutral-400 bg-neutral-800 px-1.5 py-0.5 rounded">
@@ -2797,7 +2828,7 @@ export default function Home() {
                                 {row.playerName}
                               </button>
                               {proBadgeStatuses[row.profileId]?.showBadge && (
-                                <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                               )}
                               {row.level && (
                                 <span className="text-xs text-neutral-400 bg-neutral-800 px-1 py-0.5 rounded">
@@ -2945,7 +2976,7 @@ export default function Home() {
                               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <h4 className="text-white font-medium">{result.playerName}</h4>
                                 {profileIdStr && proBadgeStatuses[profileIdStr]?.showBadge && (
-                                  <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                  <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                                 )}
                                 {result.personalStats?.profile?.country && (
                                   <div className="flex items-center gap-1">
@@ -3025,6 +3056,7 @@ export default function Home() {
                                   ? (
                                     <AdvancedStatsCollapsedPreview
                                       displayName={aliasPrimary || aliasFallback || profileIdStr}
+                                      onNavigateToPro={() => navigateToTab('pro')}
                                     />
                                   ) : (
                                     <AdvancedStatsPanel
@@ -3039,6 +3071,7 @@ export default function Home() {
                                       ctaState={advancedStatsCta}
                                       variant="embedded"
                                       onPlayerNavigate={runSearchByName}
+                                      onNavigateToPro={() => navigateToTab('pro')}
                                     />
                                   )}
                               </div>
@@ -3230,7 +3263,7 @@ export default function Home() {
                                                     )}
                                                   </button>
                                                   {!entry.isSelf && entry.profileId && proBadgeStatuses[entry.profileId]?.showBadge && (
-                                                    <ProBadge size="xs" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                                                    <ProBadge size="xs" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                                                   )}
                                                   </span>
                                                 </Fragment>
@@ -3400,7 +3433,7 @@ export default function Home() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-white font-medium">{displayName}</h4>
                             {entry.profileId && proBadgeStatuses[String(entry.profileId)]?.showBadge && (
-                              <ProBadge size="sm" clickable={true} onNavigateToPro={() => setActiveTab('pro')} />
+                              <ProBadge size="sm" clickable={true} onNavigateToPro={() => navigateToTab('pro')} />
                             )}
                             {countryCode && (
                               <div className="flex items-center gap-1">
@@ -3508,6 +3541,7 @@ export default function Home() {
                               ? (
                                 <AdvancedStatsCollapsedPreview
                                   displayName={entry.alias || entry.playerName || String(entry.profileId)}
+                                  onNavigateToPro={() => navigateToTab('pro')}
                                 />
                               ) : (
                                 <AdvancedStatsPanel
@@ -3522,6 +3556,7 @@ export default function Home() {
                                   ctaState={advancedStatsCta}
                                   variant="embedded"
                                   onPlayerNavigate={runSearchByName}
+                                  onNavigateToPro={() => navigateToTab('pro')}
                                 />
                               )}
                           </div>
