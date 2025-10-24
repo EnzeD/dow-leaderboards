@@ -277,7 +277,7 @@ CREATE TABLE public.premium_subscriptions (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT premium_subscriptions_pkey PRIMARY KEY (auth0_sub),
-  CONSTRAINT premium_subscriptions_auth0_sub_fkey FOREIGN KEY (auth0_sub) REFERENCES public.app_users(auth0_sub)
+  CONSTRAINT premium_subscriptions_auth0_sub_fkey FOREIGN KEY (auth0_sub) REFERENCES public.app_users(auth0_sub) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE TABLE public.races (
   id smallint NOT NULL,
