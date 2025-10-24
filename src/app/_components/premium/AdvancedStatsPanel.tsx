@@ -555,7 +555,7 @@ function LockedAdvancedStatsPreview({
               type="button"
               onClick={onNavigateToPro || onActivate}
               disabled={effectiveLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-yellow-400/30 bg-yellow-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-yellow-300 disabled:opacity-70"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-amber-400/60 bg-amber-400 px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:bg-amber-300 disabled:opacity-70"
             >
               {buttonLabel}
             </button>

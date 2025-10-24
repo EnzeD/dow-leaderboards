@@ -1624,7 +1624,7 @@ const isTrialEligible = session && !hasUsedTrial && !isProMember;
 <p className="text-sm text-neutral-400">
   {isTrialEligible
     ? "7-day free trial • Cancel anytime • No commitment"
-    : "$4.99/month • Cancel anytime"
+    : "7-day free trial • $4.99/month • Cancel anytime • No commitment"
   }
 </p>
 ```

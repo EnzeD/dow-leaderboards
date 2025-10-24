@@ -2,22 +2,29 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import ProBadge from "@/components/ProBadge";
 import { useAccount } from "./AccountProvider";
 
 export default function ProTab() {
   const { account } = useAccount();
+  const searchParams = useSearchParams();
+  const returnToProfile = searchParams.get("returnTo");
+
   const isProMember = account?.subscription?.active ?? false;
   const profileId = account?.profile?.profileId ?? null;
   const authUser = account?.user ?? null;
   const hasUsedTrial = account?.appUser?.has_used_trial ?? false;
   const isTrialEligible = authUser && !hasUsedTrial && !isProMember;
 
+  // Build CTA URL with returnToProfile if available
   const ctaUrl = authUser
     ? profileId
-      ? `/account?subscribe=true&profileId=${profileId}`
-      : "/account?subscribe=true"
-    : "/login?redirectTo=/account";
+      ? `/account?subscribe=true&profileId=${profileId}${returnToProfile ? `&returnTo=${returnToProfile}` : ''}`
+      : `/account?subscribe=true${returnToProfile ? `&returnTo=${returnToProfile}` : ''}`
+    : returnToProfile
+      ? `/login?redirectTo=${encodeURIComponent(`/account?subscribe=true&returnTo=${returnToProfile}`)}`
+      : `/login?redirectTo=${encodeURIComponent('/account?subscribe=true')}`;
 
   return (
     <div className="space-y-8">
@@ -25,12 +32,8 @@ export default function ProTab() {
       <div className="bg-gradient-to-br from-amber-500/5 via-neutral-900/60 to-neutral-900/80 border border-amber-400/20 rounded-lg p-6 sm:p-8 shadow-xl">
         <div className="max-w-3xl mx-auto text-center">
           <div className="mb-4 flex items-center justify-center gap-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white">Become</h2>
-            <ProBadge size="lg" clickable={false} />
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">Win more games. Understand every match.</h2>
           </div>
-          <p className="text-base sm:text-lg text-neutral-300 mb-6">
-            Track all your matches. Find what to improve. Climb to the top of the ladder.
-          </p>
           <p className="text-base sm:text-lg text-neutral-300 mb-6">
             Fullfil the Emperor's will.
           </p>
@@ -49,14 +52,14 @@ export default function ProTab() {
             <div className="flex flex-col items-center gap-3">
               <Link
                 href={ctaUrl}
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-500 px-6 py-3 text-lg font-bold text-neutral-900 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400"
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-400 px-6 py-3 text-lg font-bold text-neutral-900 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300"
               >
-                {authUser ? "Start 7-day trial" : "Sign in to start"}
+                {authUser ? "Start my free trial" : "Start my free trial"}
               </Link>
               <p className="text-xs text-neutral-400">
                 {isTrialEligible
-                  ? "7-day free trial • Cancel anytime • No commitment"
-                  : "$4.99/month • Cancel anytime"}
+                  ? "7-day free trial • Cancel anytime • No commitment • Support this website <3"
+                  : "7-day free trial • $4.99/month • Cancel anytime • No commitment • Support this website <3"}
               </p>
             </div>
           )}
@@ -253,9 +256,9 @@ export default function ProTab() {
           {!isProMember && (
             <Link
               href={ctaUrl}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-500 px-6 py-3 text-lg font-bold text-neutral-900 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-400/60 bg-amber-400 px-6 py-3 text-lg font-bold text-neutral-900 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300"
             >
-              {authUser ? "Start 7-day trial" : "Sign in to start"}
+              {authUser ? "Start 7-day trial" : "Start my free trial"}
             </Link>
           )}
         </div>
