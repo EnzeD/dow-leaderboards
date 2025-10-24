@@ -2298,12 +2298,7 @@ export default function Home() {
                       onClick={() => handleMobileNavSelect('replays')}
                       className={mobileNavButtonClass('replays')}
                     >
-                      <span className="flex items-center gap-2">
-                        Replays
-                        <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
-                          NEW
-                        </span>
-                      </span>
+                      <span>Replays</span>
                     </button>
                     <button
                       type="button"
@@ -2468,12 +2463,7 @@ export default function Home() {
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
-                <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                  Replays
-                  <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
-                    NEW
-                  </span>
-                </span>
+                Replays
               </button>
               <button
                 onClick={() => setActiveTab('stats')}
@@ -2493,7 +2483,7 @@ export default function Home() {
                 onClick={() => navigateToTab('pro')}
                 className={`px-4 py-3 font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'pro'
                   ? 'text-white border-b-3 border-amber-400 bg-amber-500/20 shadow-lg'
-                  : 'text-amber-200 hover:text-amber-100 hover:bg-amber-500/10'
+                  : 'text-neutral-300 hover:text-white hover:bg-amber-500/10'
                   }`}
               >
                 <span>Become</span>
