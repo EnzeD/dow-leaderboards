@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import { getStripe } from "@/lib/stripe";
 import { sanitizeEmail, upsertAppUser } from "@/lib/app-users";
-import { getSupabaseAdmin } from "@/lib/premium/subscription-server";
+import { getSupabaseAdmin, isStripeSubscriptionActive } from "@/lib/premium/subscription-server";
 
 const resolveBaseUrl = () => {
   const raw =
@@ -74,15 +74,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "lookup_failed" }, { status: 500 });
   }
 
-  // Check if user already used trial
-  const hasUsedTrial = appUser?.has_used_trial ?? false;
+  // Check if user has an active subscription
+  const { data: existingSubscription } = await supabase
+    .from("premium_subscriptions")
+    .select("status, cancel_at_period_end, current_period_end")
+    .eq("auth0_sub", session.user.sub)
+    .maybeSingle();
 
-  if (hasUsedTrial) {
+  const hasActiveSubscription = existingSubscription && isStripeSubscriptionActive(existingSubscription);
+
+  if (hasActiveSubscription) {
     return NextResponse.json({
-      error: "trial_already_used",
-      message: "You've already used your free trial. You can still subscribe for $4.99/month."
+      error: "active_subscription_exists",
+      message: "You already have an active Pro subscription. Please manage your subscription in the billing portal."
     }, { status: 400 });
   }
+
+  // Track if user has used trial (affects checkout session creation)
+  const hasUsedTrial = appUser?.has_used_trial ?? false;
 
   const profileId =
     requestedProfileId ??
@@ -169,7 +178,8 @@ export async function POST(request: Request) {
       metadata,
       subscription_data: {
         metadata,
-        trial_period_days: 7,
+        // Only include trial if user hasn't used it before
+        ...(hasUsedTrial ? {} : { trial_period_days: 7 }),
       },
       line_items: [
         {
