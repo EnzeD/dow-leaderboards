@@ -198,58 +198,33 @@ export default function EloHistoryCard({ profileId, leaderboardId, windowDays }:
     };
   }, []);
 
-  // Process data for selected leaderboard
-  const chartData = useMemo(() => {
-    if (allData.length === 0) return [];
-
-    // Group by leaderboard to find which ones the player has
+  const samplesByLeaderboard = useMemo(() => {
     const byLeaderboard = new Map<number, EloSample[]>();
     allData.forEach(sample => {
-      // Include combined (-1) now
       if (!byLeaderboard.has(sample.leaderboardId)) {
         byLeaderboard.set(sample.leaderboardId, []);
       }
       byLeaderboard.get(sample.leaderboardId)!.push(sample);
     });
+    return byLeaderboard;
+  }, [allData]);
 
-    // Auto-select best leaderboard on first load
-    if (selectedLeaderboard === null && byLeaderboard.size > 0) {
-      let bestLb = -1;
-      let highestRating = 0;
-
-      byLeaderboard.forEach((samples, lbId) => {
-        const maxRating = Math.max(...samples.map(s => s.rating || 0));
-        if (maxRating > highestRating) {
-          highestRating = maxRating;
-          bestLb = lbId;
-        }
-      });
-
-      if (bestLb !== -1) {
-        setSelectedLeaderboard(bestLb);
-      }
-    }
-
-    // Get data for selected leaderboard
-    const lbId = selectedLeaderboard ?? -1;
-    const samples = byLeaderboard.get(lbId) || [];
-
+  const chartData = useMemo(() => {
+    if (selectedLeaderboard === null) return [];
+    const samples = samplesByLeaderboard.get(selectedLeaderboard) ?? [];
     return samples
+      .slice()
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
       .map(sample => ({
         timestamp: sample.timestamp,
         rating: sample.rating,
         rank: sample.rank,
       }));
-  }, [allData, selectedLeaderboard]);
+  }, [samplesByLeaderboard, selectedLeaderboard]);
 
   // Get available leaderboards for this player
   const playerLeaderboards = useMemo(() => {
-    const lbIds = new Set<number>();
-    allData.forEach(sample => {
-      lbIds.add(sample.leaderboardId);
-    });
-
+    const lbIds = new Set(samplesByLeaderboard.keys());
     return availableLeaderboards
       .filter(lb => {
         // Skip Custom leaderboard
@@ -258,15 +233,15 @@ export default function EloHistoryCard({ profileId, leaderboardId, windowDays }:
       })
       .sort((a, b) => {
         // Sort by max rating
-        const samplesA = allData.filter(s => s.leaderboardId === a.id);
-        const samplesB = allData.filter(s => s.leaderboardId === b.id);
+        const samplesA = samplesByLeaderboard.get(a.id) ?? [];
+        const samplesB = samplesByLeaderboard.get(b.id) ?? [];
         const maxA = Math.max(...samplesA.map(s => s.rating || 0));
         const maxB = Math.max(...samplesB.map(s => s.rating || 0));
         return maxB - maxA;
       })
       .map(lb => {
         // Add current rating to label
-        const samples = allData.filter(s => s.leaderboardId === lb.id);
+        const samples = samplesByLeaderboard.get(lb.id) ?? [];
         const latestRating = samples.length > 0
           ? samples[samples.length - 1].rating
           : null;
@@ -281,7 +256,19 @@ export default function EloHistoryCard({ profileId, leaderboardId, windowDays }:
 
         return { ...lb, labelWithRating: label };
       });
-  }, [allData, availableLeaderboards]);
+  }, [availableLeaderboards, samplesByLeaderboard]);
+
+  useEffect(() => {
+    if (selectedLeaderboard !== null) return;
+    if (playerLeaderboards.length === 0) {
+      const firstFromData = samplesByLeaderboard.keys().next();
+      if (!firstFromData.done) {
+        setSelectedLeaderboard(firstFromData.value);
+      }
+      return;
+    }
+    setSelectedLeaderboard(playerLeaderboards[0].id);
+  }, [playerLeaderboards, samplesByLeaderboard, selectedLeaderboard]);
 
   const selectedLeaderboardName = useMemo(() => {
     const lb = playerLeaderboards.find(l => l.id === selectedLeaderboard);
