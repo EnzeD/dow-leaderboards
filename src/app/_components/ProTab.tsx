@@ -35,7 +35,7 @@ export default function ProTab() {
             <h2 className="text-2xl sm:text-3xl font-bold text-white">Win more games. Understand every match.</h2>
           </div>
           <p className="text-base sm:text-lg text-neutral-300 mb-6">
-            Fullfil the Emperor's will.
+            Fullfil the Emperor&apos;s will.
           </p>
 
           {isProMember ? (
