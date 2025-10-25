@@ -580,6 +580,17 @@ export default function Home() {
   useEffect(() => {
     eventTracker.current.setAuth0Sub(authUser?.sub || null);
   }, [authUser?.sub]);
+  const trackTournamentDiscordClick = useCallback(() => {
+    eventTracker.current.track({
+      event_type: 'feature_interaction',
+      event_name: 'tournament_discord_click',
+      properties: {
+        tournament_name: 'Dawn of War World Championship',
+        cta_destination: 'discord',
+        location: 'header_tournament_banner'
+      }
+    });
+  }, []);
 
   const [leaderboards, setLeaderboards] = useState<Leaderboard[]>([]);
   const [selectedId, setSelectedId] = useState<number>(1);
@@ -2422,12 +2433,71 @@ export default function Home() {
                   )}
                 </div>
               </div>
-            </div>
           </div>
+        </div>
 
-          {/* Tab Navigation */}
-          <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
-            {/* Desktop Navigation */}
+        {/* Tournament Promo */}
+        <div className="mb-4 sm:mb-6">
+          <div className="flex flex-col gap-4 rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-4 shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
+            <div className="flex flex-1 items-start gap-4">
+              <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center self-center rounded-xl border border-neutral-700/60 bg-neutral-800/70 p-2 shadow-inner shadow-black/30">
+                <img
+                  src="/assets/world-championship.png"
+                  alt="Dawn of War World Championship logo"
+                  className="h-10 w-10"
+                  loading="lazy"
+                />
+              </span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-neutral-400">
+                  Tournament Spotlight
+                </span>
+                <h2 className="truncate text-lg font-semibold text-white sm:text-xl">
+                  Dawn of War World Championship
+                </h2>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-300 sm:text-base">
+                  <span>Starts Saturday, 15&nbsp;November&nbsp;2025 at 13:00 Moscow time.</span>
+                  <span className="inline-flex items-center gap-2 rounded-md border border-neutral-600/50 bg-neutral-700/30 px-3 py-1 text-sm font-semibold text-neutral-200 sm:text-base">
+                    <svg
+                      className="h-4 w-4 text-yellow-500/80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.6}
+                      aria-hidden="true"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m7-13a4 4 0 01-4 4h-6a4 4 0 01-4-4V5h14v3zM5 5h14M5 9C3.343 9 2 7.657 2 6V5h3m14 4c1.657 0 3-1.343 3-3V5h-3" />
+                    </svg>
+                    Prize pool: $1,470+
+                  </span>
+                </div>
+              </div>
+            </div>
+            <a
+              href="https://discord.gg/p6WNEuhgvV"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={trackTournamentDiscordClick}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
+            >
+              Join the Discord
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="mb-4 sm:mb-6 sm:border-b sm:border-neutral-700/60">
+          {/* Desktop Navigation */}
             <div className="hidden sm:flex items-end">
               <button
                 onClick={() => setActiveTab('leaderboards')}
