@@ -2438,7 +2438,7 @@ export default function Home() {
 
         {/* Tournament Promo - Hide after November 15, 2025 */}
         {new Date() < new Date('2025-11-16T00:00:00Z') && (
-          <div className="mb-4 sm:mb-6">
+          <div className="mb-1 sm:mb-2">
             <div className="flex flex-col gap-4 rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-4 shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
               <div className="flex flex-1 items-start gap-4">
                 <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center self-center rounded-xl border border-neutral-700/60 bg-neutral-800/70 p-2 shadow-inner shadow-black/30">
