@@ -133,6 +133,17 @@ export default function StatsMatchupsHeatmap() {
     });
   }, [state.data, factions]);
 
+  // Calculate overall winrate for each race (row)
+  const overallStats = useMemo(() => {
+    return matrix.map((rowCells) => {
+      const totalWins = rowCells.reduce((sum, cell) => sum + cell.wins, 0);
+      const totalLosses = rowCells.reduce((sum, cell) => sum + cell.losses, 0);
+      const totalMatches = totalWins + totalLosses;
+      const overallWinrate = totalMatches > 0 ? (totalWins / totalMatches) : null;
+      return { totalWins, totalLosses, totalMatches, overallWinrate };
+    });
+  }, [matrix]);
+
   const effectiveWindow = state.data?.windowDays ?? windowDays;
 
   return (
@@ -212,24 +223,37 @@ export default function StatsMatchupsHeatmap() {
                 </tr>
               </thead>
               <tbody>
-                {factions.map((rowFaction, rowIdx) => (
-                  <tr key={`row-${rowFaction.raceId}`} className="border-t border-neutral-800/60">
-                    <th className="sticky left-0 z-10 bg-neutral-950/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-300">
-                      <div className="flex items-center gap-2">
-                        {getFactionIcon(rowFaction.raceId) ? (
-                          <Image
-                            src={getFactionIcon(rowFaction.raceId)!}
-                            alt=""
-                            className="h-8 w-8 rounded-full border border-neutral-700/70 bg-neutral-900/80 p-1"
-                          />
-                        ) : (
-                          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/70 bg-neutral-900/80 text-[0.6rem] text-neutral-300">
-                            {rowFaction.shortName}
-                          </span>
-                        )}
-                        <span>{rowFaction.name}</span>
-                      </div>
-                    </th>
+                {factions.map((rowFaction, rowIdx) => {
+                  const stats = overallStats[rowIdx];
+                  const overallWinrateDisplay = formatWinrate(stats.overallWinrate);
+                  const totalMatchesDisplay = formatCount(stats.totalMatches);
+
+                  return (
+                    <tr key={`row-${rowFaction.raceId}`} className="border-t border-neutral-800/60">
+                      <th className="sticky left-0 z-10 bg-neutral-950/95 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-neutral-300">
+                        <div className="flex items-center gap-2">
+                          {getFactionIcon(rowFaction.raceId) ? (
+                            <Image
+                              src={getFactionIcon(rowFaction.raceId)!}
+                              alt=""
+                              className="h-8 w-8 rounded-full border border-neutral-700/70 bg-neutral-900/80 p-1"
+                            />
+                          ) : (
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-700/70 bg-neutral-900/80 text-[0.6rem] text-neutral-300">
+                              {rowFaction.shortName}
+                            </span>
+                          )}
+                          <div className="flex flex-col">
+                            <span>{rowFaction.name}</span>
+                            <span className="text-[0.65rem] font-normal normal-case tracking-normal text-neutral-400">
+                              {overallWinrateDisplay} overall
+                            </span>
+                            <span className="text-[0.65rem] font-normal normal-case tracking-normal text-neutral-500">
+                              {totalMatchesDisplay} matches
+                            </span>
+                          </div>
+                        </div>
+                      </th>
                     {factions.map((colFaction, colIdx) => {
                       const cell = matrix[rowIdx][colIdx];
                       const winrateDisplay = formatWinrate(cell.winrate);
@@ -254,7 +278,8 @@ export default function StatsMatchupsHeatmap() {
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
