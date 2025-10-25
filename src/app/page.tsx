@@ -2214,7 +2214,7 @@ export default function Home() {
       <div className="min-h-screen text-white">
         <div className="container mx-auto px-3 py-4 sm:px-6 sm:py-6 max-w-7xl">
           {/* Header */}
-          <div className="mb-4 sm:mb-8">
+          <div className="mb-4 sm:mb-2">
             {/* Mobile Header & Navigation */}
             <div className="sm:hidden sticky top-0 z-50 -mx-3 px-3 pt-3 pb-3 bg-neutral-950/95 border-b border-neutral-800/70 backdrop-blur-md shadow-[0_12px_28px_rgba(0,0,0,0.55)]">
               <div className="flex items-start gap-3">
@@ -2393,7 +2393,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="ml-6 flex items-center gap-3 whitespace-nowrap flex-shrink-0">
-                <div className="hidden lg:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
+                <div className="hidden xl:flex items-center px-3 py-1.5 bg-neutral-800/50 border border-neutral-600/50 rounded-md shadow-sm">
                   <span className="w-2 h-2 rounded-full bg-green-500 mr-2" aria-hidden></span>
                   <span className="text-sm text-neutral-300">Players online</span>
                   <span className="ml-2 text-sm font-semibold text-white">
@@ -2534,7 +2534,8 @@ export default function Home() {
                       name="matchType"
                       value={selectedMatchType}
                       onChange={(e) => setSelectedMatchType(e.target.value)}
-                      className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                      className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 pr-10 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base appearance-none"
+                      style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em" }}
                       disabled={loading}
                     >
                       {matchTypes.map(type => (
@@ -2550,7 +2551,8 @@ export default function Home() {
                         name="faction"
                         value={selectedFaction}
                         onChange={(e) => handleFactionChange(e.target.value)}
-                        className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                        className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 pr-10 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base appearance-none"
+                        style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em" }}
                         disabled={loading}
                       >
                         {factions.map(faction => (
@@ -2567,7 +2569,8 @@ export default function Home() {
                       autoComplete="country"
                       value={selectedCountry}
                       onChange={(e) => setSelectedCountry(e.target.value)}
-                      className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base"
+                      className="bg-neutral-900 border border-neutral-600/50 rounded-md px-3 py-3 pr-10 text-white focus:border-neutral-400 focus:ring-2 focus:ring-neutral-500/20 transition-all text-base appearance-none"
+                      style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em" }}
                       disabled={loading}
                     >
                       {countries.map(country => (
