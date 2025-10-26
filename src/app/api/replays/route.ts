@@ -540,12 +540,18 @@ export async function PATCH(req: NextRequest) {
 
   // Validate winnerTeam if provided
   let winnerTeam: number | null = null;
-  if (winnerTeamRaw !== undefined && winnerTeamRaw !== null) {
-    const parsed = Number(winnerTeamRaw);
-    if (parsed === 1 || parsed === 2) {
-      winnerTeam = parsed;
-    } else if (winnerTeamRaw === null || winnerTeamRaw === '') {
+  let shouldUpdateWinnerTeam = false;
+  if (winnerTeamRaw !== undefined) {
+    shouldUpdateWinnerTeam = true;
+    if (winnerTeamRaw === null || winnerTeamRaw === '') {
       winnerTeam = null;
+    } else {
+      const parsed = Number(winnerTeamRaw);
+      if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 8) {
+        winnerTeam = parsed;
+      } else {
+        winnerTeam = null;
+      }
     }
   }
 
@@ -553,7 +559,7 @@ export async function PATCH(req: NextRequest) {
   if (submittedName !== null) update.submitted_name = submittedName;
   if (submittedComment !== null) update.submitted_comment = submittedComment;
   if (status) update.status = status;
-  if (winnerTeamRaw !== undefined) update.winner_team = winnerTeam;
+  if (shouldUpdateWinnerTeam) update.winner_team = winnerTeam;
 
   const { error } = await supabaseAdmin
     .from('replay_metadata')

@@ -37,6 +37,72 @@ const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: 'recent', label: 'Newest upload' },
 ];
 
+type TeamAccent = {
+  button: string;
+  card: string;
+  chip: string;
+  icon: string;
+};
+
+const TEAM_ACCENTS: TeamAccent[] = [
+  {
+    button: 'bg-emerald-600/30 border-emerald-500/60 text-emerald-200',
+    card: 'bg-emerald-900/20 border-2 border-emerald-600/40 shadow-emerald-600/20 shadow-lg',
+    chip: 'bg-emerald-600/30 border border-emerald-500/60 text-emerald-200',
+    icon: 'text-emerald-400'
+  },
+  {
+    button: 'bg-blue-600/30 border-blue-500/60 text-blue-200',
+    card: 'bg-blue-900/20 border-2 border-blue-600/40 shadow-blue-600/20 shadow-lg',
+    chip: 'bg-blue-600/30 border border-blue-500/60 text-blue-200',
+    icon: 'text-blue-400'
+  },
+  {
+    button: 'bg-purple-600/30 border-purple-500/60 text-purple-200',
+    card: 'bg-purple-900/20 border-2 border-purple-600/40 shadow-purple-600/20 shadow-lg',
+    chip: 'bg-purple-600/30 border border-purple-500/60 text-purple-200',
+    icon: 'text-purple-400'
+  },
+  {
+    button: 'bg-amber-600/30 border-amber-500/60 text-amber-200',
+    card: 'bg-amber-900/20 border-2 border-amber-600/40 shadow-amber-600/20 shadow-lg',
+    chip: 'bg-amber-600/30 border border-amber-500/60 text-amber-200',
+    icon: 'text-amber-400'
+  },
+  {
+    button: 'bg-rose-600/30 border-rose-500/60 text-rose-200',
+    card: 'bg-rose-900/20 border-2 border-rose-600/40 shadow-rose-600/20 shadow-lg',
+    chip: 'bg-rose-600/30 border border-rose-500/60 text-rose-200',
+    icon: 'text-rose-400'
+  },
+  {
+    button: 'bg-teal-600/30 border-teal-500/60 text-teal-200',
+    card: 'bg-teal-900/20 border-2 border-teal-600/40 shadow-teal-600/20 shadow-lg',
+    chip: 'bg-teal-600/30 border border-teal-500/60 text-teal-200',
+    icon: 'text-teal-400'
+  },
+  {
+    button: 'bg-indigo-600/30 border-indigo-500/60 text-indigo-200',
+    card: 'bg-indigo-900/20 border-2 border-indigo-600/40 shadow-indigo-600/20 shadow-lg',
+    chip: 'bg-indigo-600/30 border border-indigo-500/60 text-indigo-200',
+    icon: 'text-indigo-400'
+  },
+  {
+    button: 'bg-cyan-600/30 border-cyan-500/60 text-cyan-200',
+    card: 'bg-cyan-900/20 border-2 border-cyan-600/40 shadow-cyan-600/20 shadow-lg',
+    chip: 'bg-cyan-600/30 border border-cyan-500/60 text-cyan-200',
+    icon: 'text-cyan-400'
+  }
+];
+
+const getTeamAccent = (teamId: number): TeamAccent => {
+  if (!Number.isFinite(teamId)) {
+    return TEAM_ACCENTS[0];
+  }
+  const index = (Math.max(1, teamId) - 1) % TEAM_ACCENTS.length;
+  return TEAM_ACCENTS[index] ?? TEAM_ACCENTS[0];
+};
+
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILE_SIZE_MB = Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024));
 
@@ -184,6 +250,24 @@ const getFactionColor = (faction: string): string => {
   return factionColors[faction] || 'bg-blue-600/30 border-blue-500/60 text-blue-200';
 };
 
+const extractTeamIds = (
+  profiles: (EnrichedReplayProfile | Player | null | undefined)[] | null | undefined
+): number[] => {
+  if (!Array.isArray(profiles)) {
+    return [];
+  }
+
+  const ids = new Set<number>();
+  profiles.forEach(profile => {
+    const teamValue = Number((profile as any)?.team);
+    if (Number.isInteger(teamValue) && teamValue >= 1) {
+      ids.add(teamValue);
+    }
+  });
+
+  return Array.from(ids).sort((a, b) => a - b).slice(0, 8);
+};
+
 interface ReplaysTabProps {
   onPlayerClick?: (playerName: string, profileId?: string) => void;
 }
@@ -230,6 +314,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [formComment, setFormComment] = useState<string>('');
   const [formWinnerTeam, setFormWinnerTeam] = useState<number | null>(null);
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
+  const previewTeamIds = useMemo(() => extractTeamIds(preview?.profiles ?? null), [preview]);
+  const previewWinnerOptions = useMemo(() => {
+    const options = previewTeamIds.length > 0 ? previewTeamIds : [1, 2];
+    return options.slice(0, 8);
+  }, [previewTeamIds]);
 
   // Pro badge state
   const [proBadgeStatuses, setProBadgeStatuses] = useState<Record<string, { isProMember: boolean; showBadge: boolean }>>({});
@@ -737,7 +826,10 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     setEditingPath(replay.path);
     setEditName(replay.submittedName || replay.replayName || replay.originalName);
     setEditComment(replay.submittedComment || '');
-    setEditWinnerTeam(replay.winnerTeam ?? null);
+    const normalizedWinner = typeof replay.winnerTeam === 'number' && replay.winnerTeam >= 1 && replay.winnerTeam <= 8
+      ? replay.winnerTeam
+      : null;
+    setEditWinnerTeam(normalizedWinner);
     setActionErrorCode(null);
   }, []);
 
@@ -901,29 +993,25 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-xs text-neutral-400 font-medium">Winner (optional)</label>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setFormWinnerTeam(1)}
-                  className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
-                    formWinnerTeam === 1
-                      ? 'bg-emerald-600/30 border-emerald-500/60 text-emerald-200'
-                      : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                  }`}
-                >
-                  Team 1 won
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormWinnerTeam(2)}
-                  className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
-                    formWinnerTeam === 2
-                      ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
-                      : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                  }`}
-                >
-                  Team 2 won
-                </button>
+              <div className="flex flex-wrap gap-2">
+                {previewWinnerOptions.map(teamId => {
+                  const accent = getTeamAccent(teamId);
+                  const isSelected = formWinnerTeam === teamId;
+                  return (
+                    <button
+                      key={`preview-winner-${teamId}`}
+                      type="button"
+                      onClick={() => setFormWinnerTeam(teamId)}
+                      className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                        isSelected
+                          ? accent.button
+                          : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                      }`}
+                    >
+                      Team {teamId} won
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   onClick={() => setFormWinnerTeam(null)}
@@ -1283,6 +1371,103 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               const mapImagePath = getMapImage(replay.mapName);
               const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
               const averageElo = calculateAverageElo(replay);
+              const teamIds = extractTeamIds(replay.profiles);
+              const isTwoTeamLayout = teamIds.length <= 2;
+              const winnerOptionIds = (teamIds.length > 0 ? teamIds : [1, 2]).slice(0, 8);
+              const winnerAccent = typeof replay.winnerTeam === 'number' ? getTeamAccent(replay.winnerTeam) : null;
+              const revealActive = typeof replay.winnerTeam === 'number' && revealedWinners.has(replay.path);
+
+              const renderTeamMembers = (teamId: number) => {
+                if (!Array.isArray(replay.profiles)) {
+                  return <span className="text-xs text-neutral-500">No players</span>;
+                }
+                const members = replay.profiles.filter(p => Number(p.team) === teamId);
+                if (members.length === 0) {
+                  return <span className="text-xs text-neutral-500">No players</span>;
+                }
+
+                return members.map((profile, idx) => {
+                  const enrichedProfile = profile as EnrichedReplayProfile;
+                  return (
+                    <div key={`team-${teamId}-player-${idx}`} className="flex items-center justify-between gap-2 py-1">
+                      <PlayerTeam
+                        profiles={[enrichedProfile]}
+                        team={teamId}
+                        onPlayerClick={onPlayerClick}
+                        showDetails={true}
+                        compact={false}
+                        className="text-neutral-200 text-xs flex-1"
+                        proBadgeStatuses={proBadgeStatuses}
+                      />
+                      {enrichedProfile.faction_rating && (
+                        <span className="text-xs font-semibold text-yellow-400">
+                          {enrichedProfile.faction_rating} ELO
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              };
+
+              const renderTeamCard = (teamId: number, dualLayout: boolean) => {
+                const accent = getTeamAccent(teamId);
+                const isWinner = revealActive && replay.winnerTeam === teamId;
+                const cardStateClass = isWinner
+                  ? accent.card
+                  : revealActive
+                    ? 'bg-neutral-800/20 border border-neutral-700/40 opacity-75'
+                    : 'bg-neutral-800/30 border border-neutral-600/25';
+
+                return (
+                  <div key={`team-${teamId}`} className={dualLayout ? 'flex-1' : ''}>
+                    <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide flex items-center gap-1">
+                      Team {teamId}
+                      {isWinner && (
+                        <svg className={`w-3 h-3 ${accent.icon}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className={`rounded-md p-2 transition-all ${cardStateClass}`}>
+                      {renderTeamMembers(teamId)}
+                    </div>
+                  </div>
+                );
+              };
+
+              const renderMapTile = (layout: 'dual' | 'multi') => (
+                <div
+                  className={
+                    layout === 'dual'
+                      ? 'shrink-0 flex flex-col items-center justify-start px-3'
+                      : 'flex flex-col items-center justify-start mx-auto md:px-3'
+                  }
+                >
+                  {mapImagePath ? (
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
+                      <Image
+                        src={mapImagePath}
+                        alt={`${mapDisplayName} mini-map`}
+                        fill
+                        sizes="(min-width: 640px) 6rem, 5rem"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border border-neutral-600/25 bg-neutral-800/50 flex items-center justify-center">
+                      <span className="text-2xl text-neutral-600">?</span>
+                    </div>
+                  )}
+                  <div className="mt-2 text-center">
+                    <div className="text-xs text-neutral-200 font-medium" title={mapDisplayName}>
+                      {mapDisplayName}
+                    </div>
+                    <div className="text-xs text-neutral-400 mt-1">
+                      {duration || 'Duration unknown'}
+                    </div>
+                  </div>
+                </div>
+              );
 
 
               return (
@@ -1332,12 +1517,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                           Click to reveal winner
                         </button>
                       ) : replay.winnerTeam && revealedWinners.has(replay.path) ? (
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md ${
-                          replay.winnerTeam === 1
-                            ? 'bg-emerald-600/30 border border-emerald-500/60 text-emerald-200'
-                            : 'bg-blue-600/30 border border-blue-500/60 text-blue-200'
-                        }`}>
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md ${winnerAccent ? winnerAccent.chip : 'bg-neutral-700/50 border border-neutral-500/60 text-neutral-200'}`}>
+                          <svg className={`w-3.5 h-3.5 ${winnerAccent ? winnerAccent.icon : ''}`} fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
                           Team {replay.winnerTeam} victory
@@ -1400,123 +1581,33 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     </div>
                   </div>
 
-                  {/* Teams display with map in the middle */}
-                  <div className="flex flex-col sm:flex-row gap-3 items-start">
-                    {/* Team 1 */}
-                    <div className="flex-1">
-                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide flex items-center gap-1">
-                        Team 1
-                        {replay.winnerTeam === 1 && revealedWinners.has(replay.path) && (
-                          <svg className="w-3 h-3 text-emerald-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className={`rounded-md p-2 transition-all ${
-                        replay.winnerTeam === 1 && revealedWinners.has(replay.path)
-                          ? 'bg-emerald-900/20 border-2 border-emerald-600/40 shadow-emerald-600/20 shadow-lg'
-                          : replay.winnerTeam === 2 && revealedWinners.has(replay.path)
-                          ? 'bg-neutral-800/20 border border-red-900/30 opacity-75'
-                          : 'bg-neutral-800/30 border border-neutral-600/25'
-                      }`}>
-                        {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 1).map((profile, idx) => {
-                          const enrichedProfile = profile as EnrichedReplayProfile;
-                          return (
-                            <div key={`t1-${idx}`} className="flex items-center justify-between gap-2 py-1">
-                              <PlayerTeam
-                                profiles={[enrichedProfile]}
-                                team={1}
-                                onPlayerClick={onPlayerClick}
-                                showDetails={true}
-                                compact={false}
-                                className="text-neutral-200 text-xs flex-1"
-                                proBadgeStatuses={proBadgeStatuses}
-                              />
-                              {enrichedProfile.faction_rating && (
-                                <span className="text-xs font-semibold text-yellow-400">
-                                  {enrichedProfile.faction_rating} ELO
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {(!replay.profiles || !replay.profiles.filter(p => p.team === 1).length) && (
-                          <span className="text-xs text-neutral-500">No players</span>
-                        )}
+                  {/* Teams display */}
+                  {teamIds.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3">
+                      {renderMapTile('multi')}
+                      <div className="rounded-md border border-neutral-700/40 bg-neutral-800/30 p-3 text-xs text-neutral-400 text-center w-full">
+                        No team data available.
                       </div>
                     </div>
-
-                    {/* Map in the middle */}
-                    <div className="shrink-0 flex flex-col items-center justify-start px-3">
-                      {mapImagePath ? (
-                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-neutral-600/25 bg-neutral-900">
-                          <Image
-                            src={mapImagePath}
-                            alt={`${mapDisplayName} mini-map`}
-                            fill
-                            sizes="(min-width: 640px) 6rem, 5rem"
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border border-neutral-600/25 bg-neutral-800/50 flex items-center justify-center">
-                          <span className="text-2xl text-neutral-600">?</span>
-                        </div>
-                      )}
-                      <div className="mt-2 text-center">
-                        <div className="text-xs text-neutral-200 font-medium" title={mapDisplayName}>
-                          {mapDisplayName}
-                        </div>
-                        <div className="text-xs text-neutral-400 mt-1">
-                          {duration || 'Duration unknown'}
-                        </div>
+                  ) : isTwoTeamLayout ? (
+                    <div className="flex flex-col sm:flex-row gap-3 items-start">
+                      {teamIds[0] !== undefined && renderTeamCard(teamIds[0], true)}
+                      {renderMapTile('dual')}
+                      {teamIds[1] !== undefined && renderTeamCard(teamIds[1], true)}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col md:flex-row md:items-start gap-3">
+                      <div className="flex flex-col gap-3 order-2 md:order-1 md:flex-1">
+                        {teamIds.filter((_, index) => index % 2 === 0).map(teamId => renderTeamCard(teamId, false))}
+                      </div>
+                      <div className="order-1 md:order-2 flex justify-center md:flex-none">
+                        {renderMapTile('multi')}
+                      </div>
+                      <div className="flex flex-col gap-3 order-3 md:order-3 md:flex-1">
+                        {teamIds.filter((_, index) => index % 2 === 1).map(teamId => renderTeamCard(teamId, false))}
                       </div>
                     </div>
-
-                    {/* Team 2 */}
-                    <div className="flex-1">
-                      <div className="text-xs text-neutral-400 mb-1 font-semibold uppercase tracking-wide flex items-center gap-1">
-                        Team 2
-                        {replay.winnerTeam === 2 && revealedWinners.has(replay.path) && (
-                          <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className={`rounded-md p-2 transition-all ${
-                        replay.winnerTeam === 2 && revealedWinners.has(replay.path)
-                          ? 'bg-blue-900/20 border-2 border-blue-600/40 shadow-blue-600/20 shadow-lg'
-                          : replay.winnerTeam === 1 && revealedWinners.has(replay.path)
-                          ? 'bg-neutral-800/20 border border-red-900/30 opacity-75'
-                          : 'bg-neutral-800/30 border border-neutral-600/25'
-                      }`}>
-                        {Array.isArray(replay.profiles) && replay.profiles.filter(p => p.team === 2).map((profile, idx) => {
-                          const enrichedProfile = profile as EnrichedReplayProfile;
-                          return (
-                            <div key={`t2-${idx}`} className="flex items-center justify-between gap-2 py-1">
-                              <PlayerTeam
-                                profiles={[enrichedProfile]}
-                                team={2}
-                                onPlayerClick={onPlayerClick}
-                                showDetails={true}
-                                compact={false}
-                                className="text-neutral-200 text-xs flex-1"
-                                proBadgeStatuses={proBadgeStatuses}
-                              />
-                              {enrichedProfile.faction_rating && (
-                                <span className="text-xs font-semibold text-yellow-400">
-                                  {enrichedProfile.faction_rating} ELO
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {(!replay.profiles || !replay.profiles.filter(p => p.team === 2).length) && (
-                          <span className="text-xs text-neutral-500">No players</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Edit form (if editing this replay) */}
                   {editingPath === replay.path ? (
@@ -1540,29 +1631,25 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       </div>
                       <div className="flex flex-col gap-2">
                         <label className="text-xs text-neutral-400 font-medium">Winner</label>
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setEditWinnerTeam(1)}
-                            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
-                              editWinnerTeam === 1
-                                ? 'bg-emerald-600/30 border-emerald-500/60 text-emerald-200'
-                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                            }`}
-                          >
-                            Team 1 won
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditWinnerTeam(2)}
-                            className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
-                              editWinnerTeam === 2
-                                ? 'bg-blue-600/30 border-blue-500/60 text-blue-200'
-                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                            }`}
-                          >
-                            Team 2 won
-                          </button>
+                        <div className="flex flex-wrap gap-2">
+                          {winnerOptionIds.map(teamId => {
+                            const accent = getTeamAccent(teamId);
+                            const isSelected = editWinnerTeam === teamId;
+                            return (
+                              <button
+                                key={`edit-winner-${replay.path}-${teamId}`}
+                                type="button"
+                                onClick={() => setEditWinnerTeam(teamId)}
+                                className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
+                                  isSelected
+                                    ? accent.button
+                                    : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                                }`}
+                              >
+                                Team {teamId} won
+                              </button>
+                            );
+                          })}
                           <button
                             type="button"
                             onClick={() => setEditWinnerTeam(null)}

@@ -316,7 +316,7 @@ CREATE TABLE public.replay_metadata (
   created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
   uploader_ip_hash text,
-  winner_team integer CHECK (winner_team IS NULL OR (winner_team = ANY (ARRAY[1, 2]))),
+  winner_team integer CHECK (winner_team IS NULL OR (winner_team >= 1 AND winner_team <= 8)),
   id integer NOT NULL DEFAULT nextval('replay_metadata_id_seq'::regclass) UNIQUE,
   CONSTRAINT replay_metadata_pkey PRIMARY KEY (path)
 );
