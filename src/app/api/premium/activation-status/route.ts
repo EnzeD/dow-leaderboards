@@ -6,6 +6,10 @@ import {
   getSupabaseAdmin,
   isStripeSubscriptionActive,
 } from "@/lib/premium/subscription-server";
+import {
+  getForcedAdvancedStatsProfileId,
+  getForcedAdvancedStatsProfileIdNumber,
+} from "@/lib/premium/force-advanced-stats";
 
 type ActivationResponse = {
   activated: boolean;
@@ -18,6 +22,45 @@ type ActivationResponse = {
 };
 
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+  const profileIdRaw =
+    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
+  const profileIdParam = profileIdRaw?.trim() ?? null;
+
+  const forcedProfileId = getForcedAdvancedStatsProfileId();
+  const forcedProfileIdNumber = getForcedAdvancedStatsProfileIdNumber();
+  const isForcedRequest =
+    Boolean(
+      forcedProfileId &&
+      forcedProfileIdNumber !== null &&
+      (!profileIdParam || profileIdParam === forcedProfileId),
+    );
+
+  if (isForcedRequest) {
+    if (forcedProfileIdNumber === null) {
+      return attachCacheHeaders(
+        NextResponse.json<ActivationResponse>(
+          { activated: false, reason: "invalid_forced_profile" },
+          { status: 400 },
+        ),
+      );
+    }
+
+    return attachCacheHeaders(
+      NextResponse.json<ActivationResponse>(
+        {
+          activated: true,
+          status: "forced_preview",
+          cancelAtPeriodEnd: false,
+          currentPeriodStart: null,
+          currentPeriodEnd: null,
+          profileId: forcedProfileIdNumber,
+        },
+        { status: 200 },
+      ),
+    );
+  }
+
   const session = await auth0.getSession();
 
   if (!session) {
@@ -41,10 +84,6 @@ export async function GET(req: NextRequest) {
   }
 
   const auth0Sub = session.user.sub;
-  const url = new URL(req.url);
-  const profileIdRaw =
-    url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
-  const profileIdParam = profileIdRaw?.trim() ?? null;
 
   const { data: appUser, error: appUserError } = await supabase
     .from("app_users")

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
@@ -7,6 +8,10 @@ import {
   isStripeSubscriptionActive,
   resolveSinceDate,
 } from "@/lib/premium/subscription-server";
+import {
+  getForcedAdvancedStatsProfileId,
+  getForcedAdvancedStatsProfileIdNumber,
+} from "@/lib/premium/force-advanced-stats";
 
 interface MapRow {
   map_identifier: string | null;
@@ -60,34 +65,176 @@ const normalizeMapIdentifier = (identifier: string | null): string => {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const requestedProfileId =
+  const requestedProfileIdRaw =
     url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
+  const requestedProfileId = requestedProfileIdRaw?.trim() ?? null;
+
+  const windowDays = coerceInt(
+    url.searchParams.get("windowDays") ?? url.searchParams.get("window"),
+    90,
+  );
+  const windowStart = resolveSinceDate(windowDays);
+  const matchTypeParsed = coerceOptionalInt(
+    url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"),
+  );
+  const matchTypeId =
+    typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed)
+      ? matchTypeParsed
+      : undefined;
+  const limit = coerceInt(url.searchParams.get("limit"), 50);
+
+  const buildResponse = async (
+    supabaseClient: SupabaseClient,
+    profileNumeric: number,
+  ) => {
+    const profileId = String(profileNumeric);
+
+    try {
+      const { data, error } = await supabaseClient.rpc("premium_get_map_stats", {
+        p_profile_id: profileNumeric,
+        p_since: windowStart,
+        p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
+        p_limit: limit,
+      });
+
+      if (error) {
+        console.error("[premium] map stats rpc failed", error);
+        return attachCacheHeaders(
+          NextResponse.json<MapsResponse>(
+            {
+              activated: true,
+              profileId,
+              windowStart,
+              matchTypeId,
+              generatedAt: new Date().toISOString(),
+              rows: [],
+              reason: "rpc_failed",
+            },
+            { status: 500 },
+          ),
+        );
+      }
+
+      const rows = ((data as MapRow[]) ?? []).map((row: MapRow) => ({
+        mapIdentifier: normalizeMapIdentifier(row.map_identifier),
+        mapName: row.map_name ?? "Unknown Map",
+        matchTypeId: row.match_type_id,
+        matches: row.matches ?? 0,
+        wins: row.wins ?? 0,
+        losses: row.losses ?? 0,
+        winrate:
+          row.winrate === null || row.winrate === undefined
+            ? null
+            : Number(row.winrate),
+        lastPlayed: row.last_played,
+      }));
+
+      return attachCacheHeaders(
+        NextResponse.json<MapsResponse>({
+          activated: true,
+          profileId,
+          windowStart,
+          matchTypeId,
+          generatedAt: new Date().toISOString(),
+          rows,
+        }),
+      );
+    } catch (error) {
+      console.error("[premium] map stats unexpected error", error);
+      return attachCacheHeaders(
+        NextResponse.json<MapsResponse>(
+          {
+            activated: true,
+            profileId,
+            windowStart,
+            matchTypeId,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "unexpected_error",
+          },
+          { status: 500 },
+        ),
+      );
+    }
+  };
+
+  const forcedProfileId = getForcedAdvancedStatsProfileId();
+  const forcedProfileIdNumber = getForcedAdvancedStatsProfileIdNumber();
+  const isForcedRequest =
+    Boolean(
+      forcedProfileId &&
+      forcedProfileIdNumber !== null &&
+      (!requestedProfileId || requestedProfileId === forcedProfileId),
+    );
+
+  if (isForcedRequest) {
+    if (forcedProfileIdNumber === null) {
+      return attachCacheHeaders(
+        NextResponse.json<MapsResponse>(
+          {
+            activated: false,
+            profileId: "",
+            windowStart,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "invalid_forced_profile",
+          },
+          { status: 400 },
+        ),
+      );
+    }
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return attachCacheHeaders(
+        NextResponse.json<MapsResponse>(
+          {
+            activated: false,
+            profileId: "",
+            windowStart,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "supabase_unavailable",
+          },
+          { status: 503 },
+        ),
+      );
+    }
+
+    return buildResponse(supabase, forcedProfileIdNumber);
+  }
 
   const session = await auth0.getSession();
   if (!session) {
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "not_authenticated",
-      }, { status: 401 })
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "not_authenticated",
+        },
+        { status: 401 },
+      ),
     );
   }
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "supabase_unavailable",
-      }, { status: 503 })
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "supabase_unavailable",
+        },
+        { status: 503 },
+      ),
     );
   }
 
@@ -101,14 +248,17 @@ export async function GET(req: NextRequest) {
   if (appUserError) {
     console.error("[premium] maps failed to load app_user", appUserError);
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "lookup_failed",
-      }, { status: 500 })
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "lookup_failed",
+        },
+        { status: 500 },
+      ),
     );
   }
 
@@ -118,14 +268,17 @@ export async function GET(req: NextRequest) {
 
   if (!primaryProfileId) {
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "profile_not_linked",
-      }, { status: 403 })
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "profile_not_linked",
+        },
+        { status: 403 },
+      ),
     );
   }
 
@@ -134,95 +287,36 @@ export async function GET(req: NextRequest) {
     Number.parseInt(requestedProfileId, 10) !== primaryProfileId
   ) {
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: String(primaryProfileId),
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "profile_mismatch",
-      }, { status: 403 })
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "profile_mismatch",
+        },
+        { status: 403 },
+      ),
     );
   }
 
   const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
   if (!isStripeSubscriptionActive(subscription)) {
     return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: false,
-        profileId: String(primaryProfileId),
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "not_subscribed",
-      }, { status: 403 })
-    );
-  }
-
-  const profileId = String(primaryProfileId);
-
-  const windowDays = coerceInt(url.searchParams.get("windowDays") ?? url.searchParams.get("window"), 90);
-  const windowStart = resolveSinceDate(windowDays);
-  const matchTypeParsed = coerceOptionalInt(url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"));
-  const matchTypeId = typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed) ? matchTypeParsed : undefined;
-  const limit = coerceInt(url.searchParams.get("limit"), 50);
-
-  try {
-    const { data, error } = await supabase.rpc("premium_get_map_stats", {
-      p_profile_id: primaryProfileId,
-      p_since: windowStart,
-      p_match_type_id: typeof matchTypeId === "number" ? matchTypeId : null,
-      p_limit: limit,
-    });
-
-    if (error) {
-      console.error("[premium] map stats rpc failed", error);
-      return attachCacheHeaders(
-        NextResponse.json<MapsResponse>({
-          activated: true,
-          profileId,
+      NextResponse.json<MapsResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
           windowStart,
-          matchTypeId,
           generatedAt: new Date().toISOString(),
           rows: [],
-          reason: "rpc_failed",
-        }, { status: 500 })
-      );
-    }
-
-    const rows = ((data as MapRow[]) ?? []).map((row: MapRow) => ({
-      mapIdentifier: normalizeMapIdentifier(row.map_identifier),
-      mapName: row.map_name ?? "Unknown Map",
-      matchTypeId: row.match_type_id,
-      matches: row.matches ?? 0,
-      wins: row.wins ?? 0,
-      losses: row.losses ?? 0,
-      winrate: row.winrate === null || row.winrate === undefined ? null : Number(row.winrate),
-      lastPlayed: row.last_played,
-    }));
-
-    return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: true,
-        profileId,
-        windowStart,
-        matchTypeId,
-        generatedAt: new Date().toISOString(),
-        rows,
-      })
-    );
-  } catch (error) {
-    console.error("[premium] map stats unexpected error", error);
-    return attachCacheHeaders(
-      NextResponse.json<MapsResponse>({
-        activated: true,
-        profileId,
-        windowStart,
-        matchTypeId,
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "unexpected_error",
-      }, { status: 500 })
+          reason: "not_subscribed",
+        },
+        { status: 403 },
+      ),
     );
   }
+
+  return buildResponse(supabase, primaryProfileId);
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { auth0 } from "@/lib/auth0";
 import {
   attachCacheHeaders,
@@ -7,6 +8,10 @@ import {
   isStripeSubscriptionActive,
   resolveSinceDate,
 } from "@/lib/premium/subscription-server";
+import {
+  getForcedAdvancedStatsProfileId,
+  getForcedAdvancedStatsProfileIdNumber,
+} from "@/lib/premium/force-advanced-stats";
 
 interface OpponentRow {
   opponent_profile_id: string | number | null;
@@ -54,7 +59,10 @@ const coerceOptionalInt = (value: string | null): number | undefined => {
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-const normalizeOpponentAlias = (alias: string | null, profileId: string | number | null): string => {
+const normalizeOpponentAlias = (
+  alias: string | null,
+  profileId: string | number | null,
+): string => {
   if (alias && alias.trim().length > 0) {
     return alias.trim();
   }
@@ -79,117 +87,28 @@ const normalizeProfileId = (value: string | number | null): string | null => {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
-  const requestedProfileId =
+  const requestedProfileIdRaw =
     url.searchParams.get("profileId") ?? url.searchParams.get("profile_id");
+  const requestedProfileId = requestedProfileIdRaw?.trim() ?? null;
 
-  const session = await auth0.getSession();
-  if (!session) {
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "not_authenticated",
-      }, { status: 401 })
-    );
-  }
-
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "supabase_unavailable",
-      }, { status: 503 })
-    );
-  }
-
-  const auth0Sub = session.user.sub;
-  const { data: appUser, error: appUserError } = await supabase
-    .from("app_users")
-    .select("primary_profile_id")
-    .eq("auth0_sub", auth0Sub)
-    .maybeSingle();
-
-  if (appUserError) {
-    console.error("[premium] opponents failed to load app_user", appUserError);
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "lookup_failed",
-      }, { status: 500 })
-    );
-  }
-
-  const primaryProfileId = appUser?.primary_profile_id
-    ? Number.parseInt(String(appUser.primary_profile_id), 10)
-    : null;
-
-  if (!primaryProfileId) {
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: "",
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "profile_not_linked",
-      }, { status: 403 })
-    );
-  }
-
-  if (
-    requestedProfileId &&
-    Number.parseInt(requestedProfileId, 10) !== primaryProfileId
-  ) {
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: String(primaryProfileId),
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "profile_mismatch",
-      }, { status: 403 })
-    );
-  }
-
-  const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
-  if (!isStripeSubscriptionActive(subscription)) {
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: false,
-        profileId: String(primaryProfileId),
-        windowStart: resolveSinceDate(),
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "not_subscribed",
-      }, { status: 403 })
-    );
-  }
-
-  const profileId = String(primaryProfileId);
-
-  const windowDays = coerceInt(url.searchParams.get("windowDays") ?? url.searchParams.get("window"), 90);
+  const windowDays = coerceInt(
+    url.searchParams.get("windowDays") ?? url.searchParams.get("window"),
+    90,
+  );
   const windowStart = resolveSinceDate(windowDays);
-  const matchTypeParsed = coerceOptionalInt(url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"));
-  const matchTypeId = typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed) ? matchTypeParsed : undefined;
+  const matchTypeParsed = coerceOptionalInt(
+    url.searchParams.get("matchTypeId") ?? url.searchParams.get("match_type_id"),
+  );
+  const matchTypeId =
+    typeof matchTypeParsed === "number" && Number.isFinite(matchTypeParsed)
+      ? matchTypeParsed
+      : undefined;
   const matchScopeRaw =
-    url.searchParams.get("matchScope")
-    ?? url.searchParams.get("match_scope")
-    ?? url.searchParams.get("matchTypeScope")
-    ?? url.searchParams.get("match_type_scope")
-    ?? "";
+    url.searchParams.get("matchScope") ??
+    url.searchParams.get("match_scope") ??
+    url.searchParams.get("matchTypeScope") ??
+    url.searchParams.get("match_type_scope") ??
+    "";
   const matchScope = ((): "all" | "automatch" | "custom" => {
     const normalized = matchScopeRaw.toLowerCase();
     if (normalized === "automatch" || normalized === "custom") return normalized;
@@ -203,16 +122,66 @@ export async function GET(req: NextRequest) {
     return null;
   })();
 
-  try {
-    const { data, error } = await supabase.rpc("premium_get_opponent_stats", {
-      p_profile_id: primaryProfileId,
-      p_since: windowStart,
-      p_match_type_id: rpcMatchTypeId,
-      p_limit: limit,
-    });
+  const buildResponse = async (
+    supabaseClient: SupabaseClient,
+    profileNumeric: number,
+  ) => {
+    const profileId = String(profileNumeric);
 
-    if (error) {
-      console.error("[premium] opponent stats rpc failed", error);
+    try {
+      const { data, error } = await supabaseClient.rpc("premium_get_opponent_stats", {
+        p_profile_id: profileNumeric,
+        p_since: windowStart,
+        p_match_type_id: rpcMatchTypeId,
+        p_limit: limit,
+      });
+
+      if (error) {
+        console.error("[premium] opponent stats rpc failed", error);
+        return attachCacheHeaders(
+          NextResponse.json<OpponentsResponse>(
+            {
+              activated: true,
+              profileId,
+              windowStart,
+              matchTypeId,
+              matchScope,
+              generatedAt: new Date().toISOString(),
+              rows: [],
+              reason: "rpc_failed",
+            },
+            { status: 500 },
+          ),
+        );
+      }
+
+      const rows = ((data as OpponentRow[]) ?? []).map((row: OpponentRow) => {
+        const opponentProfile = normalizeProfileId(row.opponent_profile_id ?? null);
+        const opponentCountry =
+          typeof (row as any)?.opponent_country === "string"
+            ? ((row as any).opponent_country as string)
+            : null;
+        const opponentMainRaceId =
+          typeof (row as any)?.opponent_main_race_id === "number"
+            ? ((row as any).opponent_main_race_id as number)
+            : null;
+
+        return {
+          opponentProfileId: opponentProfile,
+          opponentAlias: normalizeOpponentAlias(row.opponent_alias, opponentProfile),
+          opponentCountry,
+          opponentMainRaceId,
+          matches: row.matches ?? 0,
+          wins: row.wins ?? 0,
+          losses: row.losses ?? 0,
+          winrate:
+            row.winrate === null || row.winrate === undefined
+              ? null
+              : Number(row.winrate),
+          lastPlayed: row.last_played,
+        };
+      });
+
       return attachCacheHeaders(
         NextResponse.json<OpponentsResponse>({
           activated: true,
@@ -221,57 +190,188 @@ export async function GET(req: NextRequest) {
           matchTypeId,
           matchScope,
           generatedAt: new Date().toISOString(),
-          rows: [],
-          reason: "rpc_failed",
-        }, { status: 500 })
+          rows,
+        }),
+      );
+    } catch (error) {
+      console.error("[premium] opponent stats unexpected error", error);
+      return attachCacheHeaders(
+        NextResponse.json<OpponentsResponse>(
+          {
+            activated: true,
+            profileId,
+            windowStart,
+            matchTypeId,
+            matchScope,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "unexpected_error",
+          },
+          { status: 500 },
+        ),
+      );
+    }
+  };
+
+  const forcedProfileId = getForcedAdvancedStatsProfileId();
+  const forcedProfileIdNumber = getForcedAdvancedStatsProfileIdNumber();
+  const isForcedRequest =
+    Boolean(
+      forcedProfileId &&
+      forcedProfileIdNumber !== null &&
+      (!requestedProfileId || requestedProfileId === forcedProfileId),
+    );
+
+  if (isForcedRequest) {
+    if (forcedProfileIdNumber === null) {
+      return attachCacheHeaders(
+        NextResponse.json<OpponentsResponse>(
+          {
+            activated: false,
+            profileId: "",
+            windowStart,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "invalid_forced_profile",
+          },
+          { status: 400 },
+        ),
       );
     }
 
-    const rows = ((data as OpponentRow[]) ?? []).map((row: OpponentRow) => {
-      const opponentProfile = normalizeProfileId(row.opponent_profile_id ?? null);
-      const opponentCountry = typeof (row as any)?.opponent_country === "string"
-        ? ((row as any).opponent_country as string)
-        : null;
-      const opponentMainRaceId = typeof (row as any)?.opponent_main_race_id === "number"
-        ? ((row as any).opponent_main_race_id as number)
-        : null;
-      return {
-        opponentProfileId: opponentProfile,
-        opponentAlias: normalizeOpponentAlias(row.opponent_alias, opponentProfile),
-        opponentCountry,
-        opponentMainRaceId,
-        matches: row.matches ?? 0,
-        wins: row.wins ?? 0,
-        losses: row.losses ?? 0,
-        winrate: row.winrate === null || row.winrate === undefined ? null : Number(row.winrate),
-        lastPlayed: row.last_played,
-      };
-    });
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return attachCacheHeaders(
+        NextResponse.json<OpponentsResponse>(
+          {
+            activated: false,
+            profileId: "",
+            windowStart,
+            generatedAt: new Date().toISOString(),
+            rows: [],
+            reason: "supabase_unavailable",
+          },
+          { status: 503 },
+        ),
+      );
+    }
 
+    return buildResponse(supabase, forcedProfileIdNumber);
+  }
+
+  const session = await auth0.getSession();
+  if (!session) {
     return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: true,
-        profileId,
-        windowStart,
-        matchTypeId,
-        matchScope,
-        generatedAt: new Date().toISOString(),
-        rows,
-      })
-    );
-  } catch (error) {
-    console.error("[premium] opponent stats unexpected error", error);
-    return attachCacheHeaders(
-      NextResponse.json<OpponentsResponse>({
-        activated: true,
-        profileId,
-        windowStart,
-        matchTypeId,
-        matchScope,
-        generatedAt: new Date().toISOString(),
-        rows: [],
-        reason: "unexpected_error",
-      }, { status: 500 })
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "not_authenticated",
+        },
+        { status: 401 },
+      ),
     );
   }
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return attachCacheHeaders(
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "supabase_unavailable",
+        },
+        { status: 503 },
+      ),
+    );
+  }
+
+  const auth0Sub = session.user.sub;
+  const { data: appUser, error: appUserError } = await supabase
+    .from("app_users")
+    .select("primary_profile_id")
+    .eq("auth0_sub", auth0Sub)
+    .maybeSingle();
+
+  if (appUserError) {
+    console.error("[premium] opponents failed to load app_user", appUserError);
+    return attachCacheHeaders(
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "lookup_failed",
+        },
+        { status: 500 },
+      ),
+    );
+  }
+
+  const primaryProfileId = appUser?.primary_profile_id
+    ? Number.parseInt(String(appUser.primary_profile_id), 10)
+    : null;
+
+  if (!primaryProfileId) {
+    return attachCacheHeaders(
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: "",
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "profile_not_linked",
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  if (
+    requestedProfileId &&
+    Number.parseInt(requestedProfileId, 10) !== primaryProfileId
+  ) {
+    return attachCacheHeaders(
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "profile_mismatch",
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  const subscription = await fetchSubscriptionSnapshot(supabase, auth0Sub);
+  if (!isStripeSubscriptionActive(subscription)) {
+    return attachCacheHeaders(
+      NextResponse.json<OpponentsResponse>(
+        {
+          activated: false,
+          profileId: String(primaryProfileId),
+          windowStart,
+          generatedAt: new Date().toISOString(),
+          rows: [],
+          reason: "not_subscribed",
+        },
+        { status: 403 },
+      ),
+    );
+  }
+
+  return buildResponse(supabase, primaryProfileId);
 }

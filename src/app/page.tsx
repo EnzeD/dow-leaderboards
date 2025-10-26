@@ -19,6 +19,7 @@ import { cachedFetch, clearAllCache } from "@/lib/cached-fetch";
 import { useAccount } from "@/app/_components/AccountProvider";
 import { AccountIcon } from "@/components/icons";
 import { ADVANCED_STATS_INTENT_STORAGE_KEY } from "@/lib/premium/advanced-stats-intent";
+import { matchesForcedAdvancedStatsProfile } from "@/lib/premium/force-advanced-stats";
 import { AccountDropdown } from "@/app/_components/AccountDropdown";
 import ProBadge from "@/components/ProBadge";
 import { getEventTracker } from "@/lib/analytics/event-tracker";
@@ -566,6 +567,9 @@ export default function Home() {
   };
   const canAccessAdvancedStats = (profileId?: string | null) => {
     if (!profileId) return false;
+    if (matchesForcedAdvancedStatsProfile(profileId)) {
+      return true;
+    }
     if (subscriptionActive) {
       return linkedProfileId === profileId;
     }
@@ -3221,6 +3225,7 @@ export default function Home() {
                                   ) : (
                                     <AdvancedStatsPanel
                                       profileId={profileIdStr}
+                                      activatedOverride={matchesForcedAdvancedStatsProfile(profileIdStr)}
                                       alias={aliasPrimary || aliasFallback}
                                       onRequestAccess={() => handleUpgradeRequest({
                                         profileId: profileIdStr,
@@ -3706,6 +3711,7 @@ export default function Home() {
                               ) : (
                                 <AdvancedStatsPanel
                                   profileId={String(entry.profileId)}
+                                  activatedOverride={matchesForcedAdvancedStatsProfile(String(entry.profileId))}
                                   alias={entry.alias}
                                   onRequestAccess={() => handleUpgradeRequest({
                                     profileId: String(entry.profileId),
