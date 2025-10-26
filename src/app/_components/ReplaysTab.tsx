@@ -19,6 +19,7 @@ type ReplayListEntry = {
   mapName: string | null;
   matchDurationSeconds: number | null;
   matchDurationLabel: string | null;
+  gameVersion: string | null;
   profiles: EnrichedReplayProfile[] | Player[] | null;
   // User submitted
   submittedName: string | null;
@@ -217,6 +218,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [customEloRange, setCustomEloRange] = useState<{ min: number; max: number } | null>(null);
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
+  const [selectedVersions, setSelectedVersions] = useState<Set<string>>(new Set());
   const [aliasSearch, setAliasSearch] = useState<string>('');
   const [sortMode, setSortMode] = useState<SortMode>('downloads');
 
@@ -309,6 +311,14 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     return Array.from(maps).sort();
   }, [replays]);
 
+  const availableVersions = useMemo(() => {
+    const versions = new Set<string>();
+    replays.forEach(replay => {
+      versions.add(replay.gameVersion || 'Unknown');
+    });
+    return Array.from(versions).sort();
+  }, [replays]);
+
   const eloLimits = useMemo(() => {
     let min = Infinity;
     let max = -Infinity;
@@ -364,6 +374,12 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         if (!selectedMaps.has(mapDisplayName)) return false;
       }
 
+      // Version filter
+      if (selectedVersions.size > 0) {
+        const versionLabel = replay.gameVersion || 'Unknown';
+        if (!selectedVersions.has(versionLabel)) return false;
+      }
+
       // ELO filter (only apply if custom range is set)
       if (customEloRange) {
         if (Array.isArray(replay.profiles)) {
@@ -380,7 +396,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
       return true;
     });
-  }, [replays, selectedFactions, selectedFormats, selectedMaps, customEloRange, aliasSearch]);
+  }, [replays, selectedFactions, selectedFormats, selectedMaps, selectedVersions, customEloRange, aliasSearch]);
 
   const sortedFilteredReplays = useMemo(() => {
     return sortReplays(filteredReplays, sortMode);
@@ -390,6 +406,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const hasActiveFilters = selectedFactions.size > 0 ||
     selectedFormats.size > 0 ||
     selectedMaps.size > 0 ||
+    selectedVersions.size > 0 ||
     customEloRange !== null ||
     aliasSearch.trim() !== '';
 
@@ -397,6 +414,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     setSelectedFactions(new Set());
     setSelectedFormats(new Set());
     setSelectedMaps(new Set());
+    setSelectedVersions(new Set());
     setCustomEloRange(null);
     setAliasSearch('');
   };
@@ -441,6 +459,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             downloads: Number.isFinite(downloadsRaw) ? downloadsRaw : 0,
             replayName: typeof entry?.replayName === 'string' ? entry.replayName : null,
             mapName: typeof entry?.mapName === 'string' ? entry.mapName : null,
+            gameVersion: typeof entry?.gameVersion === 'string'
+              ? entry.gameVersion
+              : entry?.gameVersion !== null && entry?.gameVersion !== undefined
+                ? String(entry.gameVersion)
+                : null,
             matchDurationSeconds: typeof entry?.matchDurationSeconds === 'number' ? entry.matchDurationSeconds : null,
             matchDurationLabel: typeof entry?.matchDurationLabel === 'string' ? entry.matchDurationLabel : null,
             profiles: Array.isArray(entry?.profiles) ? entry.profiles : null,
@@ -518,6 +541,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           downloads: 0,
           replayName: typeof replay.replayName === 'string' ? replay.replayName : null,
           mapName: typeof replay.mapName === 'string' ? replay.mapName : null,
+          gameVersion: typeof replay.gameVersion === 'string'
+            ? replay.gameVersion
+            : replay?.gameVersion !== null && replay?.gameVersion !== undefined
+              ? String(replay.gameVersion)
+              : null,
           matchDurationSeconds: typeof replay.matchDurationSeconds === 'number' ? replay.matchDurationSeconds : null,
           matchDurationLabel: typeof replay.matchDurationLabel === 'string' ? replay.matchDurationLabel : null,
           profiles: Array.isArray(replay.profiles) ? replay.profiles : null,
@@ -840,6 +868,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               <p>
                 Map: <span className="text-neutral-200">{preview.mapName || 'Unknown'}</span>
                 {' '}· Duration: <span className="text-neutral-200">{preview.matchDurationLabel || (preview.matchDurationSeconds ? `${Math.floor((preview.matchDurationSeconds||0)/60)}:${String((preview.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span>
+                {' '}· Version: <span className="text-neutral-200">{preview.gameVersion || 'Unknown'}</span>
               </p>
               {Array.isArray(preview.profiles) && preview.profiles.length > 0 && (
                 <p>
@@ -1026,6 +1055,29 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     <option value="any">Any</option>
                     {availableMaps.map(map => (
                       <option key={map} value={map}>{map}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Version Dropdown */}
+              {availableVersions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-neutral-400 font-medium">Version:</label>
+                  <select
+                    value={selectedVersions.size === 0 ? 'any' : Array.from(selectedVersions)[0]}
+                    onChange={(e) => {
+                      if (e.target.value === 'any') {
+                        setSelectedVersions(new Set());
+                      } else {
+                        setSelectedVersions(new Set([e.target.value]));
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+                  >
+                    <option value="any">Any</option>
+                    {availableVersions.map(version => (
+                      <option key={version} value={version}>{version}</option>
                     ))}
                   </select>
                 </div>
@@ -1250,7 +1302,17 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         {averageElo !== null && (
                           <>
                             <span>•</span>
-                            <span className="text-neutral-200 font-medium">Avg ELO {Math.round(averageElo)}</span>
+                            <span className="text-neutral-200 font-medium">
+                              Avg ELO {Math.round(averageElo)}
+                            </span>
+                          </>
+                        )}
+                        {typeof replay.gameVersion === 'string' && replay.gameVersion.trim().length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-neutral-200 font-medium">
+                              Version {replay.gameVersion}
+                            </span>
                           </>
                         )}
                       </div>
@@ -1405,11 +1467,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                         <div className="text-xs text-neutral-200 font-medium" title={mapDisplayName}>
                           {mapDisplayName}
                         </div>
-                        {duration && (
-                          <div className="text-xs text-neutral-400 mt-1">
-                            {duration}
-                          </div>
-                        )}
+                        <div className="text-xs text-neutral-400 mt-1">
+                          {duration || 'Duration unknown'}
+                        </div>
                       </div>
                     </div>
 

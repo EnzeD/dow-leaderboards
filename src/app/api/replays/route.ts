@@ -4,7 +4,7 @@ import { Buffer } from 'node:buffer';
 import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
-import { parseReplay } from 'dowde-replay-parser';
+import { parseReplay } from '@dowde-replay-parser/core';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { Filter } from 'bad-words';
 import { generateSignedReplayUrl, getClientIpHash, REPLAYS_BUCKET, supabaseAdmin } from './shared';
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
   // Query 1: Get metadata (contains all paths and data we need)
   const { data: metaRows, error: metaError } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, winner_team, updated_at, created_at')
+    .select('path, original_name, replay_name, map_name, game_version, match_duration_seconds, match_duration_label, profiles, raw_metadata, submitted_name, submitted_comment, status, uploader_ip_hash, winner_team, updated_at, created_at')
     .eq('status', 'published')
     .order('updated_at', { ascending: false })
     .limit(100);
@@ -197,6 +197,11 @@ export async function GET(req: NextRequest) {
       downloads: downloadMap.get(meta.path) ?? 0,
       replayName: meta.replay_name,
       mapName: meta.map_name,
+      gameVersion: typeof meta.game_version === 'string'
+        ? meta.game_version
+        : meta.game_version !== null && meta.game_version !== undefined
+          ? String(meta.game_version)
+          : null,
       matchDurationSeconds: meta.match_duration_seconds,
       matchDurationLabel: meta.match_duration_label,
       profiles: enrichedProfiles,
@@ -294,10 +299,20 @@ export async function POST(req: NextRequest) {
     let meta: any = null;
     let matchDurationSeconds: number | null = null;
     let matchDurationLabel: string | null = null;
+    let gameVersion: string | null = null;
     try {
       const tmpPath = joinPath(tmpdir(), `${objectKey.replace(/\//g, '_')}`);
       await writeFile(tmpPath, buffer);
       const parsed = parseReplay(tmpPath) as any;
+      const parsedGameVersion = parsed?.gameversion;
+      if (typeof parsedGameVersion === 'string') {
+        const trimmed = parsedGameVersion.trim();
+        gameVersion = trimmed.length > 0 ? trimmed : null;
+      } else if (typeof parsedGameVersion === 'number' && Number.isFinite(parsedGameVersion)) {
+        gameVersion = String(parsedGameVersion);
+      } else {
+        gameVersion = null;
+      }
       await unlink(tmpPath).catch(() => {});
 
       // parsed.matchduration is like "MM:SS" string
@@ -324,6 +339,7 @@ export async function POST(req: NextRequest) {
         raw_metadata: parsed ?? null,
       };
     } catch (parseError: any) {
+      gameVersion = null;
       // Check if this is specifically a non-DoW:DE replay file
       const errorMessage = parseError?.message || '';
       if (errorMessage.includes('Not a valid replay file for Warhammer 40,000: Dawn of War - Definitive Edition')) {
@@ -363,6 +379,7 @@ export async function POST(req: NextRequest) {
         original_name: fileName,
         replay_name: meta.replay_name,
         map_name: meta.map_name,
+        game_version: gameVersion,
         match_duration_seconds: matchDurationSeconds,
         match_duration_label: matchDurationLabel,
         profiles: meta.profiles,
@@ -420,7 +437,7 @@ export async function POST(req: NextRequest) {
   // Fetch the metadata row to return it in the response for immediate UI preview
   const { data: metaRow } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
+    .select('path, original_name, replay_name, map_name, game_version, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
     .eq('path', objectKey)
     .maybeSingle();
 
@@ -442,6 +459,11 @@ export async function POST(req: NextRequest) {
       originalName: metaRow.original_name,
       replayName: metaRow.replay_name,
       mapName: metaRow.map_name,
+      gameVersion: typeof metaRow.game_version === 'string'
+        ? metaRow.game_version
+        : metaRow.game_version !== null && metaRow.game_version !== undefined
+          ? String(metaRow.game_version)
+          : null,
       matchDurationSeconds: metaRow.match_duration_seconds,
       matchDurationLabel: metaRow.match_duration_label,
       profiles: enrichedProfiles,

@@ -305,6 +305,7 @@ CREATE TABLE public.replay_metadata (
   original_name text NOT NULL,
   replay_name text,
   map_name text,
+  game_version text,
   match_duration_seconds integer,
   match_duration_label text,
   profiles jsonb,
