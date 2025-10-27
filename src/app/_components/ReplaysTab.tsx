@@ -515,6 +515,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const handleLoadMoreReplays = useCallback(() => {
     setVisibleCount((prev) => Math.min(prev + VISIBLE_REPLAYS_INCREMENT, totalFilteredReplays));
   }, [totalFilteredReplays]);
+  const totalDownloadCount = useMemo(() => {
+    return filteredReplays.reduce((sum, replay) => sum + Math.max(0, replay.downloads ?? 0), 0);
+  }, [filteredReplays]);
 
   // Check if any filters are active
   const hasActiveFilters = selectedFactions.size > 0 ||
@@ -1392,6 +1395,16 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </div>
         ) : (
           <div className="space-y-3">
+            {!loadingList && (
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-neutral-400">
+                <span>
+                  Showing {visibleReplays.length.toLocaleString()} of {totalFilteredReplays.toLocaleString()} replays
+                </span>
+                <span>
+                  Total downloads: {totalDownloadCount.toLocaleString()}
+                </span>
+              </div>
+            )}
             {visibleReplays.map((replay) => {
               const mapDisplayName = getMapName(replay.mapName);
               const mapImagePath = getMapImage(replay.mapName);
