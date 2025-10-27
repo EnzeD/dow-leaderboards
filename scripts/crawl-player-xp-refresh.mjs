@@ -22,12 +22,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 const RELIC_BASE = "https://dow-api.reliclink.com";
 
-const BATCH_SIZE = Number.parseInt(process.env.XP_REFRESH_BATCH_SIZE ?? "1000", 10);
+const BATCH_SIZE = Number.parseInt(process.env.XP_REFRESH_BATCH_SIZE ?? "100", 10);
 const CONCURRENCY = Number.parseInt(process.env.XP_REFRESH_CONCURRENCY ?? "6", 10);
-const MATCH_FETCH_COUNT = Number.parseInt(process.env.XP_REFRESH_MATCH_COUNT ?? "20", 10);
+const MATCH_FETCH_COUNT = Number.parseInt(process.env.XP_REFRESH_MATCH_COUNT ?? "50", 10);
 const UPSERT_CHUNK_SIZE = Number.parseInt(process.env.XP_REFRESH_UPSERT_CHUNK ?? "500", 10);
 const RELIC_DELAY_MS = Number.parseInt(process.env.XP_REFRESH_RELIC_DELAY_MS ?? "150", 10);
-const RELIC_REQUEST_CAP = Number.parseInt(process.env.XP_REFRESH_RELIC_REQUEST_CAP ?? "20000", 10);
+const RELIC_REQUEST_CAP = Number.parseInt(process.env.XP_REFRESH_RELIC_REQUEST_CAP ?? "100000", 10);
 const LOG_EVERY = Number.parseInt(process.env.XP_REFRESH_LOG_EVERY ?? "100", 10);
 
 let relicRequestCount = 0;
