@@ -28,3 +28,6 @@ jobs:
 
       - name: Refresh player XP cache
         run: node scripts/crawl-player-xp-refresh.mjs
+
+      - name: Enrich player metadata
+        run: node scripts/enrich-players.mjs
