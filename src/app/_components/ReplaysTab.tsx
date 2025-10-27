@@ -105,6 +105,8 @@ const getTeamAccent = (teamId: number): TeamAccent => {
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILE_SIZE_MB = Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024));
+const INITIAL_VISIBLE_REPLAYS = 20;
+const VISIBLE_REPLAYS_INCREMENT = 20;
 
 const resolveErrorMessage = (code: string) => {
   switch (code) {
@@ -147,6 +149,14 @@ const resolveErrorMessage = (code: string) => {
     default:
       return 'Something went wrong. Please try again shortly.';
   }
+};
+
+const formatDurationFromSeconds = (totalSeconds: number): string => {
+  const normalized = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(normalized / 3600);
+  const minutes = Math.floor((normalized % 3600) / 60);
+  const seconds = normalized % 60;
+  return [hours, minutes, seconds].map((unit) => String(unit).padStart(2, '0')).join(':');
 };
 
 
@@ -319,6 +329,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     const options = previewTeamIds.length > 0 ? previewTeamIds : [1, 2];
     return options.slice(0, 8);
   }, [previewTeamIds]);
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_REPLAYS);
 
   // Pro badge state
   const [proBadgeStatuses, setProBadgeStatuses] = useState<Record<string, { isProMember: boolean; showBadge: boolean }>>({});
@@ -491,6 +502,20 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     return sortReplays(filteredReplays, sortMode);
   }, [filteredReplays, sortMode]);
 
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_REPLAYS);
+  }, [aliasSearch, selectedFactions, selectedFormats, selectedMaps, selectedVersions, customEloRange, sortMode]);
+
+  const totalFilteredReplays = sortedFilteredReplays.length;
+  const visibleReplays = useMemo(
+    () => sortedFilteredReplays.slice(0, visibleCount),
+    [sortedFilteredReplays, visibleCount]
+  );
+  const hasMoreReplays = visibleCount < totalFilteredReplays;
+  const handleLoadMoreReplays = useCallback(() => {
+    setVisibleCount((prev) => Math.min(prev + VISIBLE_REPLAYS_INCREMENT, totalFilteredReplays));
+  }, [totalFilteredReplays]);
+
   // Check if any filters are active
   const hasActiveFilters = selectedFactions.size > 0 ||
     selectedFormats.size > 0 ||
@@ -566,6 +591,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         .filter((entry: ReplayListEntry) => Boolean(entry.path));
 
       setReplays(normalized);
+      setVisibleCount(INITIAL_VISIBLE_REPLAYS);
       setActionErrorCode(null);
     } catch (error) {
       const code = error instanceof Error ? error.message : 'list_failed';
@@ -959,7 +985,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               </p>
               <p>
                 Map: <span className="text-neutral-200">{preview.mapName || 'Unknown'}</span>
-                {' '}· Duration: <span className="text-neutral-200">{preview.matchDurationLabel || (preview.matchDurationSeconds ? `${Math.floor((preview.matchDurationSeconds||0)/60)}:${String((preview.matchDurationSeconds||0)%60).padStart(2,'0')}` : 'Unknown')}</span>
+                {' '}· Duration: <span className="text-neutral-200">{preview.matchDurationLabel || (preview.matchDurationSeconds != null ? formatDurationFromSeconds(preview.matchDurationSeconds) : 'Unknown')}</span>
                 {' '}· Version: <span className="text-neutral-200">{preview.gameVersion || 'Unknown'}</span>
               </p>
               {Array.isArray(preview.profiles) && preview.profiles.length > 0 && (
@@ -1366,10 +1392,13 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           </div>
         ) : (
           <div className="space-y-3">
-            {sortedFilteredReplays.map((replay) => {
+            {visibleReplays.map((replay) => {
               const mapDisplayName = getMapName(replay.mapName);
               const mapImagePath = getMapImage(replay.mapName);
-              const duration = replay.matchDurationLabel || (replay.matchDurationSeconds ? `${Math.floor((replay.matchDurationSeconds||0)/60)}:${String((replay.matchDurationSeconds||0)%60).padStart(2,'0')}` : null);
+              const duration = replay.matchDurationLabel
+                || (replay.matchDurationSeconds != null
+                  ? formatDurationFromSeconds(replay.matchDurationSeconds)
+                  : null);
               const averageElo = calculateAverageElo(replay);
               const teamIds = extractTeamIds(replay.profiles);
               const isTwoTeamLayout = teamIds.length <= 2;
@@ -1693,6 +1722,16 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 </div>
               );
             })}
+            {hasMoreReplays && (
+              <div className="flex justify-center">
+                <button
+                  onClick={handleLoadMoreReplays}
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-5 py-2 text-sm font-medium text-white transition-colors duration-300 hover:bg-neutral-700/80"
+                >
+                  See more replays
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

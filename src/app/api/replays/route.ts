@@ -315,13 +315,32 @@ export async function POST(req: NextRequest) {
       }
       await unlink(tmpPath).catch(() => {});
 
-      // parsed.matchduration is like "MM:SS" string
-      const md = typeof parsed?.matchduration === 'string' ? parsed.matchduration : null;
-      if (md && /^\d{1,2}:\d{2}$/.test(md)) {
-        const [m, s] = md.split(':').map((v: string) => Number(v));
-        if (Number.isFinite(m) && Number.isFinite(s)) {
-          matchDurationSeconds = m * 60 + s;
-          matchDurationLabel = md;
+      const mdRaw = typeof parsed?.matchduration === 'string' ? parsed.matchduration.trim() : null;
+      if (mdRaw) {
+        const segments = mdRaw.split(':').map((segment: string) => Number(segment));
+        if (segments.every((value: number) => Number.isFinite(value))) {
+          let totalSeconds: number | null = null;
+
+          if (segments.length === 2) {
+            const [minutes, seconds] = segments;
+            totalSeconds = minutes * 60 + seconds;
+          } else if (segments.length === 3) {
+            const [hours, minutes, seconds] = segments;
+            totalSeconds = hours * 3600 + minutes * 60 + seconds;
+          }
+
+          if (totalSeconds !== null) {
+            const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
+            matchDurationSeconds = normalizedSeconds;
+
+            const hours = Math.floor(normalizedSeconds / 3600);
+            const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+            const seconds = normalizedSeconds % 60;
+
+            matchDurationLabel = [hours, minutes, seconds]
+              .map((value) => String(value).padStart(2, '0'))
+              .join(':');
+          }
         }
       }
       // Normalize faction names to match the rest of the codebase
