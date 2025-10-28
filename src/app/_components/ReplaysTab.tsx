@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import Image from "next/image";
 import { EnrichedReplayProfile, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { PlayerTeam, PlayerList } from '@/components/ClickablePlayer';
@@ -322,7 +322,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [preview, setPreview] = useState<ReplayListEntry | null>(null);
   const [formName, setFormName] = useState<string>('');
   const [formComment, setFormComment] = useState<string>('');
-  const [formWinnerTeam, setFormWinnerTeam] = useState<number | null>(null);
+  const [formWinnerTeam, setFormWinnerTeam] = useState<number | 'unknown' | null>(null);
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
   const previewTeamIds = useMemo(() => extractTeamIds(preview?.profiles ?? null), [preview]);
   const previewWinnerOptions = useMemo(() => {
@@ -608,25 +608,27 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     void loadReplays();
   }, [loadReplays]);
 
-  const handleUpload = useCallback(async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleUpload = useCallback(async (file: File) => {
     setUploadErrorCode(null);
     setUploadSuccessMessage(null);
-
-    const file = fileInputRef.current?.files?.[0] ?? null;
-
-    if (!file) {
-      setUploadErrorCode('missing_replay');
-      return;
-    }
+    setPreview(null);
+    setFormName('');
+    setFormComment('');
+    setFormWinnerTeam(null);
 
     if (!file.name.toLowerCase().endsWith('.rec')) {
       setUploadErrorCode('invalid_extension');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       setUploadErrorCode('file_too_large');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       return;
     }
 
@@ -679,17 +681,28 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       } else {
         setUploadSuccessMessage('Replay uploaded successfully.');
       }
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
       // Do not refresh list here; unpublished previews should not appear in the list
     } catch (error) {
       const code = error instanceof Error ? error.message : 'upload_failed';
       setUploadErrorCode(code || 'upload_failed');
     } finally {
       setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-  }, []);
+  }, [fileInputRef]);
+
+  const handleFileSelectionChange = useCallback(() => {
+    if (uploading) {
+      return;
+    }
+    const file = fileInputRef.current?.files?.[0] ?? null;
+    if (!file) {
+      return;
+    }
+    void handleUpload(file);
+  }, [handleUpload, fileInputRef, uploading]);
 
   const requestSignedUrl = useCallback(async (path: string) => {
     const response = await fetch(`/api/replays?path=${encodeURIComponent(path)}`, {
@@ -823,13 +836,20 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
   const handleSaveDetails = useCallback(async () => {
     if (!preview?.path) return;
+    if (formWinnerTeam === null) return;
     setSavingDetails(true);
     setActionErrorCode(null);
     try {
       const res = await fetch('/api/replays', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: preview.path, submittedName: formName, submittedComment: formComment, winnerTeam: formWinnerTeam, status: 'published' }),
+        body: JSON.stringify({
+          path: preview.path,
+          submittedName: formName,
+          submittedComment: formComment,
+          winnerTeam: formWinnerTeam === 'unknown' ? null : formWinnerTeam,
+          status: 'published'
+        }),
       });
       const payload = await res.json().catch(() => null);
       if (!res.ok) {
@@ -936,38 +956,38 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             Upload Dawn of War `.rec` files and let other commanders download your favourite matches.
           </p>
         </div>
-        <form onSubmit={handleUpload} className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 space-y-3 sm:space-y-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              name="replay"
-              accept=".rec"
-              className="block w-full text-sm text-neutral-200 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-800/80 file:px-4 file:py-2 file:text-sm file:font-medium file:text-neutral-100 hover:file:bg-neutral-700/80"
-              onChange={() => {
-                setUploadErrorCode(null);
-                setUploadSuccessMessage(null);
-                setPreview(null);
-                setFormName('');
-                setFormComment('');
-                setFormWinnerTeam(null);
-              }}
-            />
-            <button
-              type="submit"
-              disabled={uploading}
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-5 py-2 text-sm font-medium text-white transition-colors duration-300 hover:bg-neutral-700/80 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              {uploading ? 'Uploading...' : 'Upload Replay'}
-            </button>
-          </div>
+        <div className="space-y-4">
+          <label htmlFor="replay-upload-input" className="sr-only">
+            Upload replay file
+          </label>
+          <input
+            ref={fileInputRef}
+            id="replay-upload-input"
+            type="file"
+            name="replay"
+            accept=".rec"
+            className="sr-only"
+            onChange={handleFileSelectionChange}
+          />
+          <button
+            type="button"
+            disabled={uploading}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-neutral-600/60 bg-neutral-800/80 px-5 py-2 text-sm font-medium text-white transition-colors duration-300 hover:bg-neutral-700/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => {
+              if (!uploading) {
+                fileInputRef.current?.click();
+              }
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            {uploading ? 'Uploading...' : 'Upload Replay'}
+          </button>
           <p className="text-sm text-neutral-500">
             Only `.rec` files up to {MAX_FILE_SIZE_MB}MB are accepted.
           </p>
-        </form>
+        </div>
         {uploadErrorMessage && (
           <div className="rounded-md border border-red-700/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
             {uploadErrorMessage}
@@ -1021,7 +1041,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-xs text-neutral-400 font-medium">Winner (optional)</label>
+              <label className="text-xs text-neutral-400 font-medium">Winner (required)</label>
               <div className="flex flex-wrap gap-2">
                 {previewWinnerOptions.map(teamId => {
                   const accent = getTeamAccent(teamId);
@@ -1043,9 +1063,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 })}
                 <button
                   type="button"
-                  onClick={() => setFormWinnerTeam(null)}
+                  onClick={() => setFormWinnerTeam('unknown')}
                   className={`px-3 py-2 text-xs font-medium rounded-md border transition-colors ${
-                    formWinnerTeam === null
+                    formWinnerTeam === 'unknown'
                       ? 'bg-neutral-700/50 border-neutral-500/60 text-neutral-200'
                       : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
                   }`}
@@ -1058,7 +1078,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               <button
                 type="button"
                 onClick={() => void handleSaveDetails()}
-                disabled={savingDetails || !formName.trim()}
+                disabled={savingDetails || !formName.trim() || formWinnerTeam === null}
                 className="inline-flex items-center justify-center rounded-md border border-emerald-700/60 bg-emerald-800/80 px-3 py-1.5 text-sm font-medium text-emerald-100 hover:bg-emerald-700/80 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {savingDetails ? 'Saving...' : 'Save & publish'}
