@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { Filter } from 'bad-words';
+import * as ReplayParserModule from '@dowde-replay-parser/core';
 import { generateSignedReplayUrl, getClientIpHash, REPLAYS_BUCKET, supabaseAdmin } from './shared';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB prototype limit
@@ -19,38 +20,18 @@ let cachedParseReplay: ParseReplayFn | null = null;
 
 const loadParseReplay = async (): Promise<ParseReplayFn> => {
   if (cachedParseReplay) return cachedParseReplay;
+  const parseReplay = typeof (ReplayParserModule as any)?.parseReplay === 'function'
+    ? (ReplayParserModule as any).parseReplay
+    : typeof (ReplayParserModule as any)?.default === 'function'
+      ? (ReplayParserModule as any).default
+      : null;
 
-  const moduleSpecifier = ['@', 'dowde-replay-parser/core'].join('');
-
-  const tryRequire = () => {
-    try {
-      const req = (globalThis as any)?.require ?? (eval('require') as any);
-      if (!req) return null;
-      const mod = req(moduleSpecifier);
-      return typeof mod?.parseReplay === 'function' ? mod.parseReplay as ParseReplayFn : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const fromRequire = tryRequire();
-  if (fromRequire) {
-    cachedParseReplay = fromRequire;
-    return cachedParseReplay;
+  if (!parseReplay) {
+    throw new Error('replay_parser_unavailable');
   }
 
-  try {
-    const dynamicImport = new Function('modulePath', 'return import(modulePath);');
-    const mod = await (dynamicImport(moduleSpecifier) as Promise<any>);
-    if (mod && typeof mod.parseReplay === 'function') {
-      cachedParseReplay = mod.parseReplay as ParseReplayFn;
-      return cachedParseReplay;
-    }
-  } catch {
-    // ignore
-  }
-
-  throw new Error('replay_parser_unavailable');
+  cachedParseReplay = parseReplay as ParseReplayFn;
+  return cachedParseReplay;
 };
 
 const sanitizeBaseName = (input: string): string => {
