@@ -1,23 +1,27 @@
-import { NextResponse } from "next/server";
-import { getSupabase, PUBLIC_CACHE_CONTROL } from "@/app/api/stats/helpers";
+import { NextRequest, NextResponse } from "next/server";
+import { getSupabase, PUBLIC_CACHE_CONTROL, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type SummaryResponse = {
   totalMatches: number;
   generatedAt: string;
+  ratingFloor: number;
   reason?: string;
 };
 
 const ERROR_HEADERS = { "Cache-Control": "no-store" };
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = getSupabase();
   const generatedAt = new Date().toISOString();
+  const params = new URL(req.url).searchParams;
+  const ratingFloor = resolveRatingFloor(params);
 
   if (!supabase) {
     return NextResponse.json<SummaryResponse>(
       {
         totalMatches: 0,
         generatedAt,
+        ratingFloor,
         reason: "supabase_unavailable",
       },
       { status: 503, headers: ERROR_HEADERS },
@@ -27,8 +31,9 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from("stats_summary")
-      .select("metric, value, computed_at")
+      .select("metric, value, computed_at, rating_floor")
       .eq("metric", "total_1v1_matches")
+      .eq("rating_floor", ratingFloor)
       .maybeSingle();
 
     if (error) {
@@ -37,6 +42,7 @@ export async function GET() {
         {
           totalMatches: 0,
           generatedAt,
+          ratingFloor,
           reason: "query_failed",
         },
         { status: 500, headers: ERROR_HEADERS },
@@ -53,6 +59,7 @@ export async function GET() {
       {
         totalMatches,
         generatedAt: computedAt,
+        ratingFloor,
       },
       { headers: { "Cache-Control": PUBLIC_CACHE_CONTROL } },
     );
@@ -62,6 +69,7 @@ export async function GET() {
       {
         totalMatches: 0,
         generatedAt,
+        ratingFloor,
         reason: "unexpected_error",
       },
       { status: 500, headers: ERROR_HEADERS },

@@ -4,7 +4,6 @@ import { Buffer } from 'node:buffer';
 import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
-import { parseReplay } from '@dowde-replay-parser/core';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { Filter } from 'bad-words';
 import { generateSignedReplayUrl, getClientIpHash, REPLAYS_BUCKET, supabaseAdmin } from './shared';
@@ -13,6 +12,46 @@ const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB prototype limit
 const MAX_UPLOADS_PER_HOUR = 20; // Rate limit per IP
 
 const profanityFilter = new Filter();
+
+type ParseReplayFn = (path: string) => Promise<unknown> | unknown;
+
+let cachedParseReplay: ParseReplayFn | null = null;
+
+const loadParseReplay = async (): Promise<ParseReplayFn> => {
+  if (cachedParseReplay) return cachedParseReplay;
+
+  const moduleSpecifier = ['@', 'dowde-replay-parser/core'].join('');
+
+  const tryRequire = () => {
+    try {
+      const req = (globalThis as any)?.require ?? (eval('require') as any);
+      if (!req) return null;
+      const mod = req(moduleSpecifier);
+      return typeof mod?.parseReplay === 'function' ? mod.parseReplay as ParseReplayFn : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const fromRequire = tryRequire();
+  if (fromRequire) {
+    cachedParseReplay = fromRequire;
+    return cachedParseReplay;
+  }
+
+  try {
+    const dynamicImport = new Function('modulePath', 'return import(modulePath);');
+    const mod = await (dynamicImport(moduleSpecifier) as Promise<any>);
+    if (mod && typeof mod.parseReplay === 'function') {
+      cachedParseReplay = mod.parseReplay as ParseReplayFn;
+      return cachedParseReplay;
+    }
+  } catch {
+    // ignore
+  }
+
+  throw new Error('replay_parser_unavailable');
+};
 
 const sanitizeBaseName = (input: string): string => {
   return input
@@ -303,7 +342,8 @@ export async function POST(req: NextRequest) {
     try {
       const tmpPath = joinPath(tmpdir(), `${objectKey.replace(/\//g, '_')}`);
       await writeFile(tmpPath, buffer);
-      const parsed = parseReplay(tmpPath) as any;
+      const parseReplay = await loadParseReplay();
+      const parsed = await Promise.resolve(parseReplay(tmpPath)) as any;
       const parsedGameVersion = parsed?.gameversion;
       if (typeof parsedGameVersion === 'string') {
         const trimmed = parsedGameVersion.trim();
@@ -361,6 +401,10 @@ export async function POST(req: NextRequest) {
       gameVersion = null;
       // Check if this is specifically a non-DoW:DE replay file
       const errorMessage = parseError?.message || '';
+      if (errorMessage === 'replay_parser_unavailable') {
+        console.error('Replay parser dependency missing');
+        return NextResponse.json({ error: 'replay_parser_unavailable' }, { status: 503 });
+      }
       if (errorMessage.includes('Not a valid replay file for Warhammer 40,000: Dawn of War - Definitive Edition')) {
         console.log('Invalid DoW:DE replay file detected, removing from storage:', objectKey);
 

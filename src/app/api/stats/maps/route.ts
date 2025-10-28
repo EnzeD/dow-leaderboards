@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, parseIntegerParam, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber } from "@/app/api/stats/helpers";
+import { getSupabase, parseIntegerParam, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type MapsResponse = {
   windowDays: number;
   limit: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: Array<{
     mapIdentifier: string;
@@ -31,6 +32,7 @@ export async function GET(req: NextRequest) {
       {
         windowDays: 90,
         limit: DEFAULT_LIMIT,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "supabase_unavailable",
@@ -44,14 +46,16 @@ export async function GET(req: NextRequest) {
   const requestedWindow = resolveWindowDays(params);
   const windowDays = pickAllowedNumber(requestedWindow, ALLOWED_WINDOWS, 90);
   const limit = parseIntegerParam(params, "limit", DEFAULT_LIMIT, 5, MAX_LIMIT);
+  const ratingFloor = resolveRatingFloor(params);
 
   try {
     const { data, error } = await supabase
       .from("stats_map_overview")
       .select(
-        "map_identifier, map_name, matches, wins, losses, winrate, last_played, computed_at",
+        "map_identifier, map_name, matches, wins, losses, winrate, last_played, computed_at, rating_floor",
       )
       .eq("window_days", windowDays)
+      .eq("rating_floor", ratingFloor)
       .order("matches", { ascending: false })
       .limit(limit);
 
@@ -61,6 +65,7 @@ export async function GET(req: NextRequest) {
         {
           windowDays,
           limit,
+          ratingFloor,
           generatedAt,
           rows: [],
           reason: "query_failed",
@@ -91,6 +96,7 @@ export async function GET(req: NextRequest) {
       {
         windowDays,
         limit,
+        ratingFloor,
         generatedAt: computedAt,
         rows,
       },
@@ -102,6 +108,7 @@ export async function GET(req: NextRequest) {
       {
         windowDays,
         limit,
+        ratingFloor,
         generatedAt,
         rows: [],
         reason: "unexpected_error",

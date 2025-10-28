@@ -24,6 +24,7 @@ type MapOverviewRow = {
 
 type MapsResponse = {
   windowDays: number;
+  ratingFloor: number;
   generatedAt: string;
   limit: number;
   rows: MapOverviewRow[];
@@ -153,7 +154,11 @@ const hexToRgba = (hex: string, alpha: number): string => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-export default function StatsMapsPanel() {
+type StatsMapsPanelProps = {
+  ratingFloor: number;
+};
+
+export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
   const [windowDays, setWindowDays] = useState<number>(90);
   const [reloadKey, setReloadKey] = useState(0);
   const [expandedMap, setExpandedMap] = useState<string | null>(null);
@@ -178,7 +183,7 @@ export default function StatsMapsPanel() {
     const load = async () => {
       setMapsState(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const res = await fetch(`/api/stats/maps?windowDays=${windowDays}`, {
+        const res = await fetch(`/api/stats/maps?windowDays=${windowDays}&minRating=${ratingFloor}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -221,10 +226,11 @@ export default function StatsMapsPanel() {
     load();
 
     return () => controller.abort();
-  }, [windowDays, reloadKey]);
+  }, [windowDays, reloadKey, ratingFloor]);
 
   const maps = useMemo(() => mapsState.data?.rows ?? [], [mapsState.data]);
   const effectiveWindow = mapsState.data?.windowDays ?? windowDays;
+  const effectiveRating = mapsState.data?.ratingFloor ?? ratingFloor;
 
   const [columns, setColumns] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
@@ -280,7 +286,7 @@ export default function StatsMapsPanel() {
 
     try {
       const res = await fetch(
-        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}?windowDays=${effectiveWindow}`,
+        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}?windowDays=${effectiveWindow}&minRating=${effectiveRating}`,
       );
       if (!res.ok) {
         let reason = "Failed to load breakdown.";
@@ -334,7 +340,7 @@ export default function StatsMapsPanel() {
 
     try {
       const res = await fetch(
-        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}/race/${raceId}?windowDays=${effectiveWindow}`,
+        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}/race/${raceId}?windowDays=${effectiveWindow}&minRating=${effectiveRating}`,
       );
 
       if (!res.ok) {

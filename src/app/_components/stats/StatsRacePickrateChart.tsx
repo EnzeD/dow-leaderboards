@@ -23,6 +23,7 @@ type RacePickrateRow = {
 
 type RacePickrateResponse = {
   weeks: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: RacePickrateRow[];
   reason?: string;
@@ -61,7 +62,7 @@ const formatWeek = (value: string): string => {
   return weekLabelFormatter.format(date);
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, factionOrder }: { active?: boolean; payload?: any[]; label?: string; factionOrder: ReturnType<typeof allFactions>; }) => {
   if (!active || !payload || !payload.length) return null;
   const entry = payload[0]?.payload as ChartDatum | undefined;
   if (!entry) return null;
@@ -81,12 +82,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         </span>
       </div>
       <div className="mt-3 space-y-1.5">
-        {payload.map((item: any) => {
-          const dataKey = String(item.dataKey);
-          const actual = Number(entry[dataKey as keyof ChartDatum] ?? 0);
+        {factionOrder.map(faction => {
+          const dataKey = `race_${faction.raceId}` as const;
+          const actual = Number(entry[dataKey] ?? 0);
           if (!Number.isFinite(actual) || actual <= 0) return null;
           const percent = totalPicks > 0 ? ((actual / totalPicks) * 100).toFixed(1) : "0.0";
-          const colour = item.color;
+          const colour = getFactionHexColor(faction.raceId);
           return (
             <div key={dataKey} className="flex items-center justify-between gap-4">
               <span className="flex items-center gap-3">
@@ -95,7 +96,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                   style={{ backgroundColor: colour }}
                   aria-hidden="true"
                 />
-                <span>{getFactionName(Number(dataKey.replace("race_", "")))}</span>
+                <span>{faction.name}</span>
               </span>
               <span className="text-neutral-300">
                 {formatCount(actual)} picks ({percent}%)
@@ -108,8 +109,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export default function StatsRacePickrateChart() {
+type StatsRacePickrateChartProps = {
+  ratingFloor: number;
+};
+
+export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrateChartProps) {
   const factions = useMemo(() => allFactions(), []);
+  const legendOrder = useMemo(() => [...factions].reverse(), [factions]);
   const [weeks, setWeeks] = useState<number>(6);
   const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState<LoadingState>({
@@ -124,7 +130,7 @@ export default function StatsRacePickrateChart() {
     const load = async () => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const res = await fetch(`/api/stats/races?weeks=${weeks}`, {
+        const res = await fetch(`/api/stats/races?weeks=${weeks}&minRating=${ratingFloor}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -163,7 +169,7 @@ export default function StatsRacePickrateChart() {
     load();
 
     return () => controller.abort();
-  }, [weeks, reloadKey]);
+  }, [weeks, reloadKey, ratingFloor]);
 
   const chartData: ChartDatum[] = useMemo(() => {
     if (!state.data?.rows?.length) return [];
@@ -182,11 +188,12 @@ export default function StatsRacePickrateChart() {
   }, [state.data, factions]);
 
   const effectiveWeeks = state.data?.weeks ?? weeks;
+  const effectiveRating = state.data?.ratingFloor ?? ratingFloor;
 
   return (
     <StatsCard
       title="Race pick share"
-      description={`Share of races picked in ranked 1v1 matches over the last ${effectiveWeeks} weeks.`}
+      description={`Share of races picked in ranked 1v1 matches over the last ${effectiveWeeks} weeks${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
       actions={
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-400">Window</span>
@@ -241,11 +248,23 @@ export default function StatsRacePickrateChart() {
                 tick={{ fill: "#a3a3a3", fontSize: 12 }}
                 width={40}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<CustomTooltip factionOrder={legendOrder} />} />
               <Legend
                 verticalAlign="top"
-                height={32}
-                wrapperStyle={{ color: "#d4d4d4", fontSize: 12 }}
+                height={38}
+                content={() => (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-neutral-300">
+                    {legendOrder.map(faction => (
+                      <span key={faction.raceId} className="flex items-center gap-1.5">
+                        <span
+                          className="inline-flex h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: getFactionHexColor(faction.raceId) }}
+                        />
+                        <span>{faction.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               />
               {factions.map(faction => (
                 <Bar

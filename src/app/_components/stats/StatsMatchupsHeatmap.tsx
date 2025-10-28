@@ -28,6 +28,7 @@ type MatchupRow = {
 
 type MatchupResponse = {
   windowDays: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: MatchupRow[];
   reason?: string;
@@ -50,7 +51,11 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
 const keyFor = (myRaceId: number, opponentRaceId: number) =>
   `${myRaceId}-${opponentRaceId}`;
 
-export default function StatsMatchupsHeatmap() {
+type StatsMatchupsHeatmapProps = {
+  ratingFloor: number;
+};
+
+export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatmapProps) {
   const factions = useMemo(() => allFactions(), []);
   const [windowDays, setWindowDays] = useState<number>(90);
   const [reloadKey, setReloadKey] = useState(0);
@@ -66,7 +71,7 @@ export default function StatsMatchupsHeatmap() {
     const load = async () => {
       setState(prev => ({ ...prev, loading: true, error: null }));
       try {
-        const res = await fetch(`/api/stats/matchups?windowDays=${windowDays}`, {
+        const res = await fetch(`/api/stats/matchups?windowDays=${windowDays}&minRating=${ratingFloor}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -105,7 +110,7 @@ export default function StatsMatchupsHeatmap() {
     load();
 
     return () => controller.abort();
-  }, [windowDays, reloadKey]);
+  }, [windowDays, reloadKey, ratingFloor]);
 
   const matrix = useMemo(() => {
     const map = new Map<string, MatchupRow>();
@@ -145,11 +150,12 @@ export default function StatsMatchupsHeatmap() {
   }, [matrix]);
 
   const effectiveWindow = state.data?.windowDays ?? windowDays;
+  const effectiveRating = state.data?.ratingFloor ?? ratingFloor;
 
   return (
     <StatsCard
       title="Matchup heatmap"
-      description={`Row faction performance versus column faction across ranked 1v1 matches in the last ${effectiveWindow} days.`}
+      description={`Row faction performance versus column faction across ranked 1v1 matches in the last ${effectiveWindow} days${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
       actions={
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-400">Range</span>

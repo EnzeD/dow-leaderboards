@@ -4,12 +4,14 @@ import {
   PUBLIC_CACHE_CONTROL,
   resolveWindowDays,
   pickAllowedNumber,
+  resolveRatingFloor,
 } from "@/app/api/stats/helpers";
 
 type MapRaceMatchupsResponse = {
   mapIdentifier: string;
   raceId: number;
   windowDays: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: Array<{
     opponentRaceId: number;
@@ -45,6 +47,7 @@ export async function GET(
 
   const decodedMapId = decodeURIComponent(id ?? "").trim();
   const parsedRaceId = Number(raceId);
+  const searchParams = new URL(req.url).searchParams;
 
   if (!decodedMapId) {
     return NextResponse.json<MapRaceMatchupsResponse>(
@@ -52,6 +55,7 @@ export async function GET(
         mapIdentifier: "unknown",
         raceId: Number.isFinite(parsedRaceId) ? parsedRaceId : -1,
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "missing_identifier",
@@ -66,6 +70,7 @@ export async function GET(
         mapIdentifier: decodedMapId,
         raceId: -1,
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "invalid_race_id",
@@ -80,6 +85,7 @@ export async function GET(
         mapIdentifier: decodedMapId,
         raceId: parsedRaceId,
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "supabase_unavailable",
@@ -88,16 +94,18 @@ export async function GET(
     );
   }
 
-  const requestedWindow = resolveWindowDays(new URL(req.url).searchParams);
+  const requestedWindow = resolveWindowDays(searchParams);
   const windowDays = pickAllowedNumber(requestedWindow, ALLOWED_WINDOWS, 90);
+  const ratingFloor = resolveRatingFloor(searchParams);
 
   try {
     const { data, error } = await supabase
       .from("stats_map_race_matchups")
       .select(
-        "opponent_race_id, matches, wins, losses, winrate, last_played, computed_at",
+        "opponent_race_id, matches, wins, losses, winrate, last_played, computed_at, rating_floor",
       )
       .eq("window_days", windowDays)
+      .eq("rating_floor", ratingFloor)
       .eq("map_identifier", decodedMapId)
       .eq("my_race_id", parsedRaceId)
       .order("matches", { ascending: false })
@@ -110,6 +118,7 @@ export async function GET(
           mapIdentifier: decodedMapId,
           raceId: parsedRaceId,
           windowDays,
+          ratingFloor,
           generatedAt,
           rows: [],
           reason: "query_failed",
@@ -139,6 +148,7 @@ export async function GET(
         mapIdentifier: decodedMapId,
         raceId: parsedRaceId,
         windowDays,
+        ratingFloor,
         generatedAt:
           typedData?.[0]?.computed_at && typeof typedData[0].computed_at === "string"
             ? typedData[0].computed_at
@@ -154,6 +164,7 @@ export async function GET(
         mapIdentifier: decodedMapId,
         raceId: parsedRaceId,
         windowDays,
+        ratingFloor,
         generatedAt,
         rows: [],
         reason: "unexpected_error",

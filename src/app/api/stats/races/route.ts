@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, parseIntegerParam, PUBLIC_CACHE_CONTROL, pickAllowedNumber } from "@/app/api/stats/helpers";
+import { getSupabase, parseIntegerParam, PUBLIC_CACHE_CONTROL, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type RacePickrateResponse = {
   weeks: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: Array<{
     weekStart: string;
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<RacePickrateResponse>(
       {
         weeks: DEFAULT_WEEKS,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "supabase_unavailable",
@@ -36,11 +38,13 @@ export async function GET(req: NextRequest) {
   const params = url.searchParams;
   const requestedWeeks = parseIntegerParam(params, "weeks", DEFAULT_WEEKS, 6, 52);
   const weeks = pickAllowedNumber(requestedWeeks, ALLOWED_WEEKS, DEFAULT_WEEKS);
+  const ratingFloor = resolveRatingFloor(params);
 
   try {
     const { data, error } = await supabase
       .from("stats_race_pickrate")
-      .select("week_start, race_id, pick_count, match_count, computed_at")
+      .select("week_start, race_id, pick_count, match_count, computed_at, rating_floor")
+      .eq("rating_floor", ratingFloor)
       .order("week_start", { ascending: true });
 
     if (error) {
@@ -48,6 +52,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json<RacePickrateResponse>(
         {
           weeks,
+          ratingFloor,
           generatedAt,
           rows: [],
           reason: "query_failed",
@@ -93,6 +98,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<RacePickrateResponse>(
       {
         weeks,
+        ratingFloor,
         generatedAt: computedAt,
         rows,
       },
@@ -103,6 +109,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<RacePickrateResponse>(
       {
         weeks,
+        ratingFloor,
         generatedAt,
         rows: [],
         reason: "unexpected_error",

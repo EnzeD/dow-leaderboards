@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber } from "@/app/api/stats/helpers";
+import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type MatchupsResponse = {
   windowDays: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: Array<{
     myRaceId: number;
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<MatchupsResponse>(
       {
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "supabase_unavailable",
@@ -39,20 +41,23 @@ export async function GET(req: NextRequest) {
   const params = url.searchParams;
   const requestedWindow = resolveWindowDays(params);
   const windowDays = pickAllowedNumber(requestedWindow, ALLOWED_WINDOWS, 90);
+  const ratingFloor = resolveRatingFloor(params);
 
   try {
     const { data, error } = await supabase
       .from("stats_matchup_matrix")
       .select(
-        "my_race_id, opponent_race_id, matches, wins, losses, winrate, last_played, computed_at",
+        "my_race_id, opponent_race_id, matches, wins, losses, winrate, last_played, computed_at, rating_floor",
       )
-      .eq("window_days", windowDays);
+      .eq("window_days", windowDays)
+      .eq("rating_floor", ratingFloor);
 
     if (error) {
       console.error("[stats] stats_matchup_matrix query failed", error);
       return NextResponse.json<MatchupsResponse>(
         {
           windowDays,
+          ratingFloor,
           generatedAt,
           rows: [],
           reason: "query_failed",
@@ -87,6 +92,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<MatchupsResponse>(
       {
         windowDays,
+        ratingFloor,
         generatedAt: computedAt,
         rows,
       },
@@ -97,6 +103,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json<MatchupsResponse>(
       {
         windowDays,
+        ratingFloor,
         generatedAt,
         rows: [],
         reason: "unexpected_error",

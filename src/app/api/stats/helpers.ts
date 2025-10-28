@@ -51,3 +51,14 @@ export const pickAllowedNumber = (
 ): number => {
   return allowed.includes(value) ? value : fallback;
 };
+
+export const ALLOWED_RATING_FLOORS = [0, 1200, 1400] as const;
+
+export const resolveRatingFloor = (
+  params: URLSearchParams,
+  key: string = "minRating",
+  fallback: number = 0,
+): number => {
+  const requested = parseIntegerParam(params, key, fallback, 0, 10000);
+  return pickAllowedNumber(requested, ALLOWED_RATING_FLOORS, fallback);
+};

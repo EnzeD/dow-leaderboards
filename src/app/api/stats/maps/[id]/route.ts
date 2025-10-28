@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber } from "@/app/api/stats/helpers";
+import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type MapRaceResponse = {
   mapIdentifier: string;
   windowDays: number;
+  ratingFloor: number;
   generatedAt: string;
   rows: Array<{
     raceId: number;
@@ -35,6 +36,7 @@ export async function GET(
       {
         mapIdentifier: "unknown",
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "missing_identifier",
@@ -48,6 +50,7 @@ export async function GET(
       {
         mapIdentifier: rawIdentifier,
         windowDays: 90,
+        ratingFloor: 0,
         generatedAt,
         rows: [],
         reason: "supabase_unavailable",
@@ -58,14 +61,16 @@ export async function GET(
 
   const requestedWindow = resolveWindowDays(url.searchParams);
   const windowDays = pickAllowedNumber(requestedWindow, ALLOWED_WINDOWS, 90);
+  const ratingFloor = resolveRatingFloor(url.searchParams);
 
   try {
     const { data, error } = await supabase
       .from("stats_map_race_breakdown")
       .select(
-        "map_identifier, race_id, matches, wins, losses, winrate, last_played, computed_at",
+        "map_identifier, race_id, matches, wins, losses, winrate, last_played, computed_at, rating_floor",
       )
       .eq("window_days", windowDays)
+      .eq("rating_floor", ratingFloor)
       .eq("map_identifier", rawIdentifier)
       .order("matches", { ascending: false });
 
@@ -75,6 +80,7 @@ export async function GET(
         {
           mapIdentifier: rawIdentifier,
           windowDays,
+          ratingFloor,
           generatedAt,
           rows: [],
           reason: "query_failed",
@@ -111,6 +117,7 @@ export async function GET(
       {
         mapIdentifier,
         windowDays,
+        ratingFloor,
         generatedAt: computedAt,
         rows,
       },
@@ -122,6 +129,7 @@ export async function GET(
       {
         mapIdentifier: rawIdentifier,
         windowDays,
+        ratingFloor,
         generatedAt,
         rows: [],
         reason: "unexpected_error",
