@@ -8,6 +8,11 @@ import { getMapName, getMapImage } from '@/lib/mapMetadata';
 
 type Player = { alias: string; team: number; faction: string; id?: number | null; playertype?: string | null };
 
+type ReplayGameOption = {
+  key: string;
+  value: string;
+};
+
 type ReplayListEntry = {
   path: string;
   originalName: string;
@@ -27,6 +32,8 @@ type ReplayListEntry = {
   status: 'pending' | 'published' | string;
   winnerTeam?: number | null;
   canEdit?: boolean;
+  gameRules: string[];
+  gameOptions: ReplayGameOption[];
 };
 
 type SortMode = 'downloads' | 'elo' | 'recent';
@@ -107,6 +114,26 @@ const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const MAX_FILE_SIZE_MB = Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024));
 const INITIAL_VISIBLE_REPLAYS = 20;
 const VISIBLE_REPLAYS_INCREMENT = 20;
+const GAME_OPTION_LABELS: Record<string, string> = {
+  aidifficulty: 'AI difficulty',
+  startingresources: 'Starting resources',
+  lockteams: 'Lock teams',
+  enablecheats: 'Enable cheats',
+  startinglocations: 'Starting locations',
+  gamespeed: 'Game speed',
+  resourcesharing: 'Resource sharing',
+  resourcerate: 'Resource rate',
+  disableflyers: 'Disable flyers'
+};
+
+const formatGameOptionLabel = (key: string): string => {
+  const normalized = key.trim().toLowerCase();
+  if (GAME_OPTION_LABELS[normalized]) {
+    return GAME_OPTION_LABELS[normalized];
+  }
+  const spaced = normalized.replace(/[_\-\s]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+  return spaced.replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 const resolveErrorMessage = (code: string) => {
   switch (code) {
@@ -293,6 +320,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [downloadingPath, setDownloadingPath] = useState<string | null>(null);
   const [copyingPath, setCopyingPath] = useState<string | null>(null);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
+  const [infoTooltipPath, setInfoTooltipPath] = useState<string | null>(null);
+  const [pinnedInfoTooltipPath, setPinnedInfoTooltipPath] = useState<string | null>(null);
 
   // Edit/delete states
   const [editingPath, setEditingPath] = useState<string | null>(null);
@@ -324,6 +353,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [formComment, setFormComment] = useState<string>('');
   const [formWinnerTeam, setFormWinnerTeam] = useState<number | 'unknown' | null>(null);
   const [savingDetails, setSavingDetails] = useState<boolean>(false);
+  const [showPreviewGameSettings, setShowPreviewGameSettings] = useState<boolean>(false);
   const previewTeamIds = useMemo(() => extractTeamIds(preview?.profiles ?? null), [preview]);
   const previewWinnerOptions = useMemo(() => {
     const options = previewTeamIds.length > 0 ? previewTeamIds : [1, 2];
@@ -567,6 +597,34 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             : entry?.downloads === null || entry?.downloads === undefined
               ? 0
               : Number(entry?.downloads);
+          const normalizedRules = Array.isArray(entry?.gameRules)
+            ? entry.gameRules
+                .map((rule: any) => typeof rule === 'string' ? rule.trim() : null)
+                .filter((rule: string | null): rule is string => Boolean(rule && rule.length > 0))
+            : [];
+          let normalizedOptions: ReplayGameOption[] = [];
+          if (Array.isArray(entry?.gameOptions)) {
+            normalizedOptions = entry.gameOptions
+              .map((option: any) => {
+                const key = typeof option?.key === 'string' ? option.key.trim() : null;
+                const value = typeof option?.value === 'string' ? option.value.trim() : null;
+                if (!key || !value) return null;
+                return { key, value };
+              })
+              .filter((option: ReplayGameOption | null): option is ReplayGameOption => Boolean(option));
+          } else if (entry?.gameOptions && typeof entry.gameOptions === 'object') {
+            normalizedOptions = Object.entries(entry.gameOptions)
+              .map(([key, value]) => {
+                const optionKey = typeof key === 'string' ? key.trim() : null;
+                const optionValue = typeof value === 'string' ? value.trim() : null;
+                if (!optionKey || !optionValue) return null;
+                return { key: optionKey, value: optionValue };
+              })
+              .filter((option: ReplayGameOption | null): option is ReplayGameOption => Boolean(option));
+          }
+          if (normalizedOptions.length > 1) {
+            normalizedOptions.sort((a, b) => a.key.localeCompare(b.key));
+          }
 
           return {
             path,
@@ -588,6 +646,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
             submittedComment: typeof entry?.submittedComment === 'string' ? entry.submittedComment : null,
             status: typeof entry?.status === 'string' ? entry.status : 'pending',
             winnerTeam: typeof entry?.winnerTeam === 'number' ? entry.winnerTeam : null,
+            gameRules: normalizedRules,
+            gameOptions: normalizedOptions,
             canEdit: Boolean(entry?.canEdit),
           } satisfies ReplayListEntry;
         })
@@ -607,6 +667,30 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   useEffect(() => {
     void loadReplays();
   }, [loadReplays]);
+
+  const closeInfoTooltip = useCallback(() => {
+    setInfoTooltipPath(null);
+    setPinnedInfoTooltipPath(null);
+  }, []);
+
+  useEffect(() => {
+    if (!infoTooltipPath) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeInfoTooltip();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [infoTooltipPath, closeInfoTooltip]);
+
+  useEffect(() => {
+    if (!infoTooltipPath) {
+      setPinnedInfoTooltipPath(null);
+    }
+  }, [infoTooltipPath]);
 
   const handleUpload = useCallback(async (file: File) => {
     setUploadErrorCode(null);
@@ -673,8 +757,28 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
           submittedComment: null,
           status: 'pending',
           winnerTeam: null,
+          gameRules: Array.isArray(replay?.gameRules)
+            ? replay.gameRules
+                .map((rule: any) => typeof rule === 'string' ? rule.trim() : null)
+                .filter((rule: string | null): rule is string => Boolean(rule && rule.length > 0))
+            : [],
+          gameOptions: Array.isArray(replay?.gameOptions)
+            ? replay.gameOptions
+                .map((option: any) => {
+                  const key = typeof option?.key === 'string' ? option.key.trim() : null;
+                  const value = typeof option?.value === 'string' ? option.value.trim() : null;
+                  if (!key || !value) return null;
+                  return { key, value };
+                })
+                .filter((option: ReplayGameOption | null): option is ReplayGameOption => Boolean(option))
+            : [],
+          canEdit: true,
         };
+        if (normalized.gameOptions.length > 1) {
+          normalized.gameOptions.sort((a, b) => a.key.localeCompare(b.key));
+        }
         setPreview(normalized);
+        setShowPreviewGameSettings(false);
         setFormName(normalized.replayName || normalized.originalName || '');
         setFormComment('');
         setUploadSuccessMessage('Replay uploaded! Review details below, edit the title, add a comment and save.');
@@ -731,8 +835,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
   const handleRefresh = useCallback(() => {
     setActionErrorCode(null);
+    closeInfoTooltip();
     void loadReplays();
-  }, [loadReplays]);
+  }, [loadReplays, closeInfoTooltip]);
 
   const handleDownload = useCallback(async (path: string) => {
     if (!path) return;
@@ -858,6 +963,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       }
       // Clear preview and refresh list so it appears
       setPreview(null);
+      setShowPreviewGameSettings(false);
       setFormName('');
       setFormComment('');
       setFormWinnerTeam(null);
@@ -872,6 +978,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   }, [preview, formName, formComment, formWinnerTeam, loadReplays]);
 
   const handleStartEdit = useCallback((replay: ReplayListEntry) => {
+    closeInfoTooltip();
     setEditingPath(replay.path);
     setEditName(replay.submittedName || replay.replayName || replay.originalName);
     setEditComment(replay.submittedComment || '');
@@ -880,15 +987,16 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
       : null;
     setEditWinnerTeam(normalizedWinner);
     setActionErrorCode(null);
-  }, []);
+  }, [closeInfoTooltip]);
 
   const handleCancelEdit = useCallback(() => {
+    closeInfoTooltip();
     setEditingPath(null);
     setEditName('');
     setEditComment('');
     setEditWinnerTeam(null);
     setActionErrorCode(null);
-  }, []);
+  }, [closeInfoTooltip]);
 
   const handleSaveEdit = useCallback(async (path: string) => {
     setSavingEdit(true);
@@ -940,8 +1048,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   }, [loadReplays]);
 
   const handleRevealWinner = useCallback((path: string) => {
+    closeInfoTooltip();
     setRevealedWinners(prev => new Set(prev).add(path));
-  }, []);
+  }, [closeInfoTooltip]);
 
   const uploadErrorMessage = uploadErrorCode ? resolveErrorMessage(uploadErrorCode) : null;
   const listErrorMessage = listErrorCode ? resolveErrorMessage(listErrorCode) : null;
@@ -1074,6 +1183,62 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                 </button>
               </div>
             </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-neutral-300 hover:text-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
+                  onClick={() => setShowPreviewGameSettings(prev => !prev)}
+                  aria-expanded={showPreviewGameSettings}
+                  aria-controls="preview-game-settings"
+                >
+                  <span className="text-neutral-400">Game settings</span>
+                  <span>{showPreviewGameSettings ? 'Hide' : 'Show'}</span>
+                  <svg
+                    className={`h-3 w-3 transition-transform ${showPreviewGameSettings ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              {showPreviewGameSettings && (
+                <div id="preview-game-settings" className="rounded-md border border-neutral-700/40 bg-neutral-800/60 p-3 text-xs">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <p className="text-neutral-400 font-semibold uppercase tracking-wide">Game options</p>
+                      {preview?.gameOptions && preview.gameOptions.length > 0 ? (
+                        <dl className="space-y-1">
+                          {preview.gameOptions.map(option => (
+                            <div key={`preview-option-${option.key}`} className="flex items-start justify-between gap-3">
+                              <dt className="text-neutral-400">{formatGameOptionLabel(option.key)}</dt>
+                              <dd className="text-neutral-200 text-right">{option.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      ) : (
+                        <p className="text-neutral-500">No game options detected.</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-neutral-400 font-semibold uppercase tracking-wide">Game rules</p>
+                      {preview?.gameRules && preview.gameRules.length > 0 ? (
+                        <ul className="space-y-1 text-neutral-200">
+                          {preview.gameRules.map((rule, idx) => (
+                            <li key={`preview-rule-${idx}`}>{rule}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-neutral-500">No special rules detected.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1085,7 +1250,14 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               </button>
               <button
                 type="button"
-                onClick={() => { setPreview(null); setFormName(''); setFormComment(''); setFormWinnerTeam(null); setUploadSuccessMessage(null); }}
+                onClick={() => {
+                  setPreview(null);
+                  setFormName('');
+                  setFormComment('');
+                  setFormWinnerTeam(null);
+                  setUploadSuccessMessage(null);
+                  setShowPreviewGameSettings(false);
+                }}
                 className="inline-flex items-center justify-center rounded-md border border-neutral-600/60 bg-neutral-800/80 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-neutral-700/80"
               >
                 Discard
@@ -1438,6 +1610,9 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               const winnerOptionIds = (teamIds.length > 0 ? teamIds : [1, 2]).slice(0, 8);
               const winnerAccent = typeof replay.winnerTeam === 'number' ? getTeamAccent(replay.winnerTeam) : null;
               const revealActive = typeof replay.winnerTeam === 'number' && revealedWinners.has(replay.path);
+              const isTooltipOpen = infoTooltipPath === replay.path;
+              const isTooltipPinned = pinnedInfoTooltipPath === replay.path;
+              const hasGameDetails = (Array.isArray(replay.gameOptions) && replay.gameOptions.length > 0) || (Array.isArray(replay.gameRules) && replay.gameRules.length > 0);
 
               const renderTeamMembers = (teamId: number) => {
                 if (!Array.isArray(replay.profiles)) {
@@ -1533,7 +1708,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
 
               return (
-                <div key={replay.path} className="bg-neutral-900 border border-neutral-600/25 rounded-lg shadow-md overflow-hidden p-4">
+                <div key={replay.path} className="relative bg-neutral-900 border border-neutral-600/25 rounded-lg shadow-md p-4">
                   {/* Header with title and actions - title left, buttons right */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                     <div className="min-w-0 flex-1">
@@ -1565,6 +1740,87 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap items-center">
+                      {hasGameDetails && (
+                        <div
+                          className="relative"
+                          onMouseEnter={() => {
+                            if (pinnedInfoTooltipPath && pinnedInfoTooltipPath !== replay.path) return;
+                            setInfoTooltipPath(replay.path);
+                          }}
+                          onMouseLeave={() => {
+                            if (pinnedInfoTooltipPath === replay.path) return;
+                            setInfoTooltipPath((current) => current === replay.path ? null : current);
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900 ${
+                              isTooltipOpen
+                                ? 'border-neutral-500/60 bg-neutral-700/80 text-neutral-100'
+                                : 'border-neutral-600/60 bg-neutral-800/80 text-neutral-300 hover:bg-neutral-700/80'
+                            } ${isTooltipPinned ? 'ring-2 ring-blue-500/50 ring-offset-2 ring-offset-neutral-900' : ''}`}
+                            onClick={() => {
+                              if (isTooltipPinned) {
+                                setPinnedInfoTooltipPath(null);
+                              } else {
+                                setPinnedInfoTooltipPath(replay.path);
+                                setInfoTooltipPath(replay.path);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (pinnedInfoTooltipPath && pinnedInfoTooltipPath !== replay.path) return;
+                              setInfoTooltipPath(replay.path);
+                            }}
+                            onBlur={(event) => {
+                              if (isTooltipPinned) return;
+                              const nextFocused = event.relatedTarget as Node | null;
+                              if (!nextFocused || !event.currentTarget.contains(nextFocused)) {
+                                setInfoTooltipPath((current) => current === replay.path ? null : current);
+                              }
+                            }}
+                            aria-label="View game rules and options"
+                            aria-expanded={isTooltipOpen}
+                            aria-pressed={isTooltipPinned}
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </button>
+                          {isTooltipOpen && (
+                            <div className="absolute right-0 z-20 mt-2 min-w-[20rem] rounded-md border border-neutral-700/60 bg-neutral-900/95 p-3 text-xs text-neutral-200 shadow-2xl md:min-w-[24rem]">
+                              <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Game options</p>
+                                  {replay.gameOptions.length > 0 ? (
+                                    <dl className="space-y-1">
+                                      {replay.gameOptions.map(option => (
+                                        <div key={`tooltip-${replay.path}-${option.key}`} className="flex items-start justify-between gap-3">
+                                          <dt className="text-neutral-400">{formatGameOptionLabel(option.key)}</dt>
+                                          <dd className="text-neutral-100 text-right">{option.value}</dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  ) : (
+                                    <p className="text-neutral-500">No game options detected.</p>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Game rules</p>
+                                  {replay.gameRules.length > 0 ? (
+                                    <ul className="space-y-1">
+                                      {replay.gameRules.map((rule, idx) => (
+                                        <li key={`tooltip-rule-${replay.path}-${idx}`}>{rule}</li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="text-neutral-500">No special rules detected.</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {/* Winner reveal button */}
                       {replay.winnerTeam && !revealedWinners.has(replay.path) ? (
                         <button

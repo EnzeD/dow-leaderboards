@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join as joinPath } from 'node:path';
 import { enrichReplayProfiles, matchReplayPlayersToDatabase, saveReplayPlayerLinks, fetchPlayerStatsFromRelic, getGameModeFromMapName } from '@/lib/replay-player-matching';
 import { Filter } from 'bad-words';
-import * as ReplayParserModule from '@dowde-replay-parser/core';
+import { parseReplay as parseReplayExport } from '@dowde-replay-parser/core';
 import { generateSignedReplayUrl, getClientIpHash, REPLAYS_BUCKET, supabaseAdmin } from './shared';
 
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB prototype limit
@@ -14,19 +14,80 @@ const MAX_UPLOADS_PER_HOUR = 20; // Rate limit per IP
 
 const profanityFilter = new Filter();
 
+const NO_PARSER_DATA = 'No data available.';
+
+type NormalizedGameDetails = {
+  gameRules: string[];
+  gameOptions: Array<{ key: string; value: string }>;
+};
+
+const formatOptionValue = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const stringified = String(value).trim();
+  return stringified.length > 0 ? stringified : null;
+};
+
+const extractGameDetails = (rawMetadata: unknown): NormalizedGameDetails => {
+  const details: NormalizedGameDetails = {
+    gameRules: [],
+    gameOptions: [],
+  };
+
+  if (!rawMetadata || typeof rawMetadata !== 'object') {
+    return details;
+  }
+
+  const rawRules = (rawMetadata as any).gamerules;
+  if (Array.isArray(rawRules)) {
+    rawRules.forEach((rule: unknown) => {
+      const normalizedRule = formatOptionValue(rule);
+      if (normalizedRule && normalizedRule !== NO_PARSER_DATA) {
+        details.gameRules.push(normalizedRule);
+      }
+    });
+  } else {
+    const normalizedRule = formatOptionValue(rawRules);
+    if (normalizedRule && normalizedRule !== NO_PARSER_DATA) {
+      details.gameRules.push(normalizedRule);
+    }
+  }
+
+  const rawOptions = (rawMetadata as any).gameoptions;
+  if (rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)) {
+    Object.entries(rawOptions as Record<string, unknown>).forEach(([key, value]) => {
+      const optionKey = formatOptionValue(key);
+      const optionValue = formatOptionValue(value);
+      if (optionKey && optionValue && optionValue !== NO_PARSER_DATA) {
+        details.gameOptions.push({ key: optionKey, value: optionValue });
+      }
+    });
+  } else {
+    const fallbackValue = formatOptionValue(rawOptions);
+    if (fallbackValue && fallbackValue !== NO_PARSER_DATA) {
+      details.gameOptions.push({ key: 'option', value: fallbackValue });
+    }
+  }
+
+  details.gameRules = details.gameRules.filter((rule, index, array) => array.indexOf(rule) === index);
+  details.gameOptions.sort((a, b) => a.key.localeCompare(b.key));
+
+  return details;
+};
+
 type ParseReplayFn = (path: string) => Promise<unknown> | unknown;
 
 let cachedParseReplay: ParseReplayFn | null = null;
 
 const loadParseReplay = async (): Promise<ParseReplayFn> => {
   if (cachedParseReplay) return cachedParseReplay;
-  const parseReplay = typeof (ReplayParserModule as any)?.parseReplay === 'function'
-    ? (ReplayParserModule as any).parseReplay
-    : typeof (ReplayParserModule as any)?.default === 'function'
-      ? (ReplayParserModule as any).default
-      : null;
-
-  if (!parseReplay) {
+  const parseReplay = parseReplayExport;
+  if (typeof parseReplay !== 'function') {
     throw new Error('replay_parser_unavailable');
   }
 
@@ -207,6 +268,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Check if current user can edit this replay
+    const { gameRules, gameOptions } = extractGameDetails(meta.raw_metadata);
     const canEdit = Boolean(meta.uploader_ip_hash && meta.uploader_ip_hash === clientIpHash);
 
     return {
@@ -229,6 +291,8 @@ export async function GET(req: NextRequest) {
       submittedComment: meta.submitted_comment,
       status: meta.status,
       winnerTeam: meta.winner_team ?? null,
+      gameRules,
+      gameOptions,
       canEdit,
     };
   });
@@ -481,7 +545,7 @@ export async function POST(req: NextRequest) {
   // Fetch the metadata row to return it in the response for immediate UI preview
   const { data: metaRow } = await supabaseAdmin
     .from('replay_metadata')
-    .select('path, original_name, replay_name, map_name, game_version, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team')
+    .select('path, original_name, replay_name, map_name, game_version, match_duration_seconds, match_duration_label, profiles, submitted_name, submitted_comment, status, winner_team, raw_metadata')
     .eq('path', objectKey)
     .maybeSingle();
 
@@ -515,6 +579,7 @@ export async function POST(req: NextRequest) {
       submittedComment: metaRow.submitted_comment ?? null,
       status: metaRow.status ?? 'pending',
       winnerTeam: metaRow.winner_team ?? null,
+      ...extractGameDetails(metaRow.raw_metadata),
     } : null
   }, {
     status: 201,
