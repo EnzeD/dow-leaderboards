@@ -135,6 +135,9 @@ const formatGameOptionLabel = (key: string): string => {
   return spaced.replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+const normalizeGameOptionKey = (key: string): string => key.trim().toLowerCase();
+const normalizeGameOptionValue = (value: string): string => value.trim();
+
 const resolveErrorMessage = (code: string) => {
   switch (code) {
     case 'invalid_extension':
@@ -342,8 +345,11 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
   const [selectedFormats, setSelectedFormats] = useState<Set<string>>(new Set());
   const [selectedMaps, setSelectedMaps] = useState<Set<string>>(new Set());
   const [selectedVersions, setSelectedVersions] = useState<Set<string>>(new Set());
+  const [selectedGameRules, setSelectedGameRules] = useState<Set<string>>(() => new Set<string>());
+  const [selectedGameOptions, setSelectedGameOptions] = useState<Map<string, Set<string>>>(() => new Map<string, Set<string>>());
   const [aliasSearch, setAliasSearch] = useState<string>('');
   const [sortMode, setSortMode] = useState<SortMode>('downloads');
+  const [showGameSettingsFilters, setShowGameSettingsFilters] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -449,6 +455,72 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     return Array.from(versions).sort();
   }, [replays]);
 
+  const availableGameRules = useMemo(() => {
+    const counts = new Map<string, number>();
+    replays.forEach(replay => {
+      (replay.gameRules ?? []).forEach(rule => {
+        if (typeof rule !== 'string') return;
+        const trimmed = rule.trim();
+        if (!trimmed) return;
+        counts.set(trimmed, (counts.get(trimmed) ?? 0) + 1);
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([rule, count]) => ({ rule, count }))
+      .sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a.rule.localeCompare(b.rule);
+      });
+  }, [replays]);
+
+  const availableGameOptions = useMemo(() => {
+    const options = new Map<string, { label: string; values: Map<string, number> }>();
+    replays.forEach(replay => {
+      (replay.gameOptions ?? []).forEach(option => {
+        if (!option || typeof option.key !== 'string' || typeof option.value !== 'string') return;
+        const normalizedKey = normalizeGameOptionKey(option.key);
+        const normalizedValue = normalizeGameOptionValue(option.value);
+        if (!normalizedKey || !normalizedValue) return;
+
+        const label = formatGameOptionLabel(option.key);
+        const entry = options.get(normalizedKey);
+        if (entry) {
+          entry.values.set(normalizedValue, (entry.values.get(normalizedValue) ?? 0) + 1);
+        } else {
+          const values = new Map<string, number>();
+          values.set(normalizedValue, 1);
+          options.set(normalizedKey, { label, values });
+        }
+      });
+    });
+
+    return Array.from(options.entries())
+      .map(([key, meta]) => ({
+        key,
+        label: meta.label,
+        values: Array.from(meta.values.entries())
+          .map(([value, count]) => ({ value, count }))
+          .sort((a, b) => {
+            if (b.count !== a.count) {
+              return b.count - a.count;
+            }
+            return a.value.localeCompare(b.value);
+          }),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [replays]);
+
+  const hasGameSettingsFilters = availableGameRules.length > 0 || availableGameOptions.length > 0;
+  const hasSelectedGameSettingsFilters = selectedGameRules.size > 0 || selectedGameOptions.size > 0;
+
+  useEffect(() => {
+    if (hasSelectedGameSettingsFilters) {
+      setShowGameSettingsFilters(true);
+    }
+  }, [hasSelectedGameSettingsFilters]);
+
   const eloLimits = useMemo(() => {
     let min = Infinity;
     let max = -Infinity;
@@ -510,6 +582,50 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
         if (!selectedVersions.has(versionLabel)) return false;
       }
 
+      // Game rules filter (matches if replay includes any selected rule)
+      if (selectedGameRules.size > 0) {
+        const replayRules = new Set(
+          (replay.gameRules ?? [])
+            .filter((rule): rule is string => typeof rule === 'string')
+            .map(rule => rule.trim())
+            .filter(rule => rule.length > 0)
+        );
+        const hasRuleMatch = Array.from(selectedGameRules).some(rule => replayRules.has(rule));
+        if (!hasRuleMatch) return false;
+      }
+
+      // Game settings filter (per key, matches if any selected value is present)
+      if (selectedGameOptions.size > 0) {
+        const replayOptions = new Map<string, Set<string>>();
+        (replay.gameOptions ?? []).forEach(option => {
+          if (!option || typeof option.key !== 'string' || typeof option.value !== 'string') return;
+          const key = normalizeGameOptionKey(option.key);
+          const value = normalizeGameOptionValue(option.value);
+          if (!key || !value) return;
+          const existing = replayOptions.get(key);
+          if (existing) {
+            existing.add(value);
+          } else {
+            replayOptions.set(key, new Set([value]));
+          }
+        });
+
+        const matchesSelectedOptions = Array.from(selectedGameOptions.entries()).every(([key, values]) => {
+          if (values.size === 0) {
+            return true;
+          }
+          const replayValues = replayOptions.get(key);
+          if (!replayValues) {
+            return false;
+          }
+          return Array.from(values).some(value => replayValues.has(value));
+        });
+
+        if (!matchesSelectedOptions) {
+          return false;
+        }
+      }
+
       // ELO filter (only apply if custom range is set)
       if (customEloRange) {
         if (Array.isArray(replay.profiles)) {
@@ -526,7 +642,17 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
       return true;
     });
-  }, [replays, selectedFactions, selectedFormats, selectedMaps, selectedVersions, customEloRange, aliasSearch]);
+  }, [
+    replays,
+    selectedFactions,
+    selectedFormats,
+    selectedMaps,
+    selectedVersions,
+    selectedGameRules,
+    selectedGameOptions,
+    customEloRange,
+    aliasSearch
+  ]);
 
   const sortedFilteredReplays = useMemo(() => {
     return sortReplays(filteredReplays, sortMode);
@@ -534,7 +660,17 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_REPLAYS);
-  }, [aliasSearch, selectedFactions, selectedFormats, selectedMaps, selectedVersions, customEloRange, sortMode]);
+  }, [
+    aliasSearch,
+    selectedFactions,
+    selectedFormats,
+    selectedMaps,
+    selectedVersions,
+    selectedGameRules,
+    selectedGameOptions,
+    customEloRange,
+    sortMode
+  ]);
 
   const totalFilteredReplays = sortedFilteredReplays.length;
   const visibleReplays = useMemo(
@@ -554,6 +690,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     selectedFormats.size > 0 ||
     selectedMaps.size > 0 ||
     selectedVersions.size > 0 ||
+    selectedGameRules.size > 0 ||
+    selectedGameOptions.size > 0 ||
     customEloRange !== null ||
     aliasSearch.trim() !== '';
 
@@ -562,6 +700,8 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     setSelectedFormats(new Set());
     setSelectedMaps(new Set());
     setSelectedVersions(new Set());
+    setSelectedGameRules(new Set<string>());
+    setSelectedGameOptions(new Map<string, Set<string>>());
     setCustomEloRange(null);
     setAliasSearch('');
   };
@@ -1391,14 +1531,147 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   </select>
                 </div>
               )}
+
+              {hasGameSettingsFilters && (
+                <button
+                  type="button"
+                  onClick={() => setShowGameSettingsFilters(prev => !prev)}
+                  className={`inline-flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-colors ${
+                    showGameSettingsFilters
+                      ? 'bg-neutral-700/40 border-neutral-500/40 text-neutral-100'
+                      : 'bg-neutral-800/70 border-neutral-600/40 text-neutral-200 hover:bg-neutral-700/80'
+                  }`}
+                  aria-expanded={showGameSettingsFilters}
+                >
+                  <span className="flex items-center gap-2">
+                    Game options filters
+                    {hasSelectedGameSettingsFilters && (
+                      <span className="inline-flex items-center rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-200">
+                        Active
+                      </span>
+                    )}
+                  </span>
+                  <svg
+                    className={`h-3 w-3 transition-transform ${showGameSettingsFilters ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              )}
             </div>
 
-            {/* ELO Range Slider on separate row */}
+            {showGameSettingsFilters && hasGameSettingsFilters && (
+              <div className="mt-2 space-y-3 rounded-lg border border-neutral-700/50 bg-neutral-900/60 p-3">
+                {availableGameRules.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11px] font-semibold text-neutral-400">Rules</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableGameRules.map(({ rule, count }) => {
+                        const isSelected = selectedGameRules.has(rule);
+                        return (
+                          <button
+                            key={rule}
+                            type="button"
+                            onClick={() => {
+                              setSelectedGameRules(prev => {
+                                const next = new Set(prev);
+                                if (next.has(rule)) {
+                                  next.delete(rule);
+                                } else {
+                                  next.add(rule);
+                                }
+                                return next;
+                              });
+                            }}
+                            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                              isSelected
+                                ? 'bg-blue-600/30 border-blue-400/60 text-blue-100 shadow-sm'
+                                : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                            }`}
+                          >
+                            <span>{rule}</span>
+                            {count > 1 && (
+                              <span className={isSelected ? 'text-[10px] text-blue-200/80' : 'text-[10px] text-neutral-400'}>
+                                ×{count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {availableGameOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-semibold text-neutral-400">Settings</span>
+                    <div className="space-y-2">
+                      {availableGameOptions.map(option => {
+                        const activeValues = selectedGameOptions.get(option.key);
+                        const hasSelection = Boolean(activeValues && activeValues.size > 0);
+                        return (
+                          <div key={option.key} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                            <span className={`text-[11px] font-semibold ${hasSelection ? 'text-emerald-200' : 'text-neutral-400'}`}>
+                              {option.label}
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {option.values.map(({ value, count }) => {
+                                const isSelected = activeValues?.has(value) ?? false;
+                                return (
+                                  <button
+                                    key={`${option.key}-${value}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedGameOptions(prev => {
+                                        const next = new Map(prev);
+                                        const current = next.get(option.key);
+                                        const values = current ? new Set(current) : new Set<string>();
+                                        if (values.has(value)) {
+                                          values.delete(value);
+                                        } else {
+                                          values.add(value);
+                                        }
+                                        if (values.size === 0) {
+                                          next.delete(option.key);
+                                        } else {
+                                          next.set(option.key, values);
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                    className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                                      isSelected
+                                        ? 'bg-emerald-600/30 border-emerald-400/60 text-emerald-100 shadow-sm'
+                                        : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                                    }`}
+                                  >
+                                    <span>{value}</span>
+                                    {count > 1 && (
+                                      <span className={isSelected ? 'text-[10px] text-emerald-200/80' : 'text-[10px] text-neutral-400'}>
+                                        ×{count}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {eloLimits.max > eloLimits.min && (
-              <div className="flex items-center gap-3 w-full">
+              <div className="mt-2 flex items-center gap-3 w-full">
                 <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">ELO:</label>
 
-                {/* Min input */}
                 <input
                   type="number"
                   value={eloRange.min}
@@ -1412,17 +1685,14 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   className="w-20 px-2 py-1 text-xs font-medium rounded-md bg-neutral-800 border border-neutral-600/40 text-neutral-200 hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
                 />
 
-                {/* Slider container with proper height */}
                 <div className="relative flex-1 h-8 flex items-center max-w-2xl">
-                  {/* Track background */}
                   <div className="absolute w-full h-2 bg-neutral-700 rounded-full" />
 
-                  {/* Active range highlight - gray when no custom filter, blue when filtered */}
                   <div
                     className={`absolute h-2 rounded-full pointer-events-none ${
                       customEloRange === null
-                        ? 'bg-neutral-600'  // Gray when showing all (no filter)
-                        : 'bg-blue-500'      // Blue when filter is active
+                        ? 'bg-neutral-600'
+                        : 'bg-blue-500'
                     }`}
                     style={{
                       left: `${((eloRange.min - eloLimits.min) / (eloLimits.max - eloLimits.min)) * 100}%`,
@@ -1430,7 +1700,6 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     }}
                   />
 
-                  {/* Min range input - positioned absolute */}
                   <input
                     type="range"
                     min={eloLimits.min}
@@ -1442,7 +1711,6 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                     style={{ zIndex: eloRange.min === eloRange.max - 50 ? 2 : 1 }}
                   />
 
-                  {/* Max range input - positioned absolute */}
                   <input
                     type="range"
                     min={eloLimits.min}
@@ -1455,7 +1723,6 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
                   />
                 </div>
 
-                {/* Max input */}
                 <input
                   type="number"
                   value={eloRange.max}
@@ -1471,62 +1738,60 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
               </div>
             )}
 
-            {/* Race/Faction Filter - Inline with Clear All button */}
+            {/* Race/Faction Filter */}
             {availableFactions.length > 0 && (
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-2 flex-1">
-                  <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">Races:</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableFactions.map(faction => {
-                      const isSelected = selectedFactions.has(faction);
-                      // Normalize faction display name
-                      const displayName = faction
-                        .replace(/_/g, ' ')
-                        .split(' ')
-                        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                        .join(' ');
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-xs text-neutral-400 font-medium whitespace-nowrap">Races:</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableFactions.map(faction => {
+                    const isSelected = selectedFactions.has(faction);
+                    // Normalize faction display name
+                    const displayName = faction
+                      .replace(/_/g, ' ')
+                      .split(' ')
+                      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                      .join(' ');
 
-                      return (
-                        <button
-                          key={faction}
-                          onClick={() => {
-                            const newSet = new Set(selectedFactions);
-                            if (isSelected) {
-                              newSet.delete(faction);
-                            } else {
-                              newSet.add(faction);
-                            }
-                            setSelectedFactions(newSet);
-                          }}
-                          className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
-                            isSelected
-                              ? getFactionColor(displayName)
-                              : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
-                          }`}
-                        >
-                          {displayName}
-                        </button>
-                      );
-                    })}
-                  </div>
+                    return (
+                      <button
+                        key={faction}
+                        type="button"
+                        onClick={() => {
+                          const newSet = new Set(selectedFactions);
+                          if (isSelected) {
+                            newSet.delete(faction);
+                          } else {
+                            newSet.add(faction);
+                          }
+                          setSelectedFactions(newSet);
+                        }}
+                        className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                          isSelected
+                            ? getFactionColor(displayName)
+                            : 'bg-neutral-800/80 border-neutral-600/40 text-neutral-300 hover:bg-neutral-700/80'
+                        }`}
+                      >
+                        {displayName}
+                      </button>
+                    );
+                  })}
                 </div>
-
-                {/* Clear Filters Button - Bottom Right */}
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600/20 border border-red-500/50 text-red-300 hover:bg-red-600/30 transition-colors shrink-0"
-                  >
-                    Clear All
-                  </button>
-                )}
               </div>
             )}
 
-            {/* Results Count */}
+            {/* Results Count + Clear Filters */}
             {hasActiveFilters && (
-              <div className="text-xs text-neutral-400 pt-1 border-t border-neutral-700/40">
-                Showing <span className="font-semibold text-neutral-200">{filteredReplays.length}</span> of <span className="font-semibold text-neutral-200">{replays.length}</span> replays
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400 pt-2 border-t border-neutral-700/40">
+                <span>
+                  Showing <span className="font-semibold text-neutral-200">{filteredReplays.length}</span> of <span className="font-semibold text-neutral-200">{replays.length}</span> replays
+                </span>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md bg-red-600/20 border border-red-500/50 text-red-300 hover:bg-red-600/30 transition-colors"
+                >
+                  Clear All
+                </button>
               </div>
             )}
           </div>
