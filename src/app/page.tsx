@@ -2472,7 +2472,7 @@ export default function Home() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m7-13a4 4 0 01-4 4h-6a4 4 0 01-4-4V5h14v3zM5 5h14M5 9C3.343 9 2 7.657 2 6V5h3m14 4c1.657 0 3-1.343 3-3V5h-3" />
                       </svg>
-                      Prize pool: $2,266+
+                      Prize pool: $3,000
                     </span>
                   </div>
                   <div className="text-sm text-neutral-300 sm:text-base">
