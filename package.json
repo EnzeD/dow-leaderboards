@@ -16,7 +16,8 @@
     "crawl:watch": "node scripts/crawl-status.mjs --watch",
     "crawl:cleanup": "node scripts/crawl-cleanup.mjs",
     "crawl:concurrent": "node scripts/crawl-player-matches-concurrent.mjs",
-    "backfill:replay-links": "node scripts/backfill-replay-player-links.mjs"
+    "backfill:replay-links": "node scripts/backfill-replay-player-links.mjs",
+    "backup:match-tables": "node scripts/backup-match-tables.mjs"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.0.0",
