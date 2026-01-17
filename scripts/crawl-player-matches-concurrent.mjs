@@ -299,11 +299,6 @@ function parseMatchPayload(data, sourceAlias) {
       const teamId = safeNumber(member?.teamid ?? member?.teamId);
       const raceId = safeNumber(member?.race_id ?? member?.raceId);
       const outcomeRaw = member?.outcome ?? member?.result;
-      const wins = safeNumber(member?.wins);
-      const losses = safeNumber(member?.losses);
-      const streak = safeNumber(member?.streak);
-      const arbitration = safeNumber(member?.arbitration);
-      const reportType = safeNumber(member?.reporttype ?? member?.reportType);
       const oldRating = safeNumber(member?.oldrating ?? member?.oldRating);
       const newRating = safeNumber(member?.newrating ?? member?.newRating);
       const ratingDelta = Number.isFinite(oldRating) && Number.isFinite(newRating) ? newRating - oldRating : null;
@@ -314,15 +309,8 @@ function parseMatchPayload(data, sourceAlias) {
         profile_id: profileId,
         team_id: teamId,
         race_id: raceId,
-        statgroup_id: statgroupId,
         alias_at_match: alias ?? null,
         outcome: determineOutcome(outcomeRaw),
-        outcome_raw: safeNumber(outcomeRaw),
-        wins,
-        losses,
-        streak,
-        arbitration,
-        report_type: reportType,
         old_rating: oldRating,
         new_rating: newRating,
         rating_delta: ratingDelta,
