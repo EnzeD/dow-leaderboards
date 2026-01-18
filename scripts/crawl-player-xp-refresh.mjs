@@ -29,6 +29,8 @@ const UPSERT_CHUNK_SIZE = Number.parseInt(process.env.XP_REFRESH_UPSERT_CHUNK ??
 const RELIC_DELAY_MS = Number.parseInt(process.env.XP_REFRESH_RELIC_DELAY_MS ?? "150", 10);
 const RELIC_REQUEST_CAP = Number.parseInt(process.env.XP_REFRESH_RELIC_REQUEST_CAP ?? "100000", 10);
 const LOG_EVERY = Number.parseInt(process.env.XP_REFRESH_LOG_EVERY ?? "100", 10);
+const MAX_PLAYERS = Number.parseInt(process.env.XP_REFRESH_MAX_PLAYERS ?? "0", 10);
+const MAX_PLAYERS_LIMIT = Number.isFinite(MAX_PLAYERS) && MAX_PLAYERS > 0 ? MAX_PLAYERS : Infinity;
 
 let relicRequestCount = 0;
 let totalProcessed = 0;
@@ -561,6 +563,9 @@ async function processBatch(players) {
 async function main() {
   console.log("Starting daily XP refresh crawler...");
   console.log(`Batch size: ${BATCH_SIZE}, concurrency: ${CONCURRENCY}, match fetch count: ${MATCH_FETCH_COUNT}`);
+  if (Number.isFinite(MAX_PLAYERS_LIMIT)) {
+    console.log(`Max players: ${MAX_PLAYERS_LIMIT}`);
+  }
   console.log("Processing players ordered by highest XP first (profile_id breaks ties).");
 
   await loadRaceIds();
@@ -578,6 +583,11 @@ async function main() {
 
     totalProcessed += batch.length;
     offset += batch.length;
+
+    if (totalProcessed >= MAX_PLAYERS_LIMIT) {
+      console.log(`Stopping after ${totalProcessed} players due to XP_REFRESH_MAX_PLAYERS.`);
+      break;
+    }
 
     if (totalProcessed % LOG_EVERY === 0) {
       const remaining = Math.max(0, totalPlayers - totalProcessed);
