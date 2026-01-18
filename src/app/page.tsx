@@ -2250,9 +2250,6 @@ export default function Home() {
                       Dawn of War: Definitive Edition Leaderboards
                     </h1>
                     <div className="mt-1 flex items-center gap-2 text-[0.65rem]">
-                      <span className="px-2 py-0.5 bg-red-600 text-white font-semibold uppercase tracking-wide rounded-md">
-                        BETA
-                      </span>
                       <span className="inline-flex items-center px-2 py-0.5 bg-neutral-800/60 border border-neutral-600/50 rounded-md shadow-sm">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5" aria-hidden></span>
                         <span className="text-neutral-300">Players</span>
@@ -2320,12 +2317,7 @@ export default function Home() {
                       onClick={() => handleMobileNavSelect('stats')}
                       className={mobileNavButtonClass('stats')}
                     >
-                      <span className="flex items-center gap-2">
-                        Stats
-                        <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
-                          NEW
-                        </span>
-                      </span>
+                      <span>Stats</span>
                     </button>
                     <button
                       type="button"
@@ -2402,9 +2394,6 @@ export default function Home() {
                     <span>Dawn of War: Definitive Edition</span>{' '}
                     <span className="inline md:inline">Leaderboards</span>
                   </h1>
-                  <span className="ml-1.5 px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded-md flex-shrink-0 self-center">
-                    BETA
-                  </span>
                 </div>
               </div>
               <div className="ml-6 flex items-center gap-3 whitespace-nowrap flex-shrink-0">
@@ -2550,12 +2539,7 @@ export default function Home() {
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/30'
                   }`}
               >
-                <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                  Stats
-                  <span className="px-2 py-0.5 bg-red-600 text-white text-[0.65rem] font-semibold uppercase tracking-wide rounded-md">
-                    NEW
-                  </span>
-                </span>
+                <span>Stats</span>
               </button>
               <button
                 onClick={() => navigateToTab('pro')}
