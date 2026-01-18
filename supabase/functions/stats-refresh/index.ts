@@ -20,7 +20,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 
 Deno.serve(async (_req) => {
   try {
-    const { error } = await supabase.rpc("stats_refresh_global");
+    const { error } = await supabase.rpc("stats_refresh_global_from_daily");
     if (error) {
       console.error("stats_refresh_global failed", error);
       throw error;

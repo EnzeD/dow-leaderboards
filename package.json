@@ -17,7 +17,11 @@
     "crawl:cleanup": "node scripts/crawl-cleanup.mjs",
     "crawl:concurrent": "node scripts/crawl-player-matches-concurrent.mjs",
     "backfill:replay-links": "node scripts/backfill-replay-player-links.mjs",
-    "backup:match-tables": "node scripts/backup-match-tables.mjs"
+    "backup:match-tables": "node scripts/backup-match-tables.mjs",
+    "archive:matches": "node scripts/archive-match-history.mjs",
+    "stats:rollup": "node scripts/stats-rollup-daily.mjs",
+    "stats:refresh:daily": "node scripts/stats-refresh-daily.mjs",
+    "prune:matches": "node scripts/prune-match-history.mjs"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.0.0",
@@ -27,6 +31,7 @@
     "autoprefixer": "^10.4.21",
     "bad-words": "^4.0.0",
     "dotenv": "^16.4.5",
+    "duckdb": "^1.4.3",
     "flag-icons": "^7.5.0",
     "next": "14.2.35",
     "react": "^18",
