@@ -100,8 +100,8 @@ export async function GET(req: NextRequest) {
       }
 
       const { data: matchData } = await supabaseClient
-        .from("match_participants")
-        .select("match_id, matches!inner(completed_at)")
+        .from("premium_match_participants")
+        .select("match_id, premium_matches!inner(completed_at)")
         .eq("profile_id", profileNumeric)
         .eq("is_computer", false);
 
@@ -111,7 +111,9 @@ export async function GET(req: NextRequest) {
       ).toISOString();
       const matchesLast7Days =
         matchData?.filter(
-          (m: any) => m.matches?.completed_at && m.matches.completed_at >= sevenDaysAgo,
+          (m: any) =>
+            m.premium_matches?.completed_at &&
+            m.premium_matches.completed_at >= sevenDaysAgo,
         ).length || 0;
 
       const { data: playerData } = await supabaseClient

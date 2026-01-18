@@ -29,7 +29,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 ## Data Sources & Processing
 ### Profile Overview (`/api/premium/overview`)
 - Supabase queries (service role):
-  - `match_participants` joined to `matches` (ignores computer opponents) for total matches and matches within the last 7 days.
+  - `premium_match_participants` joined to `premium_matches` (ignores computer opponents) for total matches and matches within the last 7 days.
   - `players` for `last_seen_at` and `updated_at` (combined as `last_xp_sync` internally, though the current response omits it).
 - Live Relic API calls (`fetchLeaderboards`, `fetchLeaderboardRows`) fetch up to 200 rows per non-custom leaderboard. Wins/losses are summed across these rows, and `parseFactionFromName` is used to derive the primary race and share of total ladder matches. Profiles outside the top 200 may therefore show incomplete ladder totals.
 - Response fields: `matches`, `matchesLast7Days`, `leaderboardWins`, `leaderboardLosses`, `leaderboardTotal`, `leaderboardWinrate`, `mainRace`, `mainRacePercentage`.
@@ -40,7 +40,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - The card requests all leaderboards in a single call, filters client-side, and fetches human-readable leaderboard names via the public Supabase JS client (`src/lib/supabase.ts`) using the `leaderboards` table.
 
 ### Matchup Matrix (`/api/premium/matchups`)
-- Calls `premium_get_matchup_stats` (defined in `supabase/migrations/0024_advanced_stats_functions.sql`). The function joins `match_participants` twice to exclude computer opponents and aggregates `(matches, wins, losses, winrate, last_played)` per `my_race_id` × `opponent_race_id`.
+- Calls `premium_get_matchup_stats` (defined in `supabase/migrations/0024_advanced_stats_functions.sql`). The function joins `premium_match_participants` twice to exclude computer opponents and aggregates `(matches, wins, losses, winrate, last_played)` per `my_race_id` × `opponent_race_id`.
 - Query params: `profileId`, optional `matchTypeId`, `windowDays` (default 90). The UI currently sends `matchTypeId = null`.
 - The card renders a 9×9 grid using `raceIdToFaction` (`src/lib/race-utils.ts`) to translate race ids 0–8 into faction labels.
 
@@ -56,17 +56,18 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 
 ## Supabase Schema & RPC Summary
 - `premium_get_elo_history(p_profile_id bigint, p_leaderboard_id integer, p_since timestamptz, p_limit integer)` – reads `leaderboard_rank_history`.
-- `premium_get_matchup_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer)` – aggregates faction matchups from `match_participants`/`matches`.
+- `premium_get_matchup_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer)` – aggregates faction matchups from `premium_match_participants`/`premium_matches`.
 - `premium_get_map_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns per-map statistics with bounded result sizes.
 - `premium_get_map_match_history(p_profile_id bigint, p_map_identifier text, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent matches played on a specific map (with roster metadata).
 - `premium_get_matchup_match_history(p_profile_id bigint, p_my_race_id integer, p_opponent_race_id integer, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent matches for a given faction match-up, including roster metadata.
 - `premium_get_opponent_stats(p_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns most frequent human opponents (filters out computers, spectators, and same-team results).
 - `premium_get_opponent_match_history(p_profile_id bigint, p_opponent_profile_id bigint, p_since timestamptz, p_match_type_id integer, p_limit integer)` – returns recent head-to-head matches (including roster JSON) for a specific opponent while excluding spectators and same-team appearances.
 - `premium_get_profile_overview(p_profile_id bigint)` – available PL/pgSQL helper (see `supabase/migrations/0027_fix_overview_wins_losses.sql`), currently unused because the API recomputes the overview to incorporate live Relic data.
+- `sync_premium_match_history(p_since timestamptz)` – copies matches involving active premium profiles from hot tables into `premium_*` storage.
 - Schema prerequisites:
   - `public.premium_subscriptions` (`0030_premium_subscriptions.sql`) with policies in `0031_enable_rls_on_premium_subscriptions.sql`.
   - `public.app_users` (`0028_app_users_auth0.sql`, `0029_app_users_subscription_status.sql`) for Auth0 linkage.
-  - Populated gameplay tables (`match_participants`, `matches`, `leaderboard_rank_history`, `players`, `leaderboards`).
+  - Populated gameplay tables (`premium_match_participants`, `premium_matches`, `leaderboard_rank_history`, `players`, `leaderboards`).
 
 ## API Surface (`src/app/api/premium/*`)
 - `GET /api/premium/activation-status?profileId=123`  
@@ -116,6 +117,8 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
    5. `0030_premium_subscriptions.sql`
    6. `0031_enable_rls_on_premium_subscriptions.sql`
    7. `0032_update_premium_opponent_scope.sql`
+   8. `0050_premium_match_history.sql`
+   9. `0051_premium_history_functions.sql`
 3. **Stripe subscription flow**
    - `POST /api/premium/checkout` creates Stripe Checkout sessions and persists/upserts the customer id on `app_users`.
    - Successful Checkout should be followed by `POST /api/premium/sync` (or a webhook that calls `syncStripeSubscription`) to upsert the subscription snapshot into `premium_subscriptions`.
@@ -133,6 +136,7 @@ This guide documents the Advanced Statistics feature (premium analytics) so the 
 - **Exports** – No CSV/PNG export or sharing features exist.
 - **Testing** – There is no automated coverage for these Supabase functions or UI components. Manual validation is required after any schema or API change.
 - **Performance** – The overview endpoint fans out to every Relic leaderboard per request, which can be slow and may hit Relic rate limits; server-side caching/backfill would help.
+- **Premium backfill** – New premium profiles need a one-time backfill from the S3 archive to populate `premium_*` tables for matches older than the retention window.
 
 ## Monitoring & Troubleshooting
 - Check the JSON `reason` field on 4xx/5xx responses first. Common cases: missing Auth0 session (`not_authenticated`), no linked profile (`profile_not_linked`), or inactive subscription (`not_subscribed`).
