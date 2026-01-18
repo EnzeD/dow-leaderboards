@@ -222,31 +222,23 @@ function buildMatchPayload(data, sourceAlias) {
     if (!matchId) continue;
     const matchTypeId = safeNumber(entry?.matchtype_id ?? entry?.matchTypeId);
     const mapName = typeof entry?.mapname === "string" ? entry.mapname : (typeof entry?.map === "string" ? entry.map : null);
-    const description = typeof entry?.description === "string" ? entry.description : null;
     const maxPlayers = safeNumber(entry?.maxplayers ?? entry?.maxPlayers);
     const creatorProfileId = parseBigIntish(entry?.creator_profile_id ?? entry?.creatorProfileId);
     const startedAt = secToIso(entry?.startgametime ?? entry?.startGameTime ?? entry?.start_time);
     const completedAt = secToIso(entry?.completiontime ?? entry?.completionTime ?? entry?.completed_time);
     const durationSeconds = safeNumber(entry?.duration ?? (entry?.completiontime && entry?.startgametime ? entry.completiontime - entry.startgametime : null));
-    const observerTotal = safeNumber(entry?.observercount ?? entry?.observerCount);
-    const optionsBlob = entry?.options ? JSON.stringify(entry.options) : null;
-    const slotInfoBlob = entry?.slotinfo ? JSON.stringify(entry.slotinfo) : null;
 
     matches.push({
       match_id: matchId,
       match_type_id: matchTypeId,
       map_name: mapName,
-      description,
       max_players: maxPlayers,
       creator_profile_id: creatorProfileId,
       started_at: startedAt,
       completed_at: completedAt,
       duration_seconds: durationSeconds,
-      observer_total: observerTotal,
       crawled_at: nowIso(),
-      source_alias: sourceAlias ?? null,
-      options_blob: optionsBlob,
-      slot_info_blob: slotInfoBlob
+      source_alias: sourceAlias ?? null
     });
 
     const members = Array.isArray(entry?.matchhistorymember) ? entry.matchhistorymember : [];
