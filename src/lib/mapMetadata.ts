@@ -17,6 +17,7 @@ const MAP_METADATA: Record<string, MapMetadata> = {
   "2P_BLOOD_RIVER": { id: "2P_BLOOD_RIVER", name: `Blood River (2)`, imagePath: `/assets/maps/2p_blood_river_mm.webp`, fallbackName: `Blood River` },
   "2P_BLOODY_HELL": { id: "2P_BLOODY_HELL", name: `Bloody Hell (2)`, imagePath: `/assets/maps/2p_bloody hell_mm.webp`, fallbackName: `Bloody Hell` },
   "2P_DEADMANS_CROSSING": { id: "2P_DEADMANS_CROSSING", name: `Deadman’s Crossing (2)`, imagePath: `/assets/maps/2p_deadmans_crossing_mm.webp`, fallbackName: `Deadmans Crossing` },
+  "2P_DEADLY_FUN_ARCHEOLOGY": { id: "2P_DEADLY_FUN_ARCHEOLOGY", name: `Deadly Fun Archeology (2)`, imagePath: `/assets/maps/2p_deadly_fun_archeology_mm.webp`, fallbackName: `Deadly Fun Archeology` },
   "2P_EDEMUS_GAMBLE": { id: "2P_EDEMUS_GAMBLE", name: `Edemus Gamble (2)`, imagePath: `/assets/maps/2p_edemus_gamble_mm.webp`, fallbackName: `Edemus Gamble` },
   "2P_EDEN": { id: "2P_EDEN", name: `Eden (2)`, imagePath: `/assets/maps/2p_eden_mm.webp`, fallbackName: `Eden` },
   "2P_EMERALD_RIVER": { id: "2P_EMERALD_RIVER", name: `Emerald River (2)`, imagePath: `/assets/maps/2p_emerald_river_mm.webp`, fallbackName: `Emerald River` },
@@ -112,6 +113,7 @@ const MAP_METADATA: Record<string, MapMetadata> = {
   "6P_WESTERN_BARRENS": { id: "6P_WESTERN_BARRENS", name: `Western Barrens (6)`, imagePath: `/assets/maps/6p_western_barrens_mm.webp`, fallbackName: `Western Barrens` },
   "8P_BURIAL_GROUNDS": { id: "8P_BURIAL_GROUNDS", name: `Burial Grounds (8)`, imagePath: `/assets/maps/8p_burial_grounds_mm.webp`, fallbackName: `Burial Grounds` },
   "8P_CERULEA": { id: "8P_CERULEA", name: `Cerulea (8)`, imagePath: `/assets/maps/8p_cerulea_mm.webp`, fallbackName: `Cerulea` },
+  "8P_CLOOTH-NA-BARE": { id: "8P_CLOOTH-NA-BARE", name: `Clooth-na-bare (8)`, imagePath: `/assets/maps/8p_clooth-na-bare_mm.webp`, fallbackName: `Clooth-na-bare` },
   "8P_DATURIAS_PITS": { id: "8P_DATURIAS_PITS", name: `Daturias Pits (8)`, imagePath: `/assets/maps/8p_daturias_pits_mm.webp`, fallbackName: `Daturias Pits` },
   "8P_DEMES_NORTHLANDS": { id: "8P_DEMES_NORTHLANDS", name: `Demes Northlands (8)`, imagePath: `/assets/maps/8p_demes_northlands_mm.webp`, fallbackName: `Demes Northlands` },
   "8P_DOOM_CHAMBER": { id: "8P_DOOM_CHAMBER", name: `Doom Chamber (8)`, imagePath: `/assets/maps/8p_doom_chamber_mm.webp`, fallbackName: `Doom Chamber` },
@@ -135,7 +137,7 @@ const MAP_METADATA: Record<string, MapMetadata> = {
   "719272": { id: "719272", name: `Deimos Peninsula (4)`, fallbackName: `Deimos Peninsula` },
   "719273": { id: "719273", name: `Victory Bay (4)`, fallbackName: `Victory Bay` },
   "719274": { id: "719274", name: `North Vandea (4)`, fallbackName: `North Vandea` },
-  "4900096": { id: "4900096", name: `Principian Badlands (6)`, fallbackName: `Principian Badlands` },
+  "4900096": { id: "4900096", name: `Principian Badlands (6)`, imagePath: `/assets/maps/6p_principian_badlands_mm.webp`, fallbackName: `Principian Badlands` },
 };
 
 type MapsJsonEntry = {

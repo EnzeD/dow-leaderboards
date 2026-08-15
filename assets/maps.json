@@ -44,6 +44,13 @@
       ]
     },
     {
+      "id": "2P_DEADLY_FUN_ARCHEOLOGY",
+      "en": "Deadly Fun Archeology (2)",
+      "aliases": [
+        "2P_DEADLY_FUN_ARCHEOLOGY_OFFICIAL"
+      ]
+    },
+    {
       "id": "2P_EDEMUS_GAMBLE",
       "en": "Edemus Gamble (2)",
       "aliases": [
@@ -89,7 +96,8 @@
       "id": "2P_FATA_MORGANA",
       "en": "Fata Morga (2)",
       "aliases": [
-        "719288"
+        "719288",
+        "2P_FATA_MORGANA_[REM]_OFFICIAL"
       ]
     },
     {
@@ -709,6 +717,10 @@
       ]
     },
     {
+      "id": "8P_CLOOTH-NA-BARE",
+      "en": "Clooth-na-bare (8)"
+    },
+    {
       "id": "8P_DATURIAS_PITS",
       "en": "Daturias Pits (8)",
       "aliases": [
@@ -847,7 +859,10 @@
     },
     {
       "id": "4900096",
-      "en": "Principian Badlands (6)"
+      "en": "Principian Badlands (6)",
+      "aliases": [
+        "6P_PRINCIPIAN_BADLANDS"
+      ]
     }
   ]
 }
