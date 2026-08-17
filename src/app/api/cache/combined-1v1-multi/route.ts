@@ -7,16 +7,23 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const rows = await fetchCombined1v1AllEntriesMax();
-    const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
+    const url = new URL(request.url);
+    const limitParam = Number(url.searchParams.get('limit') || '200');
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
+    // Preserve the existing 500-row per-faction ceiling while avoiding work
+    // for rows the client did not request (the default view asks for 200).
+    const rows = await fetchCombined1v1AllEntriesMax(Math.min(limit, 500));
+    const limited = rows.slice(0, limit);
+
+    const missing = limited.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
-    for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
+    for (const r of limited) r.playerName = r.playerName || map[r.profileId] || "Unknown";
 
     const levelMap = new Map<string, number>();
     try {
       const profileIds = Array.from(
         new Set(
-          rows
+          limited
             .map(r => Number(r.profileId))
             .filter(id => !Number.isNaN(id))
         )
@@ -45,11 +52,6 @@ export async function GET(request: Request) {
     } catch (dbError) {
       console.warn('Database unavailable, continuing without level data:', dbError);
     }
-
-    const url = new URL(request.url);
-    const limitParam = Number(url.searchParams.get('limit') || '200');
-    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
-    const limited = rows.slice(0, limit);
 
     const previousRanks = await getLatestCombinedMultiRankMap();
 

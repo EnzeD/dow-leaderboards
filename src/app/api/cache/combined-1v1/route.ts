@@ -7,16 +7,23 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const rows = await fetchCombined1v1Max();
-    const missing = rows.filter(r => !r.playerName).map(r => r.profileId);
+    const url = new URL(request.url);
+    const limitParam = Number(url.searchParams.get('limit') || '200');
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
+    // Preserve the existing 500-row per-faction ceiling while avoiding work
+    // for rows the client did not request (the default view asks for 200).
+    const rows = await fetchCombined1v1Max(Math.min(limit, 500));
+    const limited = rows.slice(0, limit);
+
+    const missing = limited.filter(r => !r.playerName).map(r => r.profileId);
     const map = missing.length ? await resolveNames(missing) : {};
-    for (const r of rows) r.playerName = r.playerName || map[r.profileId] || "Unknown";
+    for (const r of limited) r.playerName = r.playerName || map[r.profileId] || "Unknown";
 
     // Enhance with level data from our database
     const levelMap = new Map();
     try {
       // Convert profile IDs to numbers for database query (bigint column)
-      const profileIds = rows.map(r => Number(r.profileId)).filter(id => !isNaN(id));
+      const profileIds = limited.map(r => Number(r.profileId)).filter(id => !isNaN(id));
 
       if (profileIds.length === 0) {
         console.log('No valid profile IDs to query');
@@ -50,7 +57,7 @@ export async function GET(request: Request) {
     }
 
     // Add level information to each row (will be undefined if DB is down)
-    for (const r of rows) {
+    for (const r of limited) {
       // Use database level if available, otherwise don't set level
       const key = String(r.profileId);
       if (levelMap.has(key)) {
@@ -58,11 +65,6 @@ export async function GET(request: Request) {
       }
     }
 
-    const url = new URL(request.url);
-    const limitParam = Number(url.searchParams.get('limit') || '200');
-    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
-
-    const limited = rows.slice(0, limit);
     const previousRanks = await getLatestRankMap(0);
     for (const r of limited) {
       const prevRank = previousRanks.get(String(r.profileId));

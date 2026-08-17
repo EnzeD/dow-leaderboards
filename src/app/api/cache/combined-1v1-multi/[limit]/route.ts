@@ -9,7 +9,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ limit?: string
     const limitParam = Number(params?.limit || '200');
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.floor(limitParam) : 200;
 
-    const rows = await fetchCombined1v1AllEntriesMax();
+    // Preserve the existing 500-row per-faction ceiling while avoiding work
+    // for rows the client did not request (the default view asks for 200).
+    const rows = await fetchCombined1v1AllEntriesMax(Math.min(limit, 500));
     const limitedRows = rows.slice(0, limit);
 
     const missing = limitedRows.filter(r => !r.playerName).map(r => r.profileId);
