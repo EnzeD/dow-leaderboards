@@ -26,39 +26,17 @@ const MAX_PLAYERS = Number.parseInt(process.env.SEED_PLAYER_LIMIT ?? "0", 10);
 const JOB_PRIORITY = Number.parseInt(process.env.SEED_JOB_PRIORITY ?? "5", 10);
 const KIND = "player_matches";
 
-function isDuplicateError(error) {
-  if (!error) return false;
-  if (error.code === "23505") return true;
-  const message = String(error.message ?? "");
-  return message.includes("duplicate key value") || message.includes("already exists");
-}
-
 async function insertJobs(rows) {
   if (!rows.length) return { inserted: 0, skipped: 0 };
   const res = await supabase
-    .from("crawl_jobs")
-    .insert(rows, { returning: "minimal" });
+    .rpc("enqueue_player_match_jobs", { p_jobs: rows });
 
-  if (!res.error) {
-    return { inserted: rows.length, skipped: 0 };
+  if (res.error) {
+    throw new Error(`Failed to enqueue jobs: ${res.error.message}`);
   }
 
-  if (isDuplicateError(res.error) && rows.length > 1) {
-    let inserted = 0;
-    let skipped = 0;
-    for (const row of rows) {
-      const outcome = await insertJobs([row]);
-      inserted += outcome.inserted;
-      skipped += outcome.skipped;
-    }
-    return { inserted, skipped };
-  }
-
-  if (isDuplicateError(res.error)) {
-    return { inserted: 0, skipped: 1 };
-  }
-
-  throw new Error(`Failed to enqueue jobs: ${res.error.message}`);
+  const inserted = Number(res.data ?? 0);
+  return { inserted, skipped: rows.length - inserted };
 }
 
 async function main() {

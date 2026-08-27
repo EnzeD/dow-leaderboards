@@ -380,11 +380,13 @@ async function ensureAliasHistory(rows) {
 }
 
 async function enqueueProfiles(profileIds) {
-  if (!profileIds.length) return;
-  const payloads = profileIds.map(profileId => ({ kind: "player_matches", payload: { profile_id: profileId }, priority: 12 }));
-  const { error } = await supabase.from("crawl_jobs").insert(payloads, { returning: "minimal" });
-  if (error && !isDuplicateError(error)) {
-    console.warn(`Failed to enqueue ${profileIds.length} profiles:`, error.message);
+  const uniqueProfileIds = Array.from(new Set(profileIds));
+  if (!uniqueProfileIds.length) return;
+
+  const jobs = uniqueProfileIds.map(profileId => ({ payload: { profile_id: profileId }, priority: 12 }));
+  const { error } = await supabase.rpc("enqueue_player_match_jobs", { p_jobs: jobs });
+  if (error) {
+    console.warn(`Failed to enqueue ${uniqueProfileIds.length} profiles:`, error.message);
   }
 }
 

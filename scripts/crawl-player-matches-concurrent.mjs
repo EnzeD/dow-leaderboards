@@ -75,13 +75,6 @@ function determineOutcome(raw) {
   return "unknown";
 }
 
-function isDuplicateError(error) {
-  if (!error) return false;
-  if (error.code === "23505") return true;
-  const message = String(error.message ?? "");
-  return message.includes("duplicate key value") || message.includes("already exists");
-}
-
 async function fetchRelicJson(url, context) {
   if (relicRequestCount >= RELIC_REQUEST_CAP) {
     throw new Error(`Relic request cap (${RELIC_REQUEST_CAP}) reached while fetching ${context}`);
@@ -358,18 +351,20 @@ async function chunkedUpsert(table, rows, options) {
 }
 
 async function enqueueProfiles(profileIds, playerMap) {
-  for (const profileId of profileIds) {
-    const payload = {
+  const uniqueProfileIds = Array.from(new Set(profileIds));
+  if (!uniqueProfileIds.length) return;
+
+  const priority = Math.max(JOB_PRIORITY_FLOOR, Math.min(DISCOVERY_PRIORITY, JOB_PRIORITY_CEIL));
+  const jobs = uniqueProfileIds.map(profileId => ({
+    payload: {
       profile_id: profileId,
       alias: playerMap.get(profileId)?.current_alias ?? null
-    };
-    const priority = Math.max(JOB_PRIORITY_FLOOR, Math.min(DISCOVERY_PRIORITY, JOB_PRIORITY_CEIL));
-    const insert = await supabase
-      .from("crawl_jobs")
-      .insert([{ kind: JOB_KIND, payload, priority }], { returning: "minimal" });
-    if (insert.error && !isDuplicateError(insert.error)) {
-      console.warn(`Failed to enqueue profile ${profileId}:`, insert.error.message);
-    }
+    },
+    priority
+  }));
+  const enqueue = await supabase.rpc("enqueue_player_match_jobs", { p_jobs: jobs });
+  if (enqueue.error) {
+    console.warn(`Failed to enqueue ${uniqueProfileIds.length} profiles:`, enqueue.error.message);
   }
 }
 
