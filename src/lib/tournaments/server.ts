@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { auth0 } from "@/lib/auth0";
 import type { PublicTournament, Tournament } from "@/lib/tournaments/types";
 
@@ -55,6 +56,52 @@ export const toPublicTournament = (tournament: Tournament): PublicTournament => 
 };
 
 export const getTournamentAdmin = (): SupabaseClient | null => tournamentAdmin;
+
+const TOURNAMENT_SPOTLIGHT_CACHE_TAG = "tournament-spotlight";
+
+const fetchPublicTournamentSpotlight = async (): Promise<PublicTournament | null> => {
+  if (!tournamentAdmin) {
+    throw new Error("supabase_unavailable");
+  }
+
+  const { data: spotlight, error: spotlightError } = await tournamentAdmin
+    .from("tournament_spotlight")
+    .select("tournament_id")
+    .eq("singleton", true)
+    .maybeSingle();
+
+  if (spotlightError) {
+    throw new Error(`spotlight_lookup_failed: ${spotlightError.message}`);
+  }
+  if (!spotlight?.tournament_id) return null;
+
+  const { data, error } = await tournamentAdmin
+    .from("tournaments")
+    .select(TOURNAMENT_SELECT)
+    .eq("id", spotlight.tournament_id)
+    .eq("state", "draft")
+    .gte("tournament_date", utcDateToday())
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`tournament_lookup_failed: ${error.message}`);
+  }
+
+  return data ? toPublicTournament(serializeTournament(data)) : null;
+};
+
+export const getCachedPublicTournamentSpotlight = unstable_cache(
+  fetchPublicTournamentSpotlight,
+  [TOURNAMENT_SPOTLIGHT_CACHE_TAG],
+  {
+    revalidate: 60,
+    tags: [TOURNAMENT_SPOTLIGHT_CACHE_TAG],
+  },
+);
+
+export const invalidateTournamentSpotlightCache = () => {
+  revalidateTag(TOURNAMENT_SPOTLIGHT_CACHE_TAG);
+};
 
 export type TournamentManagerContext =
   | {

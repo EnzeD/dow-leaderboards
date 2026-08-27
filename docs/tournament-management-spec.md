@@ -87,7 +87,7 @@ Hard deletion is not exposed. Managers archive records instead.
 - `POST /api/tournaments/manage/:id/deactivate` clears the spotlight when it references that tournament.
 - `POST /api/tournaments/manage/:id/archive` archives the tournament and clears it from the spotlight when necessary.
 
-All manager responses use `Cache-Control: private, no-store`. The small public endpoint initially uses `no-store` so activation and edits appear immediately.
+All manager responses use `Cache-Control: private, no-store`. The active spotlight is loaded server-side into the homepage's initial HTML and held in a short tagged server cache. Tournament edits and spotlight actions invalidate that tag immediately.
 
 ## Validation
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getTournamentManagerContext,
+  invalidateTournamentSpotlightCache,
   isTrustedJsonMutation,
   isUuid,
   privateNoStore,
@@ -68,6 +69,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     );
   }
 
+  invalidateTournamentSpotlightCache();
   return privateNoStore(
     NextResponse.json({ success: true, activeTournamentId: params.id }),
   );

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getTournamentManagerContext,
+  invalidateTournamentSpotlightCache,
   isTrustedJsonMutation,
   isUuid,
   privateNoStore,
@@ -65,6 +66,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     console.error("[tournaments] failed to clear archived spotlight", spotlightError);
   }
 
+  invalidateTournamentSpotlightCache();
   return privateNoStore(
     NextResponse.json({
       tournament: serializeTournament(data),
