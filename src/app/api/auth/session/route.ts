@@ -26,6 +26,7 @@ export async function GET() {
     premium_expires_at: string | null;
     primary_profile_id: number | null;
     has_used_trial: boolean | null;
+    can_manage_tournaments: boolean;
   } | null = null;
   let subscription: {
     stripeCustomerId: string | null;
@@ -79,7 +80,22 @@ export async function GET() {
           premium_expires_at: data.premium_expires_at ?? null,
           primary_profile_id: data.primary_profile_id ?? null,
           has_used_trial: data.has_used_trial ?? null,
+          can_manage_tournaments: false,
         };
+
+        const { data: permissions, error: permissionsError } = await supabase
+          .from("app_user_permissions")
+          .select("can_manage_tournaments")
+          .eq("auth0_sub", session.user.sub)
+          .maybeSingle();
+
+        if (permissionsError) {
+          console.error("[auth] failed to fetch app user permissions", permissionsError);
+        } else {
+          appUser.can_manage_tournaments = Boolean(
+            permissions?.can_manage_tournaments,
+          );
+        }
 
         const snapshot = await fetchSubscriptionSnapshot(supabase, session.user.sub);
         if (snapshot) {

@@ -9,9 +9,15 @@ type AccountDropdownProps = {
   avatarUrl?: string | null;
   displayName: string;
   profileId?: string | null;
+  canManageTournaments?: boolean;
 };
 
-export function AccountDropdown({ avatarUrl, displayName, profileId }: AccountDropdownProps) {
+export function AccountDropdown({
+  avatarUrl,
+  displayName,
+  profileId,
+  canManageTournaments = false,
+}: AccountDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +106,19 @@ export function AccountDropdown({ avatarUrl, displayName, profileId }: AccountDr
                 </svg>
                 <span>View my profile</span>
               </a>
+            )}
+
+            {canManageTournaments && (
+              <Link
+                href="/tournaments/manage"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-200 transition hover:bg-neutral-800/60"
+              >
+                <svg className="h-5 w-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21h8m-4-4v4m7-13a4 4 0 01-4 4h-6a4 4 0 01-4-4V5h14v3zM5 5h14M5 9C3.343 9 2 7.657 2 6V5h3m14 4c1.657 0 3-1.343 3-3V5h-3" />
+                </svg>
+                <span>Manage tournaments</span>
+              </Link>
             )}
 
             <div className="my-1 border-t border-neutral-700/50" />

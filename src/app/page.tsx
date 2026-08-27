@@ -24,6 +24,8 @@ import { AccountDropdown } from "@/app/_components/AccountDropdown";
 import ProBadge from "@/components/ProBadge";
 import { getEventTracker } from "@/lib/analytics/event-tracker";
 import { NavigationContext } from "@/lib/analytics/navigation-context";
+import { TournamentPromo } from "@/app/_components/TournamentPromo";
+import type { PublicTournament } from "@/lib/tournaments/types";
 // Faction icons (bundled assets). If you move icons to public/assets/factions,
 // you can reference them via URL instead.
 import chaosIcon from "../../assets/factions/chaos.png";
@@ -559,6 +561,7 @@ export default function Home() {
   const subscriptionActive = account?.subscription?.active ?? false;
   const linkedAlias = account?.profile?.alias ?? null;
   const linkedAvatarUrl = account?.profile?.avatarUrl ?? null;
+  const canManageTournaments = account?.appUser?.can_manage_tournaments ?? false;
   const accountButtonLabel = linkedAlias ?? "Account";
   const advancedStatsCta = {
     label: "Discover what's in Pro",
@@ -584,13 +587,34 @@ export default function Home() {
   useEffect(() => {
     eventTracker.current.setAuth0Sub(authUser?.sub || null);
   }, [authUser?.sub]);
-  const trackTournamentDiscordClick = useCallback(() => {
+  const [tournamentSpotlight, setTournamentSpotlight] = useState<PublicTournament | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const loadTournamentSpotlight = async () => {
+      try {
+        const response = await fetch("/api/tournaments", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!cancelled) {
+          setTournamentSpotlight(payload.tournament ?? null);
+        }
+      } catch {
+        // Tournament promotion is optional; keep the homepage usable if it is unavailable.
+      }
+    };
+    void loadTournamentSpotlight();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const trackTournamentCtaClick = useCallback((tournament: PublicTournament) => {
     eventTracker.current.track({
       event_type: 'feature_interaction',
-      event_name: 'tournament_discord_click',
+      event_name: 'tournament_cta_click',
       properties: {
-        tournament_name: 'Dawn of War World Championship',
-        cta_destination: 'discord',
+        tournament_id: tournament.id,
+        tournament_name: tournament.name,
+        cta_url: tournament.ctaUrl,
         location: 'header_tournament_banner'
       }
     });
@@ -2280,7 +2304,7 @@ export default function Home() {
                 id="mobile-nav-menu"
                 className={`overflow-hidden rounded-lg border border-neutral-700/60 bg-neutral-900/85 shadow-xl transition-all duration-300 ease-in-out transform ${mobileNavOpen ? 'mt-3 opacity-100 translate-y-0' : 'mt-0 opacity-0 -translate-y-2 pointer-events-none'
                   }`}
-                style={{ maxHeight: mobileNavOpen ? '520px' : '0px' }}
+                style={{ maxHeight: mobileNavOpen ? '650px' : '0px' }}
               >
                 <div className="p-3 space-y-3">
                   <div className="space-y-2">
@@ -2335,6 +2359,24 @@ export default function Home() {
                     >
                       <SupportTabKoFiButton />
                     </button>
+                    {isAuthenticated && (
+                      <Link
+                        href="/account"
+                        onClick={() => setMobileNavOpen(false)}
+                        className="flex w-full items-center justify-center rounded-md border border-neutral-700/50 bg-neutral-900/60 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800/70"
+                      >
+                        Manage account
+                      </Link>
+                    )}
+                    {canManageTournaments && (
+                      <Link
+                        href="/tournaments/manage"
+                        onClick={() => setMobileNavOpen(false)}
+                        className="flex w-full items-center justify-center rounded-md border border-indigo-400/40 bg-indigo-500/20 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:bg-indigo-500/30"
+                      >
+                        Manage tournaments
+                      </Link>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-1 text-sm">
                     <a
@@ -2414,6 +2456,7 @@ export default function Home() {
                       avatarUrl={linkedAvatarUrl}
                       displayName={accountButtonLabel}
                       profileId={linkedProfileId}
+                      canManageTournaments={canManageTournaments}
                     />
                   ) : (
                     <a
@@ -2429,67 +2472,11 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Tournament Promo - Hide after November 15, 2025 */}
-        {new Date() < new Date('2025-11-16T00:00:00Z') && (
-          <div className="mb-1 sm:mb-2">
-            <div className="flex flex-col gap-4 rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-4 shadow-[0_8px_24px_rgba(0,0,0,0.55)] sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-5">
-              <div className="flex flex-1 items-start gap-4">
-                <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center self-center rounded-xl border border-neutral-700/60 bg-neutral-800/70 p-2 shadow-inner shadow-black/30">
-                  <img
-                    src="/assets/world-championship.png"
-                    alt="Dawn of War World Championship logo"
-                    className="h-10 w-10"
-                    loading="lazy"
-                  />
-                </span>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-[0.35em] text-neutral-400">
-                    Tournament Spotlight
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-lg font-semibold text-white sm:text-xl">
-                      Dawn of War World Championship
-                    </h2>
-                    <span className="inline-flex items-center gap-2 rounded-md border border-neutral-600/50 bg-neutral-700/30 px-2.5 py-0.5 text-xs font-semibold text-neutral-200 sm:text-sm">
-                      <svg
-                        className="h-3.5 w-3.5 text-yellow-500/80 sm:h-4 sm:w-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.6}
-                        aria-hidden="true"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m7-13a4 4 0 01-4 4h-6a4 4 0 01-4-4V5h14v3zM5 5h14M5 9C3.343 9 2 7.657 2 6V5h3m14 4c1.657 0 3-1.343 3-3V5h-3" />
-                      </svg>
-                      Prize pool: $3,000
-                    </span>
-                  </div>
-                  <div className="text-sm text-neutral-300 sm:text-base">
-                    <span>Starts Saturday, 15&nbsp;November&nbsp;2025 at 13:00 Moscow time.</span>
-                  </div>
-                </div>
-              </div>
-              <a
-                href="https://discord.gg/p6WNEuhgvV"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={trackTournamentDiscordClick}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-400/40 bg-indigo-500/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-900"
-              >
-                Join the Discord
-                <svg
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                </svg>
-              </a>
-            </div>
-          </div>
+        {tournamentSpotlight && (
+          <TournamentPromo
+            tournament={tournamentSpotlight}
+            onCtaClick={trackTournamentCtaClick}
+          />
         )}
 
         {/* Tab Navigation */}

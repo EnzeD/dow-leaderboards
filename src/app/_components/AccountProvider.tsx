@@ -32,6 +32,7 @@ type AccountResponse = {
     premium_expires_at: string | null;
     primary_profile_id: number | null;
     has_used_trial: boolean | null;
+    can_manage_tournaments: boolean;
   } | null;
   subscription: {
     stripeCustomerId: string | null;
