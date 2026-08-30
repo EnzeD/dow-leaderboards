@@ -48,6 +48,7 @@ const WEEKS_OPTIONS = [6, 12, 24] as const;
 const weekLabelFormatter = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",
+  timeZone: "UTC",
 });
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
@@ -111,9 +112,10 @@ const CustomTooltip = ({ active, payload, label, factionOrder }: { active?: bool
 
 type StatsRacePickrateChartProps = {
   ratingFloor: number;
+  patch: string;
 };
 
-export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrateChartProps) {
+export default function StatsRacePickrateChart({ ratingFloor, patch }: StatsRacePickrateChartProps) {
   const factions = useMemo(() => allFactions(), []);
   const legendOrder = useMemo(() => [...factions].reverse(), [factions]);
   const [weeks, setWeeks] = useState<number>(6);
@@ -128,9 +130,9 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
     const controller = new AbortController();
 
     const load = async () => {
-      setState(prev => ({ ...prev, loading: true, error: null }));
+      setState({ data: null, loading: true, error: null });
       try {
-        const res = await fetch(`/api/stats/races?weeks=${weeks}&minRating=${ratingFloor}`, {
+        const res = await fetch(`/api/stats/races?weeks=${weeks}&minRating=${ratingFloor}&patch=${encodeURIComponent(patch)}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -147,6 +149,7 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
         }
 
         const payload = (await res.json()) as RacePickrateResponse;
+        if (controller.signal.aborted) return;
         setState({
           loading: false,
           error: null,
@@ -169,7 +172,7 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
     load();
 
     return () => controller.abort();
-  }, [weeks, reloadKey, ratingFloor]);
+  }, [weeks, reloadKey, ratingFloor, patch]);
 
   const chartData: ChartDatum[] = useMemo(() => {
     if (!state.data?.rows?.length) return [];
@@ -193,8 +196,9 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
   return (
     <StatsCard
       title="Race pick share"
-      description={`Share of races picked in ranked 1v1 matches over the last ${effectiveWeeks} weeks${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
+      description={`Share of races picked in ranked 1v1 matches ${patch === "all" ? `over the last ${effectiveWeeks} weeks` : `during patch ${patch}, grouped by week (partial weeks included)`}${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
       actions={
+        patch === "all" ?
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-400">Window</span>
           <select
@@ -208,7 +212,7 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
               </option>
             ))}
           </select>
-        </label>
+        </label> : null
       }
     >
       {state.loading && !chartData.length ? (
@@ -228,7 +232,7 @@ export default function StatsRacePickrateChart({ ratingFloor }: StatsRacePickrat
         </div>
       ) : !chartData.length ? (
         <div className="rounded-xl border border-neutral-800/70 bg-neutral-900/60 p-5 text-sm text-neutral-300">
-          Not enough ranked activity to chart faction picks for this window.
+          {patch === "all" ? "Not enough ranked activity to chart faction picks for this window." : "No ranked matches recorded for the complete days of this patch and ELO filter."}
         </div>
       ) : (
         <div className="h-[360px]">

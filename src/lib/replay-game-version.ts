@@ -26,12 +26,13 @@ export const KNOWN_GAME_PATCHES = [
   { version: '2.10.2', announcedAt: '2026-08-25T16:44:52Z' },
 ] as const;
 
-const HISTORICAL_CUTOFF = Date.parse('2026-08-31T00:00:00Z');
+export const GAME_PATCH_HISTORY_VERIFIED_THROUGH = '2026-08-31T00:00:00Z';
+const HISTORICAL_CUTOFF = Date.parse(GAME_PATCH_HISTORY_VERIFIED_THROUGH);
 const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
 const LEGACY_VERSION_RANGE = /^2\.0\.0\s*-\s*2\.[45]\.0$/;
 const STEAM_APP_ID = 3556750;
 const STEAM_FEED = 'steam_community_announcements';
-const STEAM_NEWS_URL = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${STEAM_APP_ID}&feeds=${STEAM_FEED}&count=100&maxlength=1`;
+export const STEAM_NEWS_URL = `https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=${STEAM_APP_ID}&feeds=${STEAM_FEED}&count=100&maxlength=1`;
 const STEAM_TIMEOUT_MS = 2000;
 
 /** Keep saved upload checks; resolve only the old parser's hard-coded ranges. */
@@ -58,26 +59,30 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Match release titles, not previews, beta announcements or versions in prose. */
-export function selectSteamReplayVersion(payload: unknown, createdAt: string): string | null {
-  const uploadedAt = Date.parse(createdAt);
-  if (!Number.isFinite(uploadedAt) || !isRecord(payload)) return null;
+export function parseSteamGamePatches(payload: unknown): Array<{ version: string; announcedAt: string }> {
+  if (!isRecord(payload)) return [];
   const news = payload.appnews;
-  if (!isRecord(news) || news.appid !== STEAM_APP_ID || !Array.isArray(news.newsitems)) return null;
+  if (!isRecord(news) || news.appid !== STEAM_APP_ID || !Array.isArray(news.newsitems)) return [];
 
-  let latestDate = -Infinity;
-  let latestVersion: string | null = null;
+  const patches = [];
   for (const item of news.newsitems) {
     if (!isRecord(item) || item.feedname !== STEAM_FEED || typeof item.title !== 'string') continue;
     if (typeof item.date !== 'number' || !Number.isFinite(item.date) || item.date <= 0) continue;
     const announcedAt = item.date * 1000;
-    if (announcedAt > uploadedAt || announcedAt <= latestDate) continue;
+    if (!Number.isFinite(new Date(announcedAt).getTime())) continue;
 
     const match = item.title.trim().match(/^(?:(\d+\.\d+\.\d+)\s+(?:Hot\s*Fix(?:\s+Patch Notes)?|Update(?:\s+Patch Notes)?)|Hot\s*Fix\s+(\d+\.\d+\.\d+))$/i);
     if (!match) continue;
-    latestVersion = match[1] || match[2];
-    latestDate = announcedAt;
+    patches.push({ version: match[1] || match[2], announcedAt: new Date(announcedAt).toISOString() });
   }
-  return latestVersion;
+  return patches.sort((a, b) => Date.parse(a.announcedAt) - Date.parse(b.announcedAt));
+}
+
+export function selectSteamReplayVersion(payload: unknown, createdAt: string): string | null {
+  const uploadedAt = Date.parse(createdAt);
+  if (!Number.isFinite(uploadedAt)) return null;
+  const patches = parseSteamGamePatches(payload).filter(patch => Date.parse(patch.announcedAt) <= uploadedAt);
+  return patches[patches.length - 1]?.version ?? null;
 }
 
 /** One uncached, time-bounded check per upload; failure must not reject the file. */

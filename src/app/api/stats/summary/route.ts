@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPatchStatsResponse } from "@/app/api/stats/patch-data";
 import { getSupabase, PUBLIC_CACHE_CONTROL, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type SummaryResponse = {
@@ -11,6 +12,8 @@ type SummaryResponse = {
 const ERROR_HEADERS = { "Cache-Control": "no-store" };
 
 export async function GET(req: NextRequest) {
+  const patchResponse = await getPatchStatsResponse(req, "summary");
+  if (patchResponse) return patchResponse;
   const supabase = getSupabase();
   const generatedAt = new Date().toISOString();
   const params = new URL(req.url).searchParams;

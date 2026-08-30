@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { StatsCard } from "@/app/_components/stats/StatsCard";
 import { getMapImage, getMapName } from "@/lib/mapMetadata";
@@ -23,7 +23,7 @@ type MapOverviewRow = {
 };
 
 type MapsResponse = {
-  windowDays: number;
+  windowDays: number | null;
   ratingFloor: number;
   generatedAt: string;
   limit: number;
@@ -42,7 +42,7 @@ type RaceBreakdownRow = {
 
 type RaceBreakdownResponse = {
   mapIdentifier: string;
-  windowDays: number;
+  windowDays: number | null;
   generatedAt: string;
   rows: RaceBreakdownRow[];
   reason?: string;
@@ -60,7 +60,7 @@ type RaceMatchupRow = {
 type RaceMatchupResponse = {
   mapIdentifier: string;
   raceId: number;
-  windowDays: number;
+  windowDays: number | null;
   generatedAt: string;
   rows: RaceMatchupRow[];
   reason?: string;
@@ -156,9 +156,11 @@ const hexToRgba = (hex: string, alpha: number): string => {
 
 type StatsMapsPanelProps = {
   ratingFloor: number;
+  patch: string;
 };
 
-export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
+export default function StatsMapsPanel({ ratingFloor, patch }: StatsMapsPanelProps) {
+  const requestGeneration = useRef(0);
   const [windowDays, setWindowDays] = useState<number>(90);
   const [reloadKey, setReloadKey] = useState(0);
   const [expandedMap, setExpandedMap] = useState<string | null>(null);
@@ -179,11 +181,16 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    requestGeneration.current += 1;
 
     const load = async () => {
-      setMapsState(prev => ({ ...prev, loading: true, error: null }));
+      setMapsState({ data: null, loading: true, error: null });
+      setBreakdowns({});
+      setExpandedMap(null);
+      setRaceMatchups({});
+      setExpandedRaceByMap({});
       try {
-        const res = await fetch(`/api/stats/maps?windowDays=${windowDays}&minRating=${ratingFloor}`, {
+        const res = await fetch(`/api/stats/maps?windowDays=${windowDays}&minRating=${ratingFloor}&patch=${encodeURIComponent(patch)}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -200,15 +207,12 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
         }
 
         const payload = (await res.json()) as MapsResponse;
+        if (controller.signal.aborted) return;
         setMapsState({
           loading: false,
           error: null,
           data: payload,
         });
-        setBreakdowns({});
-        setExpandedMap(null);
-        setRaceMatchups({});
-        setExpandedRaceByMap({});
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = extractErrorMessage(
@@ -225,8 +229,11 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
 
     load();
 
-    return () => controller.abort();
-  }, [windowDays, reloadKey, ratingFloor]);
+    return () => {
+      controller.abort();
+      requestGeneration.current += 1;
+    };
+  }, [windowDays, reloadKey, ratingFloor, patch]);
 
   const maps = useMemo(() => mapsState.data?.rows ?? [], [mapsState.data]);
   const effectiveWindow = mapsState.data?.windowDays ?? windowDays;
@@ -275,6 +282,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
   };
 
   const loadBreakdown = async (mapIdentifier: string) => {
+    const generation = requestGeneration.current;
     setBreakdowns(prev => ({
       ...prev,
       [mapIdentifier]: {
@@ -286,7 +294,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
 
     try {
       const res = await fetch(
-        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}?windowDays=${effectiveWindow}&minRating=${effectiveRating}`,
+        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}?windowDays=${effectiveWindow}&minRating=${effectiveRating}&patch=${encodeURIComponent(patch)}`,
       );
       if (!res.ok) {
         let reason = "Failed to load breakdown.";
@@ -301,6 +309,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
         throw new Error(reason);
       }
       const payload = (await res.json()) as RaceBreakdownResponse;
+      if (generation !== requestGeneration.current) return;
       setBreakdowns(prev => ({
         ...prev,
         [mapIdentifier]: {
@@ -310,6 +319,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
         },
       }));
     } catch (error) {
+      if (generation !== requestGeneration.current) return;
       const message = extractErrorMessage(
         error,
         "Unable to load race breakdown.",
@@ -326,6 +336,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
   };
 
   const loadRaceMatchups = async (mapIdentifier: string, raceId: number) => {
+    const generation = requestGeneration.current;
     setRaceMatchups(prev => ({
       ...prev,
       [mapIdentifier]: {
@@ -340,7 +351,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
 
     try {
       const res = await fetch(
-        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}/race/${raceId}?windowDays=${effectiveWindow}&minRating=${effectiveRating}`,
+        `/api/stats/maps/${encodeURIComponent(mapIdentifier)}/race/${raceId}?windowDays=${effectiveWindow}&minRating=${effectiveRating}&patch=${encodeURIComponent(patch)}`,
       );
 
       if (!res.ok) {
@@ -357,6 +368,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
       }
 
       const payload = (await res.json()) as RaceMatchupResponse;
+      if (generation !== requestGeneration.current) return;
       setRaceMatchups(prev => ({
         ...prev,
         [mapIdentifier]: {
@@ -369,6 +381,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
         },
       }));
     } catch (error) {
+      if (generation !== requestGeneration.current) return;
       const message = extractErrorMessage(
         error,
         "Unable to load matchup breakdown.",
@@ -580,8 +593,9 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
   return (
     <StatsCard
       title="Maps overview"
-      description={`Top ranked 1v1 maps over the last ${effectiveWindow} days.`}
+      description={`Top ranked 1v1 maps ${patch === "all" ? `over the last ${effectiveWindow} days` : `during patch ${patch}`}.`}
       actions={
+        patch === "all" ?
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-400">Range</span>
           <select
@@ -595,7 +609,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
               </option>
             ))}
           </select>
-        </label>
+        </label> : null
       }
     >
       {mapsState.loading && !maps.length ? (
@@ -615,7 +629,7 @@ export default function StatsMapsPanel({ ratingFloor }: StatsMapsPanelProps) {
         </div>
       ) : !maps.length ? (
         <div className="rounded-xl border border-neutral-800/70 bg-neutral-900/60 p-5 text-sm text-neutral-300">
-          No ranked matches recorded in this window. Try a wider range.
+          {patch === "all" ? "No ranked matches recorded in this window. Try a wider range." : "No ranked matches recorded for the complete days of this patch and ELO filter."}
         </div>
       ) : (
         <div className="space-y-6">

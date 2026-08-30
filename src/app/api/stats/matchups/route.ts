@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPatchStatsResponse } from "@/app/api/stats/patch-data";
 import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type MatchupsResponse = {
@@ -21,6 +22,8 @@ const ERROR_HEADERS = { "Cache-Control": "no-store" };
 const ALLOWED_WINDOWS = [30, 90] as const;
 
 export async function GET(req: NextRequest) {
+  const patchResponse = await getPatchStatsResponse(req, "matchups");
+  if (patchResponse) return patchResponse;
   const supabase = getSupabase();
   const generatedAt = new Date().toISOString();
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPatchStatsResponse } from "@/app/api/stats/patch-data";
 import { getSupabase, PUBLIC_CACHE_CONTROL, resolveWindowDays, pickAllowedNumber, resolveRatingFloor } from "@/app/api/stats/helpers";
 
 type MapRaceResponse = {
@@ -44,6 +45,9 @@ export async function GET(
       { status: 400, headers: ERROR_HEADERS },
     );
   }
+
+  const patchResponse = await getPatchStatsResponse(req, "mapRaces", { mapIdentifier: rawIdentifier });
+  if (patchResponse) return patchResponse;
 
   if (!supabase) {
     return NextResponse.json<MapRaceResponse>(

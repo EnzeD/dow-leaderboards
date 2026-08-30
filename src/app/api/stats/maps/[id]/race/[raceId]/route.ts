@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPatchStatsResponse } from "@/app/api/stats/patch-data";
 import {
   getSupabase,
   PUBLIC_CACHE_CONTROL,
@@ -78,6 +79,9 @@ export async function GET(
       { status: 400, headers: ERROR_HEADERS },
     );
   }
+
+  const patchResponse = await getPatchStatsResponse(req, "mapMatchups", { mapIdentifier: decodedMapId, raceId: parsedRaceId });
+  if (patchResponse) return patchResponse;
 
   if (!supabase) {
     return NextResponse.json<MapRaceMatchupsResponse>(

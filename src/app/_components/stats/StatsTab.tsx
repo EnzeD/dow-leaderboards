@@ -6,6 +6,7 @@ import StatsRacePickrateChart from "@/app/_components/stats/StatsRacePickrateCha
 import StatsMatchupsHeatmap from "@/app/_components/stats/StatsMatchupsHeatmap";
 import { formatCount } from "@/lib/stats-formatters";
 import { getEventTracker } from "@/lib/analytics/event-tracker";
+import type { StatsPatchPeriod } from "@/lib/stats-patches";
 
 type StatsView = "maps" | "pickrate" | "matchups";
 
@@ -30,6 +31,29 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
   const [totalMatches, setTotalMatches] = useState<number | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [ratingFloor, setRatingFloor] = useState<number>(0);
+  const [patch, setPatch] = useState("all");
+  const [patches, setPatches] = useState<StatsPatchPeriod[]>([]);
+  const [patchCatalogState, setPatchCatalogState] = useState<"loading" | "ready" | "stale" | "error">("loading");
+  const [catalogReload, setCatalogReload] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPatchCatalogState("loading");
+    const load = async () => {
+      try {
+        const response = await fetch("/api/stats/patches", { signal: controller.signal });
+        if (!response.ok) throw new Error("patch_catalog_unavailable");
+        const catalog = await response.json() as { patches: StatsPatchPeriod[]; stale: boolean };
+        if (controller.signal.aborted) return;
+        setPatches(catalog.patches);
+        setPatchCatalogState(catalog.stale ? "stale" : "ready");
+      } catch {
+        if (!controller.signal.aborted) setPatchCatalogState("error");
+      }
+    };
+    void load();
+    return () => controller.abort();
+  }, [catalogReload]);
 
   // Track stats sub-tab changes
   useEffect(() => {
@@ -46,12 +70,14 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
 
   useEffect(() => {
     let cancelled = false;
+    setTotalMatches(null);
+    setSummaryError(null);
 
     const loadSummary = async () => {
       try {
-        const res = await fetch(`/api/stats/summary?minRating=${ratingFloor}`);
+        const res = await fetch(`/api/stats/summary?minRating=${ratingFloor}&patch=${encodeURIComponent(patch)}`);
         if (!res.ok) {
-          setSummaryError("Total matches unavailable");
+          if (!cancelled) setSummaryError("Total matches unavailable");
           return;
         }
         const payload = (await res.json()) as {
@@ -75,7 +101,12 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
     return () => {
       cancelled = true;
     };
-  }, [ratingFloor]);
+  }, [ratingFloor, patch]);
+
+  const selectedPatch = patches.find(item => item.version === patch);
+  const lastIncludedDay = selectedPatch && selectedPatch.endDay > selectedPatch.startDay
+    ? new Date(Date.parse(`${selectedPatch.endDay}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+    : null;
 
   const activeHelper = useMemo(() => {
     const entry = VIEWS.find(v => v.key === activeView);
@@ -112,6 +143,20 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
           })}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="mr-3 flex items-center gap-2 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Patch</span>
+            <select
+              value={patch}
+              onChange={event => setPatch(event.target.value)}
+              disabled={patchCatalogState === "loading" || patchCatalogState === "error"}
+              className="rounded-md border border-neutral-700/80 bg-neutral-900/80 px-2 py-1 text-sm text-white focus:border-neutral-400 focus:outline-none disabled:opacity-50"
+            >
+              <option value="all">All patches</option>
+              {[...patches].reverse().map(item => (
+                <option key={item.version} value={item.version}>{item.version}</option>
+              ))}
+            </select>
+          </label>
           <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
             ELO filter
           </span>
@@ -135,6 +180,20 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
             );
           })}
         </div>
+        {patchCatalogState === "error" || patchCatalogState === "stale" ? (
+          <p className="text-xs text-amber-400">
+            {patchCatalogState === "error"
+              ? "Patch list unavailable."
+              : "Steam patch check unavailable. Patch periods are limited to the last verified dates."}
+            <button type="button" onClick={() => setCatalogReload(value => value + 1)} className="ml-2 underline">Retry</button>
+          </p>
+        ) : null}
+        {selectedPatch ? (
+          <p className="text-xs text-neutral-400">
+            Patch {patch}: {lastIncludedDay ? `${selectedPatch.startDay} – ${lastIncludedDay} (UTC).` : "No complete match days yet."}
+            {" "}Uses complete UTC match days; patch-release days are excluded. Replaces the rolling time window.
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-400">
           {activeHelper ? <span>{activeHelper}</span> : null}
           {totalMatches !== null ? (
@@ -149,9 +208,9 @@ export default function StatsTab({ auth0Sub }: StatsTabProps = {}) {
         </div>
       </header>
 
-      {activeView === "maps" ? <StatsMapsPanel ratingFloor={ratingFloor} /> : null}
-      {activeView === "pickrate" ? <StatsRacePickrateChart ratingFloor={ratingFloor} /> : null}
-      {activeView === "matchups" ? <StatsMatchupsHeatmap ratingFloor={ratingFloor} /> : null}
+      {activeView === "maps" ? <StatsMapsPanel key={patch} ratingFloor={ratingFloor} patch={patch} /> : null}
+      {activeView === "pickrate" ? <StatsRacePickrateChart key={patch} ratingFloor={ratingFloor} patch={patch} /> : null}
+      {activeView === "matchups" ? <StatsMatchupsHeatmap key={patch} ratingFloor={ratingFloor} patch={patch} /> : null}
     </div>
   );
 }

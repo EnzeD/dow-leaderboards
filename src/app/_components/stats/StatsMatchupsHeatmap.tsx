@@ -27,7 +27,7 @@ type MatchupRow = {
 };
 
 type MatchupResponse = {
-  windowDays: number;
+  windowDays: number | null;
   ratingFloor: number;
   generatedAt: string;
   rows: MatchupRow[];
@@ -53,9 +53,10 @@ const keyFor = (myRaceId: number, opponentRaceId: number) =>
 
 type StatsMatchupsHeatmapProps = {
   ratingFloor: number;
+  patch: string;
 };
 
-export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatmapProps) {
+export default function StatsMatchupsHeatmap({ ratingFloor, patch }: StatsMatchupsHeatmapProps) {
   const factions = useMemo(() => allFactions(), []);
   const [windowDays, setWindowDays] = useState<number>(90);
   const [reloadKey, setReloadKey] = useState(0);
@@ -69,9 +70,9 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
     const controller = new AbortController();
 
     const load = async () => {
-      setState(prev => ({ ...prev, loading: true, error: null }));
+      setState({ data: null, loading: true, error: null });
       try {
-        const res = await fetch(`/api/stats/matchups?windowDays=${windowDays}&minRating=${ratingFloor}`, {
+        const res = await fetch(`/api/stats/matchups?windowDays=${windowDays}&minRating=${ratingFloor}&patch=${encodeURIComponent(patch)}`, {
           signal: controller.signal,
         });
         if (!res.ok) {
@@ -88,6 +89,7 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
         }
 
         const payload = (await res.json()) as MatchupResponse;
+        if (controller.signal.aborted) return;
         setState({
           loading: false,
           error: null,
@@ -110,7 +112,7 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
     load();
 
     return () => controller.abort();
-  }, [windowDays, reloadKey, ratingFloor]);
+  }, [windowDays, reloadKey, ratingFloor, patch]);
 
   const matrix = useMemo(() => {
     const map = new Map<string, MatchupRow>();
@@ -155,8 +157,9 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
   return (
     <StatsCard
       title="Matchup heatmap"
-      description={`Row faction performance versus column faction across ranked 1v1 matches in the last ${effectiveWindow} days${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
+      description={`Row faction performance versus column faction across ranked 1v1 matches ${patch === "all" ? `in the last ${effectiveWindow} days` : `during patch ${patch}`}${effectiveRating > 0 ? ` (ELO >= ${effectiveRating})` : ""}.`}
       actions={
+        patch === "all" ?
         <label className="flex items-center gap-2 text-sm">
           <span className="text-neutral-400">Range</span>
           <select
@@ -170,7 +173,7 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
               </option>
             ))}
           </select>
-        </label>
+        </label> : null
       }
     >
       {state.loading && !state.data ? (
@@ -190,7 +193,7 @@ export default function StatsMatchupsHeatmap({ ratingFloor }: StatsMatchupsHeatm
         </div>
       ) : !state.data?.rows?.length ? (
         <div className="rounded-xl border border-neutral-800/70 bg-neutral-900/60 p-5 text-sm text-neutral-300">
-          Not enough ranked matches in this window to build a matchup matrix. Try expanding the range.
+          {patch === "all" ? "Not enough ranked matches in this window to build a matchup matrix. Try expanding the range." : "No ranked matches recorded for the complete days of this patch and ELO filter."}
         </div>
       ) : (
         <div className="space-y-6">
