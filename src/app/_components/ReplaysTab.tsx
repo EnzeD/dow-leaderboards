@@ -452,7 +452,7 @@ const ReplaysTab = ({ onPlayerClick }: ReplaysTabProps) => {
     replays.forEach(replay => {
       versions.add(replay.gameVersion || 'Unknown');
     });
-    return Array.from(versions).sort();
+    return Array.from(versions).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
   }, [replays]);
 
   const availableGameRules = useMemo(() => {

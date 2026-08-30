@@ -184,23 +184,10 @@ async function processReplay(row, index, total) {
 
   let tempFilePath;
   let parsed;
-  let gameVersion = null;
 
   try {
     tempFilePath = await downloadReplayToTemp(replayPath);
     parsed = parseReplay(tempFilePath);
-    const parsedGameVersion = parsed?.gameversion;
-    if (typeof parsedGameVersion === 'string') {
-      const trimmed = parsedGameVersion.trim();
-      gameVersion = trimmed.length > 0 ? trimmed : null;
-    } else if (typeof parsedGameVersion === 'number' && Number.isFinite(parsedGameVersion)) {
-      gameVersion = String(parsedGameVersion);
-    } else {
-      gameVersion = null;
-    }
-    if (parsed && typeof parsed === 'object') {
-      parsed.gameversion = gameVersion;
-    }
   } catch (error) {
     summary.errors += 1;
     console.error(`Failed to parse replay ${replayPath}`, error);
@@ -228,7 +215,7 @@ async function processReplay(row, index, total) {
   const updatePayload = {
     replay_name: parsed?.replayname ?? null,
     map_name: parsed?.mapname ?? null,
-    game_version: gameVersion,
+    // Preserve game_version: it is resolved at upload, not by the replay parser.
     match_duration_label: matchDurationLabel,
     match_duration_seconds: parseMatchDurationSeconds(matchDurationLabel),
     profiles: normalizedProfiles,
