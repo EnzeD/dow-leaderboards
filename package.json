@@ -10,6 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:replay-version": "node --test src/lib/__tests__/replay-game-version.test.mjs",
+    "test:match-history": "node --test src/lib/__tests__/relic-match-history.test.mjs",
     "test:stats-patches": "node --test src/lib/__tests__/stats-patches.test.mjs",
     "seed:leaderboards": "node scripts/seed-leaderboards.mjs",
     "enrich:players": "node scripts/enrich-players.mjs",

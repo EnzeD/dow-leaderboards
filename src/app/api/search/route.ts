@@ -1,6 +1,8 @@
 // Exact search by in-game alias using recent match history
 // This avoids scanning all leaderboards and derives profile_id and SteamID from the response.
 
+import { getPlayedMatchMembers } from '@/lib/relic-match-history';
+
 type RecentMatch = {
   matchId: number;
   mapName?: string;
@@ -136,9 +138,9 @@ async function searchByExactAlias(alias: string): Promise<SearchResult[]> {
   }
 }
 
-async function fetchRecentMatchesForAlias(alias: string, profileId: string, count: number = 10) {
-  const aliasesParam = encodeURIComponent(JSON.stringify([alias]));
-  const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&aliases=${aliasesParam}&count=${count}`;
+async function fetchRecentMatchesForProfile(profileId: string, count: number = 10) {
+  const profileIdsParam = encodeURIComponent(JSON.stringify([profileId]));
+  const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&profile_ids=${profileIdsParam}&count=${count}`;
 
   try {
     const res = await fetch(url, { cache: 'no-store' });
@@ -160,8 +162,9 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
     const matches: RecentMatch[] = [];
     const stats: any[] = Array.isArray(data?.matchHistoryStats) ? data.matchHistoryStats : [];
     for (const m of stats) {
-      const members: any[] = Array.isArray(m?.matchhistorymember) ? m.matchhistorymember : [];
+      const members: any[] = getPlayedMatchMembers(m);
       const me = members.find((mm: any) => String(mm?.profile_id ?? '') === profileId);
+      if (!me) continue;
       const oldRating = typeof me?.oldrating === 'number' ? me.oldrating : undefined;
       const newRating = typeof me?.newrating === 'number' ? me.newrating : undefined;
       const ratingDiff = (typeof oldRating === 'number' && typeof newRating === 'number') ? (newRating - oldRating) : undefined;
@@ -206,7 +209,7 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
 
     return matches;
   } catch (e) {
-    console.warn('recent match history fetch failed for', alias, e);
+    console.warn('recent match history fetch failed for profile', profileId, e);
     return [];
   }
 }
@@ -277,7 +280,7 @@ export async function POST(request: Request) {
 
       // Recent matches by alias, limited set
       try {
-        const recentMatches = await fetchRecentMatchesForAlias(r.playerName, r.profileId, 10);
+        const recentMatches = await fetchRecentMatchesForProfile(r.profileId, 10);
         out = { ...out, recentMatches };
         await new Promise(res => setTimeout(res, 120));
       } catch {}

@@ -1,6 +1,8 @@
 // Cached player payload by exact alias, built on first request.
 import { NextRequest } from "next/server";
 
+import { getPlayedMatchMembers } from "@/lib/relic-match-history";
+
 type RecentMatch = {
   matchId: number;
   mapName?: string;
@@ -130,9 +132,9 @@ async function fetchPersonalStats(steamId: string) {
   return { profile, leaderboardStats };
 }
 
-async function fetchRecentMatches(alias: string, profileId: string, count: number = 10): Promise<RecentMatch[]> {
-  const aliasesParam = encodeURIComponent(JSON.stringify([alias]));
-  const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&aliases=${aliasesParam}&count=${count}`;
+async function fetchRecentMatches(profileId: string, count: number = 10): Promise<RecentMatch[]> {
+  const profileIdsParam = encodeURIComponent(JSON.stringify([profileId]));
+  const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&profile_ids=${profileIdsParam}&count=${count}`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) return [];
   const data: any = await res.json();
@@ -152,8 +154,9 @@ async function fetchRecentMatches(alias: string, profileId: string, count: numbe
   const stats: any[] = Array.isArray(data?.matchHistoryStats) ? data.matchHistoryStats : [];
   const matches: RecentMatch[] = [];
   for (const m of stats) {
-    const members: any[] = Array.isArray(m?.matchhistorymember) ? m.matchhistorymember : [];
+    const members: any[] = getPlayedMatchMembers(m);
     const me = members.find((mm: any) => String(mm?.profile_id ?? '') === profileId);
+    if (!me) continue;
     const oldRating = typeof me?.oldrating === 'number' ? me.oldrating : undefined;
     const newRating = typeof me?.newrating === 'number' ? me.newrating : undefined;
     const ratingDiff = (typeof oldRating === 'number' && typeof newRating === 'number') ? (newRating - oldRating) : undefined;
@@ -207,7 +210,7 @@ export async function GET(_req: NextRequest, ctx: { params: { alias: string } })
 
     // personal stats via steam id (if available)
     const personalStats = ident.steamId ? await fetchPersonalStats(ident.steamId) : undefined;
-    const recentMatches = await fetchRecentMatches(alias, ident.profileId, 10);
+    const recentMatches = await fetchRecentMatches(ident.profileId, 10);
 
     const timestamp = new Date().toISOString();
     const payload: PlayerPayload = {

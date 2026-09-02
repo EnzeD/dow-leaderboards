@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 
+import { getPlayedMatchMembers } from '@/lib/relic-match-history';
+
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
@@ -128,8 +130,9 @@ export async function GET(request: NextRequest) {
     // If we have a result with Steam ID, try to get recent matches
     if (searchResults.length > 0 && alias) {
       try {
-        const aliasesParam = encodeURIComponent(JSON.stringify([alias]));
-        const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&aliases=${aliasesParam}&count=10`;
+        const targetProfileId = String(searchResults[0].profileId);
+        const profileIdsParam = encodeURIComponent(JSON.stringify([targetProfileId]));
+        const url = `https://dow-api.reliclink.com/community/leaderboard/getRecentMatchHistory?title=dow1-de&profile_ids=${profileIdsParam}&count=10`;
         const res = await fetch(url, { cache: 'no-store' });
 
         if (res.ok) {
@@ -138,10 +141,9 @@ export async function GET(request: NextRequest) {
           // Add recent matches to the first result
           const stats: any[] = Array.isArray(data?.matchHistoryStats) ? data.matchHistoryStats : [];
           const recentMatches: any[] = [];
-          const targetProfileId = searchResults[0].profileId;
 
           for (const m of stats.slice(0, 10)) {
-            const members: any[] = Array.isArray(m?.matchhistorymember) ? m.matchhistorymember : [];
+            const members: any[] = getPlayedMatchMembers(m);
             const me = members.find((mm: any) => String(mm?.profile_id ?? '') === String(targetProfileId));
 
             if (me) {
