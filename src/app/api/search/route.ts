@@ -213,14 +213,20 @@ async function fetchRecentMatchesForAlias(alias: string, profileId: string, coun
 
 export async function POST(request: Request) {
   try {
-    const { query } = await request.json();
+    const { query, profileId } = await request.json();
     const q = (typeof query === "string" ? query : "").trim();
+    const requestedProfileId = profileId === undefined || profileId === null
+      ? undefined
+      : String(profileId).trim();
 
     if (!q) {
       return Response.json({ results: [], error: "Alias required" }, { status: 400 });
     }
 
-    const results = await searchByExactAlias(q);
+    const aliasResults = await searchByExactAlias(q);
+    const results = requestedProfileId
+      ? aliasResults.filter(result => result.profileId === requestedProfileId)
+      : aliasResults;
 
     // Enrich with personal stats and recent match history when possible
     const enriched: SearchResult[] = [];

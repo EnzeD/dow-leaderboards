@@ -1032,7 +1032,11 @@ export default function HomeClient({ initialTournament }: HomeClientProps) {
         setSearchResults([]);
         if (q) {
           // Re-run search without pushing history
-          handlePlayerSearch(q, { pushHistory: false });
+          if (fromUrl.searchProfileId) {
+            runSearchByName(q, fromUrl.searchProfileId);
+          } else {
+            handlePlayerSearch(q, { pushHistory: false });
+          }
         }
       } else if (fromUrl.view === 'leaderboards') {
         if (typeof fromUrl.selectedFaction === 'string') setSelectedFaction(fromUrl.selectedFaction);
@@ -1426,7 +1430,7 @@ export default function HomeClient({ initialTournament }: HomeClientProps) {
         const response = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: q })
+          body: JSON.stringify({ query: q, profileId })
         });
 
         if (response.ok) {
@@ -1438,10 +1442,7 @@ export default function HomeClient({ initialTournament }: HomeClientProps) {
             String(result.profileId) === String(profileId)
           );
 
-          // If we found the specific player, use that result
-          const finalResults = filteredResults.length > 0 ? filteredResults : allResults.slice(0, 1);
-
-          setSearchResults(finalResults);
+          setSearchResults(filteredResults);
           setSearchLastUpdated(new Date().toISOString());
 
           // Update URL to reflect the search with profile ID
@@ -3342,7 +3343,7 @@ export default function HomeClient({ initialTournament }: HomeClientProps) {
                                               label,
                                               faction,
                                               rating: isAutomatch ? playerRating : undefined,
-                                              onClick: p.alias ? () => runSearchByName(p.alias) : undefined,
+                                              onClick: p.alias ? () => runSearchByName(p.alias, String(p.profileId)) : undefined,
                                               profileId: String(p.profileId),
                                             } satisfies RosterEntry;
                                           });
