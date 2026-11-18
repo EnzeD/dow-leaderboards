@@ -3,6 +3,7 @@ import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { Exo_2 } from "next/font/google";
 import "./globals.css";
 import { AccountProvider } from "./_components/AccountProvider";
+import { LivePresence } from "./_components/LivePresence";
 import { auth0 } from "@/lib/auth0";
 
 // Auth0 is configured at runtime when the app is built for the VPS.
@@ -47,6 +48,7 @@ export default async function RootLayout({
             {children}
           </AccountProvider>
         </Auth0Provider>
+        <LivePresence />
       </body>
     </html>
   );

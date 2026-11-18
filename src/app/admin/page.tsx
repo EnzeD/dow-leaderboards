@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { auth0, auth0Configured } from "@/lib/auth0";
 import AnalyticsDashboard, { type AnalyticsOverview } from "./analytics-dashboard";
+import { OnlineNow } from "./online-now";
 
 export const dynamic = "force-dynamic";
 
@@ -52,18 +53,21 @@ export default async function AnalyticsPage({
         </Link>
         <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <h1 className="text-3xl font-semibold text-white">Site analytics</h1>
-          <nav aria-label="Date range" className="flex gap-1 rounded-full border border-white/10 bg-neutral-900 p-1">
-            {([7, 30] as const).map((range) => (
-              <Link
-                key={range}
-                href={`/admin?days=${range}`}
-                aria-current={days === range ? "true" : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm ${days === range ? "bg-amber-400/15 text-amber-200" : "text-neutral-300 hover:bg-white/5"}`}
-              >
-                {range} days
-              </Link>
-            ))}
-          </nav>
+          <div className="flex flex-wrap items-center gap-3">
+            <OnlineNow />
+            <nav aria-label="Date range" className="flex gap-1 rounded-full border border-white/10 bg-neutral-900 p-1">
+              {([7, 30] as const).map((range) => (
+                <Link
+                  key={range}
+                  href={`/admin?days=${range}`}
+                  aria-current={days === range ? "true" : undefined}
+                  className={`rounded-full px-4 py-1.5 text-sm ${days === range ? "bg-amber-400/15 text-amber-200" : "text-neutral-300 hover:bg-white/5"}`}
+                >
+                  {range} days
+                </Link>
+              ))}
+            </nav>
+          </div>
         </div>
       </header>
 

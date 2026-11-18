@@ -40,4 +40,6 @@ The VPS target address is `51.178.86.32`.
 
 The owner can open `/admin` after signing in with the allowlisted account. It shows 7 or 30 UTC calendar days, including the current partial day, and compares totals with the preceding period through the same time of day. Browser sessions use the existing tab session IDs. Bounce rate is the share of sessions with one tracked view and zero feature interactions in the selected interval. Acquisition and browser breakdowns use the first tracked view per session in each period.
 
+Online now estimates the number of browsers with a visible visitor page in the last 75 seconds. Tabs share a temporary ID where browser storage is available. The count is kept in memory by the single VPS frontend process and naturally repopulates after a restart.
+
 For countries, download and decompress a current [DB-IP Country Lite MMDB](https://db-ip.com/db/lite.php) onto the VPS. Set `DOW_ANALYTICS_COUNTRY_DB` to its absolute path and add `-f deploy/analytics-country.compose.yaml` after `-f deploy/compose.yaml` when starting the app. Country lookup uses the address supplied by Caddy and stores only the country code in the analytics event. The Country card reports its coverage as new events arrive. Restart the container after updating the database file.
