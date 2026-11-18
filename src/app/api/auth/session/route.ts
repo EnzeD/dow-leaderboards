@@ -9,11 +9,15 @@ import {
 import { getLevelFromXP } from "@/lib/xp-levels";
 import { fetchSteamSummaryByProfile } from "@/lib/steam";
 
+export const dynamic = "force-dynamic";
+
+const SESSION_HEADERS = { "Cache-Control": "private, no-store" };
+
 export async function GET() {
   const session = await auth0.getSession();
 
   if (!session) {
-    return NextResponse.json({ user: null }, { status: 200 });
+    return NextResponse.json({ user: null }, { headers: SESSION_HEADERS });
   }
 
   const supabase = getSupabaseAdmin();
@@ -165,5 +169,5 @@ export async function GET() {
     profile,
   };
 
-  return NextResponse.json(responsePayload, { status: 200 });
+  return NextResponse.json(responsePayload, { headers: SESSION_HEADERS });
 }

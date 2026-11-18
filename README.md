@@ -58,6 +58,7 @@ npm run lint
 - API details: `API-DOCUMENTATION.md`
 - Data collection tools: `ADVANCED-STATISTICS.md`
 - Backups: `docs/backups.md`
+- VPS deployment and analytics: `docs/vps-deployment.md`
 - Deployment notes: `docs/pro-deployment-summary.md`
 
 ## Contributing

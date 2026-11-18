@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
 import { Auth0Provider } from "@auth0/nextjs-auth0";
 import { Exo_2 } from "next/font/google";
 import "./globals.css";
 import { AccountProvider } from "./_components/AccountProvider";
 import { auth0 } from "@/lib/auth0";
+
+// Auth0 is configured at runtime when the app is built for the VPS.
+export const dynamic = "force-dynamic";
 
 const exo2 = Exo_2({
   subsets: ["latin"],
@@ -45,7 +47,6 @@ export default async function RootLayout({
             {children}
           </AccountProvider>
         </Auth0Provider>
-        <Analytics />
       </body>
     </html>
   );

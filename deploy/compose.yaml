@@ -1,0 +1,22 @@
+services:
+  dow-leaderboards:
+    image: ${DOW_IMAGE:?Set DOW_IMAGE to the built release image}
+    env_file:
+      - path: ${DOW_RUNTIME_ENV:?Set DOW_RUNTIME_ENV to the VPS runtime environment file}
+        format: raw
+    ports:
+      - "127.0.0.1:13002:3000"
+    networks:
+      - proxy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/favicon.ico').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+networks:
+  proxy:
+    external: true
+    name: game-platform_default

@@ -1,0 +1,11 @@
+dow-de.com {
+  redir https://www.dow-de.com{uri} 308
+}
+
+www.dow-de.com {
+  encode zstd gzip
+  reverse_proxy dow-leaderboards:3000 {
+    header_up -CF-Connecting-IP
+    header_up -X-Real-IP
+  }
+}

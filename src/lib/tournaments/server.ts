@@ -181,7 +181,8 @@ export const isTrustedJsonMutation = (request: Request): boolean => {
   if (!origin) return true;
 
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    const appUrl = process.env.APP_BASE_URL ?? process.env.AUTH0_BASE_URL ?? request.url;
+    return new URL(origin).origin === new URL(appUrl).origin;
   } catch {
     return false;
   }
