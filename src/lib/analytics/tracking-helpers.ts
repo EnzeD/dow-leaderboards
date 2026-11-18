@@ -59,6 +59,25 @@ export function trackTabSwitch(params: {
 /**
  * Track page view with context
  */
+const campaignKeys = ['utm_source', 'utm_medium', 'utm_campaign'] as const;
+
+function getTrackedPageUrl(pageUrl?: string) {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const url = new URL(pageUrl ?? window.location.href, window.location.origin);
+    const query = new URLSearchParams();
+    for (const key of campaignKeys) {
+      const value = url.searchParams.get(key)?.trim().slice(0, 80);
+      if (value) query.set(key, value);
+    }
+    url.search = query.toString();
+    url.hash = '';
+    return url.href;
+  } catch {
+    return undefined;
+  }
+}
+
 export function trackPageView(params: {
   pageName: PageName;
   pageUrl?: string;
@@ -72,7 +91,7 @@ export function trackPageView(params: {
     event_name: 'page_viewed',
     properties: {
       page_name: params.pageName,
-      page_url: params.pageUrl || (typeof window !== 'undefined' ? window.location.href : undefined),
+      page_url: getTrackedPageUrl(params.pageUrl),
       timestamp: Date.now(),
       ...params.additionalProperties,
     },

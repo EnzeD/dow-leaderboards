@@ -14,6 +14,7 @@ export interface ProductEvent {
     last_visited_profile?: string | null;
     recent_profiles?: string[];
     referrer?: string;
+    country?: string;
     user_agent?: string;
     viewport?: {
       width: number;
@@ -24,8 +25,7 @@ export interface ProductEvent {
 }
 
 /**
- * Lightweight client-side event tracker that writes directly to Supabase
- * to avoid Vercel edge function usage on the free tier.
+ * Lightweight client-side event tracker that batches events into Supabase.
  */
 export class EventTracker {
   private queue: ProductEvent[] = [];
@@ -35,6 +35,7 @@ export class EventTracker {
   private maxQueueSize = 10;
   private flushInterval = 30000; // 30 seconds
   private auth0Sub?: string | null = null;
+  private country?: Promise<string | null>;
 
   constructor(auth0Sub?: string | null) {
     this.sessionId = this.getOrCreateSessionId();
@@ -47,6 +48,10 @@ export class EventTracker {
    * Track an event - adds to queue and flushes if needed
    */
   track(event: Omit<ProductEvent, 'session_id' | 'client_timestamp' | 'auth0_sub'>) {
+    if (event.event_type === 'page_view') {
+      this.country ??= this.lookupCountry();
+    }
+
     const enrichedEvent: ProductEvent = {
       ...event,
       session_id: this.sessionId,
@@ -79,7 +84,15 @@ export class EventTracker {
     this.queue = [];
 
     try {
-      // Direct insert to Supabase - bypasses Vercel entirely
+      if (events.some((event) => event.event_type === 'page_view')) {
+        const country = await this.country;
+        if (country) {
+          for (const event of events) {
+            if (event.event_type === 'page_view') event.context = { ...event.context, country };
+          }
+        }
+      }
+
       const { error } = await supabase
         .from('product_events')
         .insert(events);
@@ -105,6 +118,33 @@ export class EventTracker {
    */
   setAuth0Sub(auth0Sub: string | null) {
     this.auth0Sub = auth0Sub;
+  }
+
+  private async lookupCountry(): Promise<string | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1500);
+    try {
+      const response = await fetch('/api/analytics/country', {
+        cache: 'no-store',
+        credentials: 'omit',
+        signal: controller.signal,
+      });
+      if (response.status !== 200) return null;
+      const { country } = await response.json();
+      return typeof country === 'string' && /^[A-Z]{2}$/.test(country) ? country : null;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private getReferrerOrigin(): string | undefined {
+    if (!document.referrer) return undefined;
+    const referrer = new URL(document.referrer);
+    if (['http:', 'https:', 'android-app:'].includes(referrer.protocol) && referrer.host) {
+      return `${referrer.protocol}//${referrer.host}`;
+    }
   }
 
   /**
@@ -134,7 +174,7 @@ export class EventTracker {
         current_tab: sessionStorage.getItem('currentTab'),
         last_visited_profile: localStorage.getItem('lastVisitedProfile'),
         recent_profiles: recentProfiles ? JSON.parse(recentProfiles) : [],
-        referrer: typeof document !== 'undefined' ? document.referrer : undefined,
+        referrer: this.getReferrerOrigin(),
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         viewport: typeof window !== 'undefined' ? {
           width: window.innerWidth,

@@ -6,7 +6,7 @@ The frontend runs as a standalone Next.js container on the existing Caddy networ
 
 1. Run the repository's type, lint, and build checks. Use the same Node.js major as the Docker image.
 2. Keep configuration in private files on the VPS. The build file is dotenv and contains the production `NEXT_PUBLIC_*` settings, including `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Public settings are compiled into the browser bundle. The runtime file uses one literal `KEY=value` per line, without shell quotes. Include the production Supabase, Auth0, and Stripe settings from the current deployment. Use `APP_BASE_URL=https://www.dow-de.com` and set `ANALYTICS_ADMIN_AUTH0_SUB` to the owner's `user.sub` from `/api/auth/session` while they are signed in.
-3. Apply `supabase/migrations/0055_product_analytics_summary.sql` to the existing VPS database. It adds a service-role-only aggregate over the product events the site already collects.
+3. Apply `supabase/migrations/0055_product_analytics_summary.sql` and `0056_site_analytics_overview.sql` to the VPS database. They add service-role-only aggregates over existing product events.
 4. Build and start the candidate on the VPS from the reviewed source.
 
 ```sh
@@ -38,4 +38,6 @@ On November 18, 2026, OVH DNS returned the records below with a one-hour TTL. Re
 
 The VPS target address is `51.178.86.32`.
 
-The owner can open `/admin` after signing in with the allowlisted account. The page shows UTC page views, browser sessions, and feature usage over 7 or 30 calendar days, using existing event history. Its 30-day default includes the current partial day.
+The owner can open `/admin` after signing in with the allowlisted account. It shows 7 or 30 UTC calendar days, including the current partial day, and compares totals with the preceding period through the same time of day. Browser sessions use the existing tab session IDs. Bounce rate is the share of sessions with one tracked view and zero feature interactions in the selected interval. Acquisition and browser breakdowns use the first tracked view per session in each period.
+
+For countries, download and decompress a current [DB-IP Country Lite MMDB](https://db-ip.com/db/lite.php) onto the VPS. Set `DOW_ANALYTICS_COUNTRY_DB` to its absolute path and add `-f deploy/analytics-country.compose.yaml` after `-f deploy/compose.yaml` when starting the app. Country lookup uses the address supplied by Caddy and stores only the country code in the analytics event. The Country card reports its coverage as new events arrive. Restart the container after updating the database file.

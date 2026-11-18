@@ -8,6 +8,7 @@ import {
   ArrowLeftIcon,
 } from "@/components/icons";
 import { useAccount } from "@/app/_components/AccountProvider";
+import { trackPageView } from "@/lib/analytics/tracking-helpers";
 
 type SocialConnection = "google-oauth2" | "discord";
 
@@ -40,6 +41,10 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const { account, loading } = useAccount();
   const user = account?.user ?? null;
+
+  useEffect(() => {
+    trackPageView({ pageName: "login" });
+  }, []);
 
   const returnTo = useMemo(() => {
     const raw = searchParams?.get("redirectTo");

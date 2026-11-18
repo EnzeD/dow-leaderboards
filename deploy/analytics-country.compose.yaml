@@ -1,0 +1,11 @@
+services:
+  dow-leaderboards:
+    environment:
+      ANALYTICS_COUNTRY_DB: /analytics/dbip-country.mmdb
+    volumes:
+      - type: bind
+        source: ${DOW_ANALYTICS_COUNTRY_DB:?Set DOW_ANALYTICS_COUNTRY_DB to the local DB-IP Country Lite file}
+        target: /analytics/dbip-country.mmdb
+        read_only: true
+        bind:
+          create_host_path: false
