@@ -2,6 +2,7 @@
 
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
+import { readRelicJson } from "./relic-retry.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -144,16 +145,16 @@ function isDuplicateError(error) {
 }
 
 async function fetchRelicJson(url, context) {
-  if (relicRequestCount >= RELIC_REQUEST_CAP) {
-    throw new Error(`Relic request cap (${RELIC_REQUEST_CAP}) reached while fetching ${context}`);
-  }
-  relicRequestCount += 1;
-  const res = await fetch(url, { headers: { "User-Agent": "dow1-de-xp-refresh" } });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "<failed to read body>");
-    throw new Error(`Relic request failed for ${context}: ${res.status} ${res.statusText} -> ${body}`);
-  }
-  const json = await res.json();
+  const json = await readRelicJson(() => {
+    if (relicRequestCount >= RELIC_REQUEST_CAP) {
+      throw new Error(`Relic request cap (${RELIC_REQUEST_CAP}) reached while fetching ${context}`);
+    }
+    relicRequestCount += 1;
+    return fetch(url, {
+      headers: { "User-Agent": "dow1-de-xp-refresh" },
+      signal: AbortSignal.timeout(30_000),
+    });
+  }, context);
   await sleep(RELIC_DELAY_MS);
   return json;
 }
