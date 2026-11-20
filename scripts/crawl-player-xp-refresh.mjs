@@ -32,6 +32,7 @@ const RELIC_REQUEST_CAP = Number.parseInt(process.env.XP_REFRESH_RELIC_REQUEST_C
 const LOG_EVERY = Number.parseInt(process.env.XP_REFRESH_LOG_EVERY ?? "100", 10);
 const MAX_PLAYERS = Number.parseInt(process.env.XP_REFRESH_MAX_PLAYERS ?? "0", 10);
 const MAX_PLAYERS_LIMIT = Number.isFinite(MAX_PLAYERS) && MAX_PLAYERS > 0 ? MAX_PLAYERS : Infinity;
+const REPAIR_PROFILE_ID = process.env.XP_REFRESH_REPAIR_PROFILE_ID?.trim();
 
 let relicRequestCount = 0;
 let totalProcessed = 0;
@@ -310,7 +311,8 @@ function buildMatchPayload(data, sourceAlias) {
 function isRetryableUpsertError(error) {
   if (!error) return false;
   const message = String(error.message ?? "").toLowerCase();
-  return message.includes("deadlock detected") || message.includes("could not serialize access");
+  return message.includes("deadlock detected") || message.includes("could not serialize access") ||
+    (error.code === "57014" && message.includes("statement timeout"));
 }
 
 async function chunkedUpsert(table, rows, options = {}) {
@@ -446,7 +448,19 @@ function getLevelFromXP(xp) {
   return 1;
 }
 
-async function processPlayer(player) {
+async function savePlayerRefresh(playerUpdate, xpIncreased) {
+  try {
+    await chunkedUpsert("players", [playerUpdate], { onConflict: "profile_id" });
+  } catch (error) {
+    totalFailed += 1;
+    console.error(`Failed to upsert player ${playerUpdate.profile_id}: ${error.message}`);
+    return;
+  }
+  totalUpdated += 1;
+  if (xpIncreased) totalXpIncreased += 1;
+}
+
+async function processPlayer(player, forceHistory = false) {
   const playerIdStr = parseBigIntish(player.profile_id);
   if (playerIdStr) knownProfileIds.add(playerIdStr);
 
@@ -487,20 +501,8 @@ async function processPlayer(player) {
   if (country) playerUpdate.country = country;
   if (statGroup?.id) playerUpdate.statgroup_id = safeNumber(statGroup.id);
 
-  const { error: upsertError } = await supabase
-    .from("players")
-    .upsert([playerUpdate], { onConflict: "profile_id", returning: "minimal" });
-
-  if (upsertError) {
-    totalFailed += 1;
-    console.error(`Failed to upsert player ${player.profile_id}:`, upsertError.message);
-    return;
-  }
-
-  totalUpdated += 1;
-  if (xpIncreased) totalXpIncreased += 1;
-
-  if (!xpIncreased) {
+  if (!xpIncreased && !forceHistory) {
+    await savePlayerRefresh(playerUpdate, xpIncreased);
     return;
   }
 
@@ -508,6 +510,7 @@ async function processPlayer(player) {
   try {
     matchData = await fetchMatchHistoryByProfileId(player.profile_id, MATCH_FETCH_COUNT);
   } catch (error) {
+    totalFailed += 1;
     console.warn(`Failed to fetch matches for ${player.profile_id}: ${error.message}`);
     return;
   }
@@ -544,6 +547,8 @@ async function processPlayer(player) {
     totalPlayers += newIds.length;
     newIds.forEach(id => knownProfileIds.add(id));
   }
+  // Advancing XP makes unchanged players skip history on the next run.
+  await savePlayerRefresh(playerUpdate, xpIncreased);
 }
 
 async function fetchPlayersBatch(offset) {
@@ -563,7 +568,27 @@ async function processBatch(players) {
   await runWithConcurrency(players, processPlayer, CONCURRENCY);
 }
 
+async function repairPlayerHistory(profileId) {
+  const { data: player, error } = await supabase
+    .from("players")
+    .select("profile_id,steam_id64,xp,current_alias")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to look up repair profile: ${error.message}`);
+  if (!player?.steam_id64) throw new Error("Repair profile is missing a Steam ID");
+
+  console.log("Repairing recent matches for one profile.");
+  await processPlayer(player, true);
+  totalProcessed = 1;
+  if (totalUpdated !== 1 || totalFailed) throw new Error("Single-profile repair did not complete");
+}
+
 async function main() {
+  if (REPAIR_PROFILE_ID && !/^[1-9]\d{0,18}$/.test(REPAIR_PROFILE_ID)) {
+    throw new Error("Invalid XP_REFRESH_REPAIR_PROFILE_ID");
+  }
+
   console.log("Starting daily XP refresh crawler...");
   console.log(`Batch size: ${BATCH_SIZE}, concurrency: ${CONCURRENCY}, match fetch count: ${MATCH_FETCH_COUNT}`);
   if (Number.isFinite(MAX_PLAYERS_LIMIT)) {
@@ -576,9 +601,12 @@ async function main() {
   startTimeMs = Date.now();
   console.log(`Tracking ${totalPlayers} existing players before crawl.`);
 
-  let offset = 0;
+  if (REPAIR_PROFILE_ID) {
+    await repairPlayerHistory(REPAIR_PROFILE_ID);
+  }
 
-  while (true) {
+  let offset = 0;
+  while (!REPAIR_PROFILE_ID) {
     const batch = await fetchPlayersBatch(offset);
     if (!batch.length) break;
 
